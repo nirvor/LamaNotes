@@ -1,0 +1,48 @@
+{
+  "name": "nirvnotes",
+  "version": "5.5.4",
+  "type": "module",
+  "description": "An HTML-first, flat-folder note system for clean, media-rich, LLM-friendly personal knowledge work.",
+  "main": "client/index.html",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "vite build",
+    "watch": "vite build --watch",
+    "dev": "vite"
+  },
+  "author": "Adam Dullage",
+  "license": "MIT",
+  "dependencies": {
+    "@codemirror/commands": "6.10.4",
+    "@codemirror/lang-markdown": "6.5.0",
+    "@codemirror/language": "6.12.4",
+    "@codemirror/legacy-modes": "6.5.3",
+    "@codemirror/search": "6.7.1",
+    "@codemirror/state": "6.7.1",
+    "@codemirror/view": "6.43.6",
+    "@jamescoyle/vue-icon": "0.1.2",
+    "@lezer/highlight": "1.2.3",
+    "@mdi/js": "7.4.47",
+    "@mdi/light-js": "0.2.63",
+    "@toast-ui/editor": "3.2.2",
+    "@toast-ui/editor-plugin-code-syntax-highlight": "3.1.0",
+    "axios": "1.12.2",
+    "katex": "0.16.22",
+    "mermaid": "11.15.0",
+    "mousetrap": "1.6.5",
+    "pinia": "3.0.3",
+    "primevue": "3.53.1",
+    "vue": "3.5.22",
+    "vue-router": "4.5.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.1",
+    "autoprefixer": "10.4.21",
+    "postcss": "8.5.6",
+    "prettier": "3.6.2",
+    "prettier-plugin-tailwindcss": "0.6.14",
+    "sass-embedded": "1.93.2",
+    "tailwindcss": "3.4.18",
+    "vite": "7.1.9"
+  }
+}

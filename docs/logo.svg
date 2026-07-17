@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="180" viewBox="0 0 640 180" role="img" aria-label="NirvNotes">
+  <rect width="640" height="180" rx="28" fill="#20252B"/>
+  <rect x="38" y="38" width="104" height="104" rx="24" fill="#272D35" stroke="#5F6D83" stroke-width="8"/>
+  <rect x="62" y="62" width="56" height="7" rx="3.5" fill="#F8A66B"/>
+  <text
+    x="90"
+    y="102"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="34"
+    font-weight="700"
+    fill="#F6F9FC"
+  >NN</text>
+  <text
+    x="174"
+    y="86"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="54"
+    font-weight="700"
+    fill="#F6F9FC"
+  >NirvNotes</text>
+  <text
+    x="178"
+    y="124"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="21"
+    font-weight="400"
+    fill="#9EBEFF"
+  >HTML-first, flat-folder notes</text>
+</svg>

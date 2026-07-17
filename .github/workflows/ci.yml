@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Client unit tests
+        run: >-
+          node --test
+          client/documentFind.test.js
+          client/libraryCache.test.js
+          client/localNotePromotion.test.js
+          client/noteSystemTags.test.js
+          client/publicationState.test.js
+
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install pipenv
+      - run: pipenv sync --dev
+      - name: Server unit tests
+        env:
+          PYTHONPATH: server
+        run: pipenv run python -m unittest discover -s server -p "test_*.py"
+      - name: Server lint
+        run: pipenv run flake8 server --ignore=E203,E501,W503
+
+  windows-client:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install -r windows-client/requirements.txt
+      - run: python -m unittest discover -s windows-client -p "test_*.py"

@@ -1,0 +1,4 @@
+pywebview==6.2.1
+pyinstaller==6.21.0
+urllib3==2.7.0
+watchdog==6.0.0
