@@ -31,13 +31,13 @@ The desktop shell and local editor are bundled with the app. VPS notes, search,
 attachments, and media use the live RackNerd endpoint:
 
 ```text
-https://racknerd-31fcf0d.tail38b5b3.ts.net:8092
+https://notes.thuber.org
 ```
 
-On a fresh Win11 Mini-PC or laptop, install and log in to Tailscale for cloud
-notes. The installer performs a small connectivity check but does not fail when
-the machine is offline. Local text and configuration files remain
-available without the VPS.
+The Win11 client uses normal authenticated HTTPS and does not require Tailscale.
+The installer performs a small connectivity check but does not fail when the
+machine is offline. Local text and configuration files remain available without
+the VPS.
 
 ## Command-line install
 

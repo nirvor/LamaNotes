@@ -1,0 +1,7 @@
+services:
+  flatnotes:
+    image: lamanotes:90b405d
+    environment:
+      NIRVNOTES_WINDOWS_UPDATE_DIR: /updates
+    volumes:
+      - ./client-updates:/updates:ro

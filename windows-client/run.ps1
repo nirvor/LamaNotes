@@ -1,5 +1,5 @@
 param(
-  [string]$Url = "https://racknerd-31fcf0d.tail38b5b3.ts.net:8092",
+  [string]$Url = "https://notes.thuber.org",
   [string[]]$Files = @(),
   [switch]$Debug
 )

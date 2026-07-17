@@ -83,7 +83,7 @@ try {
     version = $Version
     commit = $Commit
     builtAt = (Get-Date).ToString("s")
-    defaultServerUrl = "https://racknerd-31fcf0d.tail38b5b3.ts.net:8092"
+    defaultServerUrl = "https://notes.thuber.org"
     installCommand = "Install-NirvNotes.cmd"
   }
   $Manifest | ConvertTo-Json | Set-Content -Path (Join-Path $StageDir "installer-manifest.json") -Encoding UTF8

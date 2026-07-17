@@ -1,6 +1,6 @@
 param(
   [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "Programs\NirvNotes"),
-  [string]$ServerUrl = "https://racknerd-31fcf0d.tail38b5b3.ts.net:8092",
+  [string]$ServerUrl = "https://notes.thuber.org",
   [switch]$NoStartMenuShortcut,
   [switch]$NoDesktopShortcut,
   [switch]$NoFileAssociations,
@@ -187,38 +187,21 @@ function Register-AppPath([string]$ExePath, [string]$TargetDir) {
 
 function Test-Connectivity {
   if ($SkipConnectivityCheck) {
-    Write-Warn "Skipped Tailscale/VPS connectivity check."
+    Write-Warn "Skipped cloud connectivity check."
     return
   }
 
   Write-Step "Connectivity check"
-  $Tailscale = Get-Command "tailscale.exe" -ErrorAction SilentlyContinue
-  if ($Tailscale) {
-    try {
-      $StatusJson = & $Tailscale.Source status --json 2>$null
-      $Status = $StatusJson | ConvertFrom-Json
-      if ($Status.Self.Online) {
-        Write-Ok "Tailscale is online."
-      } else {
-        Write-Warn "Tailscale exists but does not look online. NirvNotes may need Tailscale login."
-      }
-    } catch {
-      Write-Warn "Could not read Tailscale status. NirvNotes can still be installed."
-    }
-  } else {
-    Write-Warn "tailscale.exe not found. Install/login to Tailscale on this PC if the RackNerd URL is not reachable."
-  }
-
   $HealthUrl = $ServerUrl.TrimEnd("/") + "/health"
   try {
-    $Health = & curl.exe -k -s -S --max-time 8 $HealthUrl 2>$null
+    $Health = & curl.exe -s -S --max-time 8 $HealthUrl 2>$null
     if ($LASTEXITCODE -eq 0 -and $Health -match "OK") {
-      Write-Ok "RackNerd NirvNotes endpoint reachable."
+      Write-Ok "NirvNotes cloud endpoint reachable over HTTPS."
     } else {
-      Write-Warn "RackNerd endpoint did not return OK from $HealthUrl."
+      Write-Warn "Cloud endpoint did not return OK from $HealthUrl."
     }
   } catch {
-    Write-Warn "Could not reach $HealthUrl. Install continues; check Tailscale/network before first login."
+    Write-Warn "Could not reach $HealthUrl. Install continues; check the network before first login."
   }
 }
 

@@ -1,0 +1,39 @@
+services:
+  flatnotes:
+    image: lamanotes:90b405d
+    container_name: flatnotes
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data
+    expose:
+      - "8080"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: flatnotes-caddy
+    depends_on:
+      - flatnotes
+    ports:
+      - "192.3.199.119:80:80"
+      - "192.3.199.119:443:443"
+      - "192.3.199.119:443:443/udp"
+      - "100.87.228.64:8092:8092"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /data/certs:/tailnet-certs:ro
+      - ./data:/srv/flatnotes/data:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  caddy_data:
+  caddy_config:

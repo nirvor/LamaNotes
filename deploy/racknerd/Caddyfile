@@ -1,0 +1,24 @@
+(lamanotes_app) {
+	encode zstd gzip
+
+	@note_assets path /note-assets/*.png /note-assets/*.jpg /note-assets/*.jpeg /note-assets/*.gif /note-assets/*.webp /note-assets/*.svg
+	handle @note_assets {
+		uri strip_prefix /note-assets
+		root * /srv/flatnotes/data
+		file_server
+	}
+
+	handle {
+		reverse_proxy flatnotes:8080
+	}
+}
+
+notes.thuber.org {
+	header Strict-Transport-Security "max-age=31536000"
+	import lamanotes_app
+}
+
+https://racknerd-31fcf0d.tail38b5b3.ts.net:8092 {
+	tls /tailnet-certs/racknerd-31fcf0d.tail38b5b3.ts.net.crt /tailnet-certs/racknerd-31fcf0d.tail38b5b3.ts.net.key
+	import lamanotes_app
+}
