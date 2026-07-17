@@ -11,6 +11,7 @@ from urllib import error, request
 
 from nirvnotes_client import (
     ALLOWED_EXTENSIONS,
+    CredentialStore,
     NativeFileStore,
     NirvNotesApi,
     start_local_proxy,
@@ -38,6 +39,32 @@ class NirvNotesApiTests(unittest.TestCase):
             )
         finally:
             store.close()
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows DPAPI only")
+    def test_auth_token_is_user_bound_and_source_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            credential_path = Path(directory) / "credential.bin"
+            store = CredentialStore(
+                "https://notes.example",
+                path=credential_path,
+            )
+
+            self.assertTrue(store.set_token("secret-session-token"))
+            self.assertEqual(store.get_token(), "secret-session-token")
+            self.assertNotIn(
+                b"secret-session-token",
+                credential_path.read_bytes(),
+            )
+            self.assertEqual(
+                CredentialStore(
+                    "https://other.example",
+                    path=credential_path,
+                ).get_token(),
+                "",
+            )
+
+            store.clear()
+            self.assertFalse(credential_path.exists())
 
     def test_external_url_rejects_non_https(self) -> None:
         store = NativeFileStore()

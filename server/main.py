@@ -9,6 +9,7 @@ from fastapi import (
     FastAPI,
     HTTPException,
     Request,
+    Response,
     UploadFile,
 )
 from fastapi.encoders import jsonable_encoder
@@ -20,6 +21,13 @@ from attachments.base import BaseAttachments
 from attachments.models import AttachmentCreateResponse
 from auth.base import BaseAuth
 from auth.models import Login, Token
+from auth.rate_limit import LoginRateLimiter
+from auth.scopes import (
+    ATTACHMENTS_WRITE,
+    NOTES_READ,
+    NOTES_WRITE,
+    PUBLICATIONS_WRITE,
+)
 from global_config import AuthType, GlobalConfig, GlobalConfigResponseModel
 from helpers import replace_base_href
 from notes.base import BaseNotes
@@ -46,7 +54,20 @@ publication_service = PublicationService(
     public_base_url=global_config.public_base_url,
     timeout_seconds=global_config.publish_timeout_seconds,
 )
-auth_deps = [Depends(auth.authenticate)] if auth else []
+
+
+def auth_dependencies(scope: str):
+    return [Depends(auth.require(scope))] if auth else []
+
+
+read_auth_deps = auth_dependencies(NOTES_READ)
+write_auth_deps = auth_dependencies(NOTES_WRITE)
+attachment_write_auth_deps = auth_dependencies(ATTACHMENTS_WRITE)
+publication_write_auth_deps = auth_dependencies(PUBLICATIONS_WRITE)
+login_rate_limiter = LoginRateLimiter(
+    attempts=global_config.login_rate_limit_attempts,
+    window_seconds=global_config.login_rate_limit_window_seconds,
+)
 router = APIRouter()
 app = FastAPI(
     docs_url=global_config.path_prefix + "/docs",
@@ -83,6 +104,19 @@ async def add_static_cache_headers(request: Request, call_next):
         response.headers.setdefault(
             "Cache-Control",
             "public, max-age=2592000",
+        )
+
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault(
+        "Permissions-Policy",
+        "camera=(), microphone=(), geolocation=()",
+    )
+    if request.url.scheme == "https":
+        response.headers.setdefault(
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains",
         )
 
     return response
@@ -163,16 +197,52 @@ def download_windows_client_update():
 if global_config.auth_type not in [AuthType.NONE, AuthType.READ_ONLY]:
 
     @router.post("/api/token", response_model=Token)
-    def token(data: Login):
+    def token(data: Login, request: Request, response: Response):
+        client_key = request.client.host if request.client else "unknown"
+        retry_after = login_rate_limiter.retry_after(client_key)
+        if retry_after:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many login attempts. Please wait and try again.",
+                headers={"Retry-After": str(retry_after)},
+            )
         try:
-            return auth.login(data)
+            result = auth.login(data)
         except ValueError:
+            login_rate_limiter.record_failure(client_key)
             raise HTTPException(
                 status_code=401, detail=api_messages.login_failed
             )
+        login_rate_limiter.record_success(client_key)
+        response.set_cookie(
+            key=global_config.session_cookie_name,
+            value=result.access_token,
+            max_age=result.expires_in if data.remember_me else None,
+            path=global_config.path_prefix or "/",
+            secure=global_config.session_cookie_secure,
+            httponly=True,
+            samesite="strict",
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return result
+
+    @router.post("/api/logout", status_code=204)
+    def logout(response: Response):
+        response.delete_cookie(
+            key=global_config.session_cookie_name,
+            path=global_config.path_prefix or "/",
+            secure=global_config.session_cookie_secure,
+            httponly=True,
+            samesite="strict",
+        )
+        response.delete_cookie(
+            key="token",
+            path=global_config.path_prefix or "/",
+        )
+        response.headers["Cache-Control"] = "no-store"
 
 
-@router.get("/api/auth-check", dependencies=auth_deps)
+@router.get("/api/auth-check", dependencies=read_auth_deps)
 def auth_check() -> str:
     """A lightweight endpoint that simply returns 'OK' if the user is
     authenticated."""
@@ -186,7 +256,7 @@ def auth_check() -> str:
 # Get Note
 @router.get(
     "/api/notes/{title}",
-    dependencies=auth_deps,
+    dependencies=read_auth_deps,
     response_model=Note,
 )
 def get_note(title: str):
@@ -203,7 +273,7 @@ def get_note(title: str):
 
 @router.get(
     "/api/notes/{title}/context",
-    dependencies=auth_deps,
+    dependencies=read_auth_deps,
     response_model=NoteContext,
 )
 def get_note_context(title: str):
@@ -220,7 +290,7 @@ def get_note_context(title: str):
 
 @router.get(
     "/api/notes/{title}/publication",
-    dependencies=auth_deps,
+    dependencies=read_auth_deps,
     response_model=PublicationStateResponse,
 )
 def get_note_publication(title: str):
@@ -238,7 +308,7 @@ if global_config.auth_type != AuthType.READ_ONLY:
     # Create Note
     @router.post(
         "/api/notes",
-        dependencies=auth_deps,
+        dependencies=write_auth_deps,
         response_model=Note,
     )
     def post_note(note: NoteCreate):
@@ -258,7 +328,7 @@ if global_config.auth_type != AuthType.READ_ONLY:
     # Update Note
     @router.patch(
         "/api/notes/{title}",
-        dependencies=auth_deps,
+        dependencies=write_auth_deps,
         response_model=Note,
     )
     def patch_note(title: str, data: NoteUpdate):
@@ -278,7 +348,7 @@ if global_config.auth_type != AuthType.READ_ONLY:
 
     @router.post(
         "/api/notes/{title}/publication",
-        dependencies=auth_deps,
+        dependencies=publication_write_auth_deps,
         response_model=PublicationStateResponse,
         status_code=202,
     )
@@ -309,7 +379,7 @@ if global_config.auth_type != AuthType.READ_ONLY:
     # Delete Note
     @router.delete(
         "/api/notes/{title}",
-        dependencies=auth_deps,
+        dependencies=write_auth_deps,
         response_model=None,
     )
     def delete_note(title: str):
@@ -330,7 +400,7 @@ if global_config.auth_type != AuthType.READ_ONLY:
 # region Search
 @router.get(
     "/api/search",
-    dependencies=auth_deps,
+    dependencies=read_auth_deps,
     response_model=List[SearchResult],
 )
 def search(
@@ -347,7 +417,7 @@ def search(
 
 @router.get(
     "/api/tags",
-    dependencies=auth_deps,
+    dependencies=read_auth_deps,
     response_model=List[str],
 )
 def get_tags():
@@ -357,7 +427,7 @@ def get_tags():
 
 @router.get(
     "/api/index",
-    dependencies=auth_deps,
+    dependencies=read_auth_deps,
     response_model=List[NoteIndexEntry],
 )
 def get_semantic_index():
@@ -389,13 +459,13 @@ def get_config():
 # Get Attachment
 @router.get(
     "/api/attachments/{filename}",
-    dependencies=auth_deps,
+    dependencies=read_auth_deps,
 )
 # Include a secondary route used to create relative URLs that can be used
 # outside the context of flatnotes (e.g. "/attachments/image.jpg").
 @router.get(
     "/attachments/{filename}",
-    dependencies=auth_deps,
+    dependencies=read_auth_deps,
     include_in_schema=False,
 )
 def get_attachment(filename: str):
@@ -418,7 +488,7 @@ if global_config.auth_type != AuthType.READ_ONLY:
     # Create Attachment
     @router.post(
         "/api/attachments",
-        dependencies=auth_deps,
+        dependencies=attachment_write_auth_deps,
         response_model=AttachmentCreateResponse,
     )
     def post_attachment(file: UploadFile):

@@ -1,20 +1,35 @@
 const tokenStorageKey = "token";
+const persistentSessionKey = "lamanotes:persistent-session";
 
-function getBasePath() {
-  // This relies on the fact that flanotes always has a correctly formatted relative path set in <base> tag
-  return document.querySelector('base').getAttribute('href')
+function isDesktopShell() {
+  return Boolean(window.__NIRVNOTES_DESKTOP_SHELL__);
 }
 
-function getCookieString(token) {
-  const basePath = getBasePath();
-  return `${tokenStorageKey}=${token}; Path=${basePath}; SameSite=Strict`;
+function persistNativeToken(token, persist) {
+  const api = window.pywebview?.api;
+  if (!api) {
+    return;
+  }
+  if (persist && api.store_auth_token) {
+    void api.store_auth_token(token).catch(() => {});
+  } else if (api.clear_auth_token) {
+    void api.clear_auth_token().catch(() => {});
+  }
 }
 
 export function storeToken(token, persist = false) {
-  document.cookie = getCookieString(token);
-  sessionStorage.setItem(tokenStorageKey, token);
-  if (persist === true) {
-    localStorage.setItem(tokenStorageKey, token);
+  if (isDesktopShell()) {
+    sessionStorage.setItem(tokenStorageKey, token);
+    persistNativeToken(token, persist);
+  } else {
+    sessionStorage.removeItem(tokenStorageKey);
+  }
+
+  localStorage.removeItem(tokenStorageKey);
+  if (persist) {
+    localStorage.setItem(persistentSessionKey, "1");
+  } else {
+    localStorage.removeItem(persistentSessionKey);
   }
 }
 
@@ -23,24 +38,22 @@ export function getStoredToken() {
 }
 
 export function loadStoredToken() {
-  const token = localStorage.getItem(tokenStorageKey);
-  if (token != null) {
-    storeToken(token, false);
+  const legacyToken = localStorage.getItem(tokenStorageKey);
+  if (legacyToken && isDesktopShell()) {
+    sessionStorage.setItem(tokenStorageKey, legacyToken);
+    persistNativeToken(legacyToken, true);
+    localStorage.setItem(persistentSessionKey, "1");
   }
+  localStorage.removeItem(tokenStorageKey);
 }
 
 export function clearStoredToken() {
   sessionStorage.removeItem(tokenStorageKey);
   localStorage.removeItem(tokenStorageKey);
-  document.cookie =
-    getCookieString() + "; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  localStorage.removeItem(persistentSessionKey);
+  persistNativeToken("", false);
 }
 
 export function isCurrentTokenStored() {
-  const localToken = localStorage.getItem(tokenStorageKey);
-  if (localToken == null) {
-    return false;
-  }
-  const sessionToken = sessionStorage.getItem(tokenStorageKey);
-  return localToken === sessionToken;
+  return localStorage.getItem(persistentSessionKey) === "1";
 }

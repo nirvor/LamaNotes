@@ -51,6 +51,7 @@ import { apiErrorHandler, getToken } from "../api.js";
 import CustomButton from "../components/CustomButton.vue";
 import TextInput from "../components/TextInput.vue";
 import { authTypes } from "../constants.js";
+import { desktopShell } from "../desktopShell.js";
 import { useGlobalStore } from "../globalStore.js";
 import { getToastOptions } from "../helpers.js";
 import { storeToken } from "../tokenStorage.js";
@@ -64,10 +65,10 @@ const toast = useToast();
 const username = ref("");
 const password = ref("");
 const totp = ref("");
-const rememberMe = ref(false);
+const rememberMe = ref(desktopShell.enabled);
 
 function logIn() {
-  getToken(username.value, password.value, totp.value)
+  getToken(username.value, password.value, totp.value, rememberMe.value)
     .then((access_token) => {
       storeToken(access_token, rememberMe.value);
       if (props.redirect) {

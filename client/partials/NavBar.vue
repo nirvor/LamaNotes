@@ -88,7 +88,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useToast } from "primevue/usetoast";
 import { RouterLink, useRouter } from "vue-router";
 
-import { clearApiCaches } from "../api.js";
+import { clearApiCaches, logOutSession } from "../api.js";
 import CustomButton from "../components/CustomButton.vue";
 import PrimeMenu from "../components/PrimeMenu.vue";
 import { authTypes, params, searchSortOptions } from "../constants.js";
@@ -232,7 +232,8 @@ const showNoteSwitcherButton = computed(() => {
   return globalStore.config.authType != null;
 });
 
-function logOut() {
+async function logOut() {
+  await logOutSession().catch(() => {});
   clearApiCaches();
   clearStoredToken();
   localStorage.clear();

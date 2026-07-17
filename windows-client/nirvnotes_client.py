@@ -44,6 +44,8 @@ UPDATE_STATUS_TTL_SECONDS = 10 * 60
 UPDATE_MANIFEST_PATH = "/api/windows-client-update"
 CLIENT_METADATA_FILE = "client-version.json"
 UPDATE_SCRIPT_FILE = "apply-update.ps1"
+CREDENTIAL_FILE = "auth-token.bin"
+CREDENTIAL_ENTROPY = b"NirvNotes desktop credential v1"
 ALLOWED_EXTENSIONS = {
     ".md",
     ".txt",
@@ -92,6 +94,118 @@ DESKTOP_SHELL_MARKER = """
   window.__NIRVNOTES_DESKTOP_SHELL__ = true;
 </script>
 """.strip()
+
+
+class DataBlob(ctypes.Structure):
+    _fields_ = [
+        ("size", ctypes.c_ulong),
+        ("data", ctypes.POINTER(ctypes.c_ubyte)),
+    ]
+
+
+def data_blob(payload: bytes) -> tuple[DataBlob, Any]:
+    buffer = ctypes.create_string_buffer(payload)
+    blob = DataBlob(
+        len(payload),
+        ctypes.cast(buffer, ctypes.POINTER(ctypes.c_ubyte)),
+    )
+    return blob, buffer
+
+
+def dpapi_protect(payload: bytes) -> bytes:
+    if sys.platform != "win32":
+        raise OSError("Windows DPAPI is unavailable.")
+    source, source_buffer = data_blob(payload)
+    entropy, entropy_buffer = data_blob(CREDENTIAL_ENTROPY)
+    protected = DataBlob()
+    result = ctypes.windll.crypt32.CryptProtectData(
+        ctypes.byref(source),
+        APP_NAME,
+        ctypes.byref(entropy),
+        None,
+        None,
+        0x1,
+        ctypes.byref(protected),
+    )
+    del source_buffer, entropy_buffer
+    if not result:
+        raise ctypes.WinError()
+    try:
+        return ctypes.string_at(protected.data, protected.size)
+    finally:
+        ctypes.windll.kernel32.LocalFree(protected.data)
+
+
+def dpapi_unprotect(payload: bytes) -> bytes:
+    if sys.platform != "win32":
+        raise OSError("Windows DPAPI is unavailable.")
+    source, source_buffer = data_blob(payload)
+    entropy, entropy_buffer = data_blob(CREDENTIAL_ENTROPY)
+    clear = DataBlob()
+    result = ctypes.windll.crypt32.CryptUnprotectData(
+        ctypes.byref(source),
+        None,
+        ctypes.byref(entropy),
+        None,
+        None,
+        0x1,
+        ctypes.byref(clear),
+    )
+    del source_buffer, entropy_buffer
+    if not result:
+        raise ctypes.WinError()
+    try:
+        return ctypes.string_at(clear.data, clear.size)
+    finally:
+        ctypes.windll.kernel32.LocalFree(clear.data)
+
+
+class CredentialStore:
+    def __init__(self, source_url: str, path: Path | None = None) -> None:
+        self.source_url = source_url.rstrip("/")
+        self.path = path or (local_app_root() / CREDENTIAL_FILE)
+        self._lock = threading.RLock()
+
+    def get_token(self) -> str:
+        if sys.platform != "win32":
+            return ""
+        with self._lock:
+            try:
+                payload = json.loads(
+                    dpapi_unprotect(self.path.read_bytes()).decode("utf-8")
+                )
+            except (OSError, ValueError, json.JSONDecodeError, UnicodeError):
+                return ""
+        if (
+            not isinstance(payload, dict)
+            or payload.get("sourceUrl") != self.source_url
+        ):
+            return ""
+        return str(payload.get("token", ""))
+
+    def set_token(self, token: str) -> bool:
+        if sys.platform != "win32" or not token:
+            return False
+        payload = json.dumps(
+            {"sourceUrl": self.source_url, "token": token},
+            separators=(",", ":"),
+        ).encode("utf-8")
+        protected = dpapi_protect(payload)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.path.with_suffix(f".{os.getpid()}.tmp")
+        with self._lock:
+            try:
+                temporary.write_bytes(protected)
+                os.replace(temporary, self.path)
+            finally:
+                with contextlib.suppress(OSError):
+                    temporary.unlink()
+        return True
+
+    def clear(self) -> None:
+        with self._lock:
+            with contextlib.suppress(OSError):
+                self.path.unlink()
 
 
 class NativeFileStore:
@@ -293,15 +407,31 @@ class NirvNotesApi:
         launch_paths: list[str],
         update_base_url: str,
         source_url: str,
+        credential_store: CredentialStore | None = None,
     ) -> None:
         self._file_store = file_store
         self._pending_launch_files = file_store.payloads_for_paths(launch_paths)
         self._window: webview.Window | None = None
         self._update_base_url = update_base_url.rstrip("/")
         self._source_url = source_url.rstrip("/")
+        self._credential_store = credential_store
         self._update_status: dict[str, Any] | None = None
         self._update_checked_at = 0.0
         self._update_lock = threading.Lock()
+
+    def store_auth_token(self, token: str) -> dict[str, Any]:
+        if not self._credential_store:
+            return {"stored": False}
+        try:
+            return {"stored": self._credential_store.set_token(str(token))}
+        except OSError:
+            logging.exception("could not store desktop authentication token")
+            return {"stored": False}
+
+    def clear_auth_token(self) -> dict[str, Any]:
+        if self._credential_store:
+            self._credential_store.clear()
+        return {"cleared": True}
 
     def consume_launch_files(self) -> list[dict[str, Any]]:
         payloads = self._pending_launch_files
@@ -1025,9 +1155,11 @@ class LocalProxyServer(ThreadingHTTPServer):
         server_address: tuple[str, int],
         upstream_base_url: str,
         static_root: Path | None = None,
+        credential_store: CredentialStore | None = None,
     ) -> None:
         self.upstream_base_url = upstream_base_url.rstrip("/")
         self.static_root = static_root.resolve() if static_root else None
+        self.credential_store = credential_store
         self._upstream_state_lock = threading.Lock()
         self._upstream_offline_until = 0.0
         self.upstream_pool = urllib3.PoolManager(
@@ -1158,6 +1290,11 @@ class LocalProxyHandler(BaseHTTPRequestHandler):
             for key, value in self.headers.items()
             if key.lower() not in HOP_BY_HOP_HEADERS
         }
+        if not any(key.lower() == "authorization" for key in headers):
+            credential_store = self.server.credential_store  # type: ignore[attr-defined]
+            token = credential_store.get_token() if credential_store else ""
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
 
         response = None
         try:
@@ -1170,6 +1307,12 @@ class LocalProxyHandler(BaseHTTPRequestHandler):
                 decode_content=False,
                 redirect=False,
             )
+            if (
+                response.status == 401
+                and parse.urlsplit(self.path).path == "/api/auth-check"
+                and self.server.credential_store  # type: ignore[attr-defined]
+            ):
+                self.server.credential_store.clear()  # type: ignore[attr-defined]
             self.server.mark_upstream_online()  # type: ignore[attr-defined]
             self._send_upstream_response(response.status, response.headers, response)
         except Exception as exc:
@@ -1259,6 +1402,7 @@ def start_local_proxy(
     upstream_base_url: str,
     preferred_port: int = DEFAULT_PROXY_PORT,
     static_root: Path | None = None,
+    credential_store: CredentialStore | None = None,
 ) -> tuple[str, LocalProxyServer]:
     port = preferred_port if preferred_port > 0 else 0
     try:
@@ -1266,6 +1410,7 @@ def start_local_proxy(
             ("127.0.0.1", port),
             upstream_base_url,
             static_root=static_root,
+            credential_store=credential_store,
         )
     except OSError:
         if preferred_port <= 0:
@@ -1274,6 +1419,7 @@ def start_local_proxy(
             ("127.0.0.1", 0),
             upstream_base_url,
             static_root=static_root,
+            credential_store=credential_store,
         )
     port = int(server.server_address[1])
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -1722,6 +1868,7 @@ def main() -> None:
 
     file_store = NativeFileStore()
     base_url = args.url.rstrip("/") or DEFAULT_URL
+    credential_store = CredentialStore(base_url)
     proxy_server: LocalProxyServer | None = None
     handoff_server: HandoffServer | None = None
     instance_registration_stop: threading.Event | None = None
@@ -1732,9 +1879,16 @@ def main() -> None:
             base_url,
             args.proxy_port,
             static_root=shell_root,
+            credential_store=credential_store,
         )
 
-    api = NirvNotesApi(file_store, args.files, browser_base_url, base_url)
+    api = NirvNotesApi(
+        file_store,
+        args.files,
+        browser_base_url,
+        base_url,
+        credential_store=credential_store,
+    )
     start_url = build_url(browser_base_url, args.files, args.route)
     logging.info("start url prepared %s", start_url)
     window_ref: dict[str, webview.Window] = {}

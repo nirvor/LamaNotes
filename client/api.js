@@ -158,15 +158,26 @@ function fetchConfig() {
   return configRequest;
 }
 
-export async function getToken(username, password, totp) {
+export async function getToken(username, password, totp, rememberMe = false) {
   try {
     const response = await api.post("api/token", {
       username: username,
       password: totp ? password + totp : password,
+      rememberMe: rememberMe,
     });
     return response.data.access_token;
   } catch (response) {
     return Promise.reject(response);
+  }
+}
+
+export async function logOutSession() {
+  try {
+    await api.post("api/logout");
+  } catch (error) {
+    if (error?.response?.status !== 401) {
+      return Promise.reject(error);
+    }
   }
 }
 

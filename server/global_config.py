@@ -16,6 +16,53 @@ class GlobalConfig:
         self.quick_access_limit: int = self._quick_access_limit()
         self.path_prefix: str = self._load_path_prefix()
         self.windows_update_dir: str = self._load_windows_update_dir()
+        legacy_session_days = get_env(
+            "FLATNOTES_SESSION_EXPIRY_DAYS",
+            mandatory=False,
+            default=30,
+            cast_int=True,
+        )
+        self.session_expiry_hours: int = get_env(
+            "NIRVNOTES_SESSION_EXPIRY_HOURS",
+            mandatory=False,
+            default=12,
+            cast_int=True,
+        )
+        self.remember_expiry_days: int = get_env(
+            "NIRVNOTES_REMEMBER_EXPIRY_DAYS",
+            mandatory=False,
+            default=legacy_session_days,
+            cast_int=True,
+        )
+        self.session_cookie_name: str = get_env(
+            "NIRVNOTES_SESSION_COOKIE_NAME",
+            mandatory=False,
+            default="lamanotes_session",
+        )
+        self.session_cookie_secure: bool = get_env(
+            "NIRVNOTES_SESSION_COOKIE_SECURE",
+            mandatory=False,
+            default=True,
+            cast_bool=True,
+        )
+        self.accept_legacy_tokens: bool = get_env(
+            "NIRVNOTES_ACCEPT_LEGACY_TOKENS",
+            mandatory=False,
+            default=False,
+            cast_bool=True,
+        )
+        self.login_rate_limit_attempts: int = get_env(
+            "NIRVNOTES_LOGIN_RATE_LIMIT_ATTEMPTS",
+            mandatory=False,
+            default=8,
+            cast_int=True,
+        )
+        self.login_rate_limit_window_seconds: int = get_env(
+            "NIRVNOTES_LOGIN_RATE_LIMIT_WINDOW_SECONDS",
+            mandatory=False,
+            default=300,
+            cast_int=True,
+        )
         self.publish_base_url: str = get_env(
             "NIRVNOTES_PUBLISH_BASE_URL", mandatory=False, default=""
         )
@@ -40,7 +87,7 @@ class GlobalConfig:
         elif self.auth_type in (AuthType.PASSWORD, AuthType.TOTP):
             from auth.local import LocalAuth
 
-            return LocalAuth()
+            return LocalAuth(self)
 
     def load_note_storage(self):
         from notes.file_system import FileSystemNotes
@@ -54,9 +101,7 @@ class GlobalConfig:
 
     def _load_auth_type(self):
         key = "FLATNOTES_AUTH_TYPE"
-        auth_type = get_env(
-            key, mandatory=False, default=AuthType.PASSWORD.value
-        )
+        auth_type = get_env(key, mandatory=False, default=AuthType.PASSWORD.value)
         try:
             auth_type = AuthType(auth_type.lower())
         except ValueError:
