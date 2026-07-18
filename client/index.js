@@ -211,7 +211,7 @@ async function initializeNativeHost() {
 }
 
 function scheduleNativeHostInitialization() {
-  window.setTimeout(initializeNativeHost, 250);
+  window.queueMicrotask(initializeNativeHost);
 }
 
 window.addEventListener("pywebviewready", scheduleNativeHostInitialization, {

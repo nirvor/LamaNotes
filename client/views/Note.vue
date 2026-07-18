@@ -304,6 +304,7 @@ const noteLayoutKind = computed(() => {
   return "markdown";
 });
 let contentChangedTimeout = null;
+let noteLoadStartedAt = performance.now();
 const contentEditor = ref();
 const editorKey = ref(0);
 const editorFormat = ref("html");
@@ -401,6 +402,7 @@ function init() {
   }
 
   resetPublicationState();
+  noteLoadStartedAt = performance.now();
   loadingIndicator.value.setLoading();
   if (props.title) {
     getNote(props.title)
@@ -478,6 +480,7 @@ function markNoteReady() {
           phase: "note",
           route: router.currentRoute.value.fullPath,
           browserMs: Math.round(performance.now()),
+          routeMs: Math.round(performance.now() - noteLoadStartedAt),
         }),
       ).catch(() => {});
     });

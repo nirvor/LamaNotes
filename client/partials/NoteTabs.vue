@@ -84,6 +84,8 @@
               :to="{ name: 'note', params: { title } }"
               class="flatnotes-note-drawer-link"
               :title="title"
+              @focus="warmNote(title)"
+              @pointerenter="warmNote(title)"
               @click="closeDrawer"
             >
               {{ title }}
@@ -117,6 +119,8 @@
             :to="{ name: 'note', params: { title } }"
             class="flatnotes-note-drawer-recent-link"
             :title="title"
+            @focus="warmNote(title)"
+            @pointerenter="warmNote(title)"
             @click="closeDrawer"
           >
             {{ title }}
@@ -145,6 +149,7 @@ import {
   getSemanticIndex,
   libraryIndexUpdatedEvent,
   libraryNoteDeletedEvent,
+  prefetchNote,
 } from "../api.js";
 import { params, searchSortOptions } from "../constants.js";
 
@@ -166,6 +171,7 @@ let serverRecentRequest = null;
 const drawerVisible = ref(false);
 let edgeGesture = null;
 let drawerGesture = null;
+const prefetchingTitles = new Set();
 
 const activeTitle = computed(() =>
   route.name === "note" && route.params.title ? String(route.params.title) : "",
@@ -268,10 +274,47 @@ function toggleDrawer() {
 function openDrawer() {
   drawerVisible.value = true;
   loadServerRecentTitles();
+  scheduleLikelyNotePrefetch();
 }
 
 function closeDrawer() {
   drawerVisible.value = false;
+}
+
+function warmNote(title) {
+  const normalizedTitle = String(title || "").trim();
+  if (
+    !normalizedTitle ||
+    normalizedTitle === activeTitle.value ||
+    prefetchingTitles.has(normalizedTitle)
+  ) {
+    return;
+  }
+
+  prefetchingTitles.add(normalizedTitle);
+  void prefetchNote(normalizedTitle)
+    .catch(() => {})
+    .finally(() => {
+      prefetchingTitles.delete(normalizedTitle);
+    });
+}
+
+function scheduleLikelyNotePrefetch() {
+  if (route.name === "openFile") {
+    return;
+  }
+  const titles = uniqueTitles([...openTabs.value, ...recentTitles.value])
+    .filter((title) => title !== activeTitle.value)
+    .slice(0, 2);
+  if (!titles.length) {
+    return;
+  }
+  const load = () => titles.forEach(warmNote);
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(load, { timeout: 1800 });
+  } else {
+    window.setTimeout(load, 700);
+  }
 }
 
 function loadServerRecentTitles() {
@@ -455,6 +498,7 @@ onMounted(() => {
   );
   window.addEventListener(libraryNoteDeletedEvent, libraryNoteDeletedHandler);
   applySemanticIndex(getCachedSemanticIndex());
+  scheduleLikelyNotePrefetch();
 });
 
 onBeforeUnmount(() => {

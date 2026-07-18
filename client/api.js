@@ -249,6 +249,14 @@ export async function getNote(title) {
   return fetchNote(cacheKey);
 }
 
+export function prefetchNote(title) {
+  const cacheKey = String(title || "").trim();
+  if (!cacheKey) {
+    return Promise.resolve();
+  }
+  return getNote(cacheKey).then(() => undefined);
+}
+
 export async function getNoteContext(title) {
   try {
     const response = await api.get(

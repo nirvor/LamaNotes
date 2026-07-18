@@ -25,7 +25,11 @@
         :key="result.title"
         class="mb-4 cursor-pointer rounded px-2 py-1 hover:bg-theme-background-elevated"
       >
-        <RouterLink :to="{ name: 'note', params: { title: result.title } }">
+        <RouterLink
+          :to="{ name: 'note', params: { title: result.title } }"
+          @focus="warmNote(result.title)"
+          @pointerenter="warmNote(result.title)"
+        >
           <!-- Title and Tags -->
           <div>
             <span v-html="result.titleHighlightsOrTitle" class="mr-2"></span>
@@ -67,7 +71,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import { mdiPlusCircle, mdiSort } from "@mdi/js";
-import { apiErrorHandler, getNotes } from "../api.js";
+import { apiErrorHandler, getNotes, prefetchNote } from "../api.js";
 import CustomButton from "../components/CustomButton.vue";
 import LoadingIndicator from "../components/LoadingIndicator.vue";
 import PrimeMenu from "../components/PrimeMenu.vue";
@@ -168,6 +172,10 @@ const menuItems = [
 
 function toggleSortMenu(event) {
   sortMenu.value.toggle(event);
+}
+
+function warmNote(title) {
+  void prefetchNote(title).catch(() => {});
 }
 
 watch(() => props.searchTerm, init);

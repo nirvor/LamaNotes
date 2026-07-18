@@ -34,7 +34,7 @@ function cachedRenderableHtml(value) {
     return cached;
   }
 
-  const rendered = sanitizeHtml(extractRenderableHtml(value));
+  const rendered = renderSafeHtml(value);
   renderedHtmlCache.set(value, rendered);
   if (renderedHtmlCache.size > renderedHtmlCacheLimit) {
     renderedHtmlCache.delete(renderedHtmlCache.keys().next().value);
@@ -50,27 +50,15 @@ function loadRenderEnhancements() {
   return renderEnhancementsPromise;
 }
 
-function isFullHtmlDocument(value) {
-  return /<(?:!doctype|html|head|body)\b/i.test(value);
-}
-
-function extractRenderableHtml(value) {
-  if (!isFullHtmlDocument(value)) {
-    return value;
-  }
-
+function renderSafeHtml(value) {
   const documentValue = new DOMParser().parseFromString(value, "text/html");
-  return documentValue.body?.innerHTML || value;
-}
+  const body = documentValue.body;
 
-function sanitizeHtml(value) {
-  const documentValue = new DOMParser().parseFromString(value, "text/html");
-
-  documentValue
+  body
     .querySelectorAll("script, iframe[src^='javascript:']")
     .forEach((element) => element.remove());
 
-  documentValue.querySelectorAll("*").forEach((element) => {
+  body.querySelectorAll("*").forEach((element) => {
     [...element.attributes].forEach((attribute) => {
       const name = attribute.name.toLowerCase();
       const rawValue = attribute.value.trim().toLowerCase();
@@ -88,7 +76,7 @@ function sanitizeHtml(value) {
     });
   });
 
-  return documentValue.body.innerHTML;
+  return body.innerHTML;
 }
 
 function getTaskListOptions() {

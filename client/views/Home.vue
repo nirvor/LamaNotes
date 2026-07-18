@@ -18,6 +18,8 @@
             :to="{ name: 'note', params: { title: note.title } }"
             class="flatnotes-home-pinned-link"
             :title="note.title"
+            @focus="warmNote(note.title)"
+            @pointerenter="warmNote(note.title)"
           >
             <span>{{ note.title }}</span>
           </RouterLink>
@@ -53,6 +55,7 @@ import {
   apiErrorHandler,
   getSemanticIndex,
   libraryIndexUpdatedEvent,
+  prefetchNote,
 } from "../api.js";
 import LoadingIndicator from "../components/LoadingIndicator.vue";
 import { searchSortOptions } from "../constants.js";
@@ -107,6 +110,10 @@ function applySemanticIndex(index) {
 function semanticIndexUpdatedHandler(event) {
   applySemanticIndex(event.detail);
   loadingIndicator.value?.setLoaded();
+}
+
+function warmNote(title) {
+  void prefetchNote(title).catch(() => {});
 }
 
 // Watch to allow for delayed config load.

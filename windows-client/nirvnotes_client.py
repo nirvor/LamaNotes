@@ -469,10 +469,11 @@ class NirvNotesApi:
     def report_client_ready(self, metrics: dict[str, Any] | None = None) -> None:
         metrics = metrics or {}
         logging.info(
-            "client ready phase=%s route=%s browser_ms=%s",
+            "client ready phase=%s route=%s browser_ms=%s route_ms=%s",
             metrics.get("phase", "shell"),
             metrics.get("route", ""),
             metrics.get("browserMs", ""),
+            metrics.get("routeMs", ""),
         )
 
     def open_new_window(self, route: str = "/") -> dict[str, Any]:

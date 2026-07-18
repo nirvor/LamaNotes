@@ -1,8 +1,9 @@
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from notes.file_system.file_system import FileSystemNotes
-from notes.models import Note
 
 
 class HtmlTagExtractionTests(unittest.TestCase):
@@ -52,16 +53,46 @@ class HtmlTagExtractionTests(unittest.TestCase):
 
 class LiveTagTests(unittest.TestCase):
     def test_get_tags_only_returns_tags_from_existing_notes(self):
-        notes = object.__new__(FileSystemNotes)
-        notes._list_all_note_filenames = lambda: ["current.html"]
-        notes._get_by_filename = lambda _: Note(
-            title="current",
-            content='<meta name="flatnotes-tags" content="work,current">',
-            last_modified=1,
-            format="html",
-        )
+        with tempfile.TemporaryDirectory() as directory:
+            Path(directory, "current.html").write_text(
+                '<meta name="flatnotes-tags" content="work,current">',
+                encoding="utf-8",
+            )
+            notes = object.__new__(FileSystemNotes)
+            notes.storage_path = directory
 
-        self.assertEqual(notes.get_tags(), ["current", "work"])
+            self.assertEqual(notes.get_tags(), ["current", "work"])
+
+    def test_semantic_index_reuses_unchanged_note_contexts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            note_path = Path(directory, "cached.html")
+            note_path.write_text(
+                '<article><h1>Cached</h1><p>#work</p></article>',
+                encoding="utf-8",
+            )
+            notes = object.__new__(FileSystemNotes)
+            notes.storage_path = directory
+            original_context = notes._context_from_note
+            parsed_titles = []
+
+            def tracked_context(note):
+                parsed_titles.append(note.title)
+                return original_context(note)
+
+            notes._context_from_note = tracked_context
+
+            first = notes.get_semantic_index()
+            second = notes.get_semantic_index()
+            note_path.write_text(
+                '<article><h1>Changed</h1><p>#work #current</p></article>',
+                encoding="utf-8",
+            )
+            third = notes.get_semantic_index()
+
+            self.assertEqual([entry.title for entry in first], ["cached"])
+            self.assertEqual([entry.title for entry in second], ["cached"])
+            self.assertEqual(third[0].tags, ["current", "work"])
+            self.assertEqual(parsed_titles, ["cached", "cached"])
 
     def test_delete_optimizes_index_after_removing_note(self):
         notes = object.__new__(FileSystemNotes)

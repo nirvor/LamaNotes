@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import tempfile
+import threading
 import time
 from collections import Counter
 from datetime import datetime
@@ -463,6 +464,9 @@ class FileSystemNotes(BaseNotes):
                 f"'{self.storage_path}' is not a valid directory."
             )
         self.index = self._load_index()
+        self._semantic_index_cache_lock = threading.Lock()
+        self._semantic_index_cache_signature = None
+        self._semantic_index_cache = None
         self._sync_index_with_retry(optimize=True)
 
     def create(self, data: NoteCreate) -> Note:
@@ -474,6 +478,7 @@ class FileSystemNotes(BaseNotes):
         if note_format == "html":
             content = strip_publication_metadata(content)
         self._write_file(filepath, content)
+        self._invalidate_semantic_index_cache()
         return Note(
             title=data.title,
             content=content,
@@ -531,6 +536,7 @@ class FileSystemNotes(BaseNotes):
                 self._write_file(filepath, content, overwrite=True)
             else:
                 content = self._read_file(filepath)
+            self._invalidate_semantic_index_cache()
             return Note(
                 title=title,
                 content=content,
@@ -543,6 +549,7 @@ class FileSystemNotes(BaseNotes):
         is_valid_filename(title)
         filepath = self._existing_path_from_title(title)
         os.remove(filepath)
+        self._invalidate_semantic_index_cache()
         self._sync_index_with_retry(optimize=True)
 
     def search(
@@ -591,13 +598,13 @@ class FileSystemNotes(BaseNotes):
 
     def get_tags(self) -> list[str]:
         """Return tags that are present in the current note files."""
-        tags = set()
-        for filename in self._list_all_note_filenames():
-            _, note_tags = self._extract_tags(
-                self._get_by_filename(filename).content or ""
-            )
-            tags.update(note_tags)
-        return sorted(tags)
+        return sorted(
+            {
+                tag
+                for note in self.get_semantic_index()
+                for tag in note.tags
+            }
+        )
 
     def get_context(self, title: str) -> NoteContext:
         """Return structured, LLM-friendly context for one note."""
@@ -605,30 +612,68 @@ class FileSystemNotes(BaseNotes):
 
     def get_semantic_index(self) -> List[NoteIndexEntry]:
         """Return a compact structured index for all notes."""
-        contexts = [
-            self._context_from_note(self._get_by_filename(filename))
-            for filename in self._list_all_note_filenames()
-        ]
-        contexts.sort(key=lambda item: item.last_modified, reverse=True)
-        return [
-            NoteIndexEntry(
-                title=context.title,
-                last_modified=context.last_modified,
-                format=context.format,
-                note_kind=context.note_kind,
-                tags=context.tags,
-                summary=context.summary,
-                heading_count=len(context.headings),
-                link_count=len(context.links),
-                media_count=len(context.media),
-                source_count=len(context.sources),
-                component_count=sum(
-                    component.count for component in context.components
-                ),
-                word_count=context.word_count,
-            )
-            for context in contexts
-        ]
+        lock = self._get_semantic_index_cache_lock()
+        with lock:
+            signature = self._semantic_index_signature()
+            if (
+                self._semantic_index_cache is not None
+                and signature == self._semantic_index_cache_signature
+            ):
+                return list(self._semantic_index_cache)
+
+            contexts = [
+                self._context_from_note(self._get_by_filename(filename))
+                for filename, _, _ in signature
+            ]
+            contexts.sort(key=lambda item: item.last_modified, reverse=True)
+            index = [
+                NoteIndexEntry(
+                    title=context.title,
+                    last_modified=context.last_modified,
+                    format=context.format,
+                    note_kind=context.note_kind,
+                    tags=context.tags,
+                    summary=context.summary,
+                    heading_count=len(context.headings),
+                    link_count=len(context.links),
+                    media_count=len(context.media),
+                    source_count=len(context.sources),
+                    component_count=sum(
+                        component.count for component in context.components
+                    ),
+                    word_count=context.word_count,
+                )
+                for context in contexts
+            ]
+            self._semantic_index_cache_signature = signature
+            self._semantic_index_cache = index
+            return list(index)
+
+    def _get_semantic_index_cache_lock(self):
+        lock = getattr(self, "_semantic_index_cache_lock", None)
+        if lock is None:
+            lock = threading.Lock()
+            self._semantic_index_cache_lock = lock
+            self._semantic_index_cache_signature = None
+            self._semantic_index_cache = None
+        return lock
+
+    def _semantic_index_signature(self) -> tuple[tuple[str, int, int], ...]:
+        signature = []
+        for filename in sorted(self._list_all_note_filenames()):
+            filepath = os.path.join(self.storage_path, filename)
+            try:
+                stat = os.stat(filepath)
+            except FileNotFoundError:
+                continue
+            signature.append((filename, stat.st_mtime_ns, stat.st_size))
+        return tuple(signature)
+
+    def _invalidate_semantic_index_cache(self) -> None:
+        lock = self._get_semantic_index_cache_lock()
+        with lock:
+            self._semantic_index_cache_signature = None
+            self._semantic_index_cache = None
 
     @property
     def _index_path(self):

@@ -14,7 +14,7 @@
     }"
   >
     <PrimeToast />
-    <SearchModal v-model="isSearchModalVisible" />
+    <SearchModal v-if="isSearchModalVisible" v-model="isSearchModalVisible" />
     <NavBar
       v-if="showNavBar"
       ref="navBar"
@@ -41,6 +41,7 @@ import "mousetrap/plugins/global-bind/mousetrap-global-bind";
 import { useToast } from "primevue/usetoast";
 import {
   computed,
+  defineAsyncComponent,
   nextTick,
   onBeforeUnmount,
   onMounted,
@@ -69,9 +70,12 @@ import {
 } from "./desktopSession.js";
 import NavBar from "./partials/NavBar.vue";
 import NoteTabs from "./partials/NoteTabs.vue";
-import SearchModal from "./partials/SearchModal.vue";
 import LoadingIndicator from "./components/LoadingIndicator.vue";
 import router from "./router.js";
+
+const SearchModal = defineAsyncComponent(
+  () => import("./partials/SearchModal.vue"),
+);
 
 const globalStore = useGlobalStore();
 const isSearchModalVisible = ref(false);
