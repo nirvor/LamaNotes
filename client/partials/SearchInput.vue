@@ -14,7 +14,7 @@
         class="w-full bg-transparent focus:outline-none"
         :placeholder="placeholder"
         @keydown="keydownHandler"
-        @keyup="stateChangeHandler"
+        @input="stateChangeHandler"
         @click="stateChangeHandler"
         @focus="stateChangeHandler"
         @blur="hideMenus"
@@ -42,6 +42,39 @@
       </p>
     </div>
 
+    <!-- Live Note Suggestions -->
+    <div
+      v-if="suggestionMenuVisible"
+      class="flatnotes-search-suggestions"
+      role="listbox"
+      aria-label="Matching notes"
+    >
+      <button
+        v-for="(suggestion, index) in suggestions"
+        :key="suggestion.title"
+        ref="suggestionMenuItems"
+        type="button"
+        class="flatnotes-search-suggestion"
+        :class="{ 'is-selected': index === suggestionMenuIndex }"
+        role="option"
+        :aria-selected="index === suggestionMenuIndex"
+        @pointerenter="selectSuggestion(index)"
+        @focus="selectSuggestion(index)"
+        @pointerdown.prevent
+        @click="openSuggestion(suggestion)"
+      >
+        <span class="flatnotes-search-suggestion-title">{{
+          suggestion.title
+        }}</span>
+        <span
+          v-if="formatSuggestionTags(suggestion)"
+          class="flatnotes-search-suggestion-tags"
+        >
+          {{ formatSuggestionTags(suggestion) }}
+        </span>
+      </button>
+    </div>
+
     <!-- Empty Search Tag Cloud -->
     <div v-if="tagCloudVisible" class="flatnotes-tag-cloud">
       <div class="flatnotes-tag-cloud-list">
@@ -66,17 +99,20 @@
 import { mdiTag } from "@mdi/js";
 import { mdilMagnify } from "@mdi/light-js";
 import { useToast } from "primevue/usetoast";
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import {
   apiErrorHandler,
+  getCachedSemanticIndex,
   getSemanticIndex,
   libraryIndexUpdatedEvent,
+  prefetchNote,
 } from "../api.js";
 import { isCloudNetworkError } from "../desktopShell.js";
 import IconLabel from "../components/IconLabel.vue";
 import * as constants from "../constants.js";
+import { getSearchSuggestions } from "../searchSuggestions.js";
 import { isSystemTag } from "../systemTags.js";
 import {
   getTagUsage,
@@ -99,14 +135,22 @@ const searchTerm = ref(searchTermForInput(props.initialSearchTerm));
 const toast = useToast();
 let tags = [];
 let tagCloudEntries = [];
+let semanticIndexEntries = [];
 const tagMatches = ref([]);
 const tagMenuItems = ref([]);
 const tagMenuIndex = ref(0);
 const tagMenuVisible = ref(false);
 const tagCloudVisible = ref(false);
 const topTags = ref([]);
+const suggestions = ref([]);
+const suggestionMenuItems = ref([]);
+const suggestionMenuIndex = ref(0);
+const suggestionMenuVisible = ref(false);
 let tagCloudLoaded = false;
 const tagCloudLimit = 14;
+const suggestionDebounceMs = 120;
+let suggestionLoadTimer = null;
+let suggestionRun = 0;
 const priorityTagBonus = {
   work: 90,
   private: 70,
@@ -119,6 +163,7 @@ function searchTermForInput(value = "") {
 
 function hideMenus() {
   tagMenuVisible.value = false;
+  suggestionMenuVisible.value = false;
   if (searchTerm.value.trim()) {
     tagCloudVisible.value = false;
   } else {
@@ -143,14 +188,34 @@ function keydownHandler(event) {
         block: "nearest",
       });
     } else if (event.key === "Enter") {
+      event.preventDefault();
       tagChosen(tagMatches.value[tagMenuIndex.value]);
     } else if (event.key === "Escape") {
       tagMenuVisible.value = false;
       event.stopPropagation(); // Prevent the modal from closing when the tag menu is open.
     }
   }
+  // Note Suggestion Menu Open
+  else if (suggestionMenuVisible.value) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      selectSuggestion(
+        Math.min(suggestionMenuIndex.value + 1, suggestions.value.length - 1),
+        true,
+      );
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      selectSuggestion(Math.max(suggestionMenuIndex.value - 1, 0), true);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      openSuggestion(suggestions.value[suggestionMenuIndex.value]);
+    } else if (event.key === "Escape") {
+      suggestionMenuVisible.value = false;
+    }
+  }
   // Tag Menu Closed
   else if (event.key === "Enter") {
+    event.preventDefault();
     search();
   }
 }
@@ -158,6 +223,7 @@ function keydownHandler(event) {
 function tagChosen(tag) {
   replaceWordOnCursor(tag);
   tagMenuVisible.value = false;
+  queueSuggestionRefresh();
 }
 
 function tagCloudChosen(tag) {
@@ -167,6 +233,8 @@ function tagCloudChosen(tag) {
 }
 
 function search() {
+  clearSuggestionLoad();
+  suggestionMenuVisible.value = false;
   const term = searchTerm.value.trim();
   const route = getRouteForSearchTerm(term);
   if (route.name === "search") {
@@ -231,7 +299,10 @@ function stateChangeHandler() {
   const emptySearch = searchTerm.value.trim().length === 0;
 
   if (emptySearch) {
+    clearSuggestionLoad();
     tagMenuVisible.value = false;
+    suggestionMenuVisible.value = false;
+    suggestions.value = [];
     tagMatches.value = [];
     showTagCloud();
     if (props.showAllOnClear && props.initialSearchTerm !== "*") {
@@ -247,8 +318,10 @@ function stateChangeHandler() {
     tagMenuVisible.value = false;
     tagCloudVisible.value = false;
     tagMatches.value = [];
+    queueSuggestionRefresh();
   } else {
     tagCloudVisible.value = false;
+    suggestionMenuVisible.value = false;
     // All tags are stored in lowercase, so we can do a case-insensitive search.
     filterTagMatches(wordOnCursor.toLowerCase());
   }
@@ -271,8 +344,9 @@ async function showTagCloud() {
 }
 
 function applySemanticIndex(index) {
+  semanticIndexEntries = Array.isArray(index) ? index : [];
   const counts = new Map();
-  (Array.isArray(index) ? index : []).forEach((note) => {
+  semanticIndexEntries.forEach((note) => {
     new Set(note.tags || []).forEach((tag) => {
       const normalizedTag = normalizeTagName(tag);
       if (!normalizedTag || isSystemTag(normalizedTag)) {
@@ -344,9 +418,103 @@ async function filterTagMatches(input) {
   ) {
     tagMenuIndex.value = 0;
     tagMenuVisible.value = true;
+    suggestionMenuVisible.value = false;
   } else if (tagMatches.value.length === 0) {
     tagMenuVisible.value = false;
+    queueSuggestionRefresh();
   }
+}
+
+function clearSuggestionLoad() {
+  window.clearTimeout(suggestionLoadTimer);
+  suggestionLoadTimer = null;
+  suggestionRun += 1;
+}
+
+function setSuggestions(index, term, run) {
+  if (run !== suggestionRun || term !== searchTerm.value.trim()) {
+    return;
+  }
+  suggestions.value = getSearchSuggestions(index, term);
+  suggestionMenuIndex.value = 0;
+  suggestionMenuVisible.value =
+    suggestions.value.length > 0 && !tagMenuVisible.value;
+  if (suggestions.value[0]) {
+    warmSuggestion(suggestions.value[0]);
+  }
+}
+
+function queueSuggestionRefresh() {
+  window.clearTimeout(suggestionLoadTimer);
+  const term = searchTerm.value.trim();
+  const run = ++suggestionRun;
+  if (!term || tagMenuVisible.value) {
+    suggestions.value = [];
+    suggestionMenuVisible.value = false;
+    return;
+  }
+
+  const warmIndex = semanticIndexEntries.length
+    ? semanticIndexEntries
+    : getCachedSemanticIndex();
+  if (warmIndex.length) {
+    if (!semanticIndexEntries.length) {
+      applySemanticIndex(warmIndex);
+    }
+    setSuggestions(warmIndex, term, run);
+    return;
+  }
+
+  suggestionMenuVisible.value = false;
+  suggestionLoadTimer = window.setTimeout(async () => {
+    try {
+      const index = await getSemanticIndex();
+      if (run !== suggestionRun) {
+        return;
+      }
+      applySemanticIndex(index);
+      setSuggestions(index, term, run);
+    } catch {
+      if (run === suggestionRun) {
+        suggestions.value = [];
+        suggestionMenuVisible.value = false;
+      }
+    }
+  }, suggestionDebounceMs);
+}
+
+function selectSuggestion(index, scrollIntoView = false) {
+  suggestionMenuIndex.value = index;
+  const suggestion = suggestions.value[index];
+  warmSuggestion(suggestion);
+  if (scrollIntoView) {
+    nextTick(() => {
+      suggestionMenuItems.value[index]?.scrollIntoView({ block: "nearest" });
+    });
+  }
+}
+
+function warmSuggestion(suggestion) {
+  if (suggestion?.title) {
+    void prefetchNote(suggestion.title).catch(() => {});
+  }
+}
+
+function openSuggestion(suggestion) {
+  if (!suggestion?.title) {
+    return;
+  }
+  clearSuggestionLoad();
+  suggestionMenuVisible.value = false;
+  void router.push({ name: "note", params: { title: suggestion.title } });
+  emit("search");
+}
+
+function formatSuggestionTags(suggestion) {
+  return (Array.isArray(suggestion?.tags) ? suggestion.tags : [])
+    .filter((tag) => !isSystemTag(tag))
+    .slice(0, 2)
+    .join(" · ");
 }
 
 // Helpers
@@ -406,6 +574,9 @@ const stopTagUsageListener = onTagUsageChange(() => {
 
 function semanticIndexUpdatedHandler(event) {
   applySemanticIndex(event.detail);
+  if (searchTerm.value.trim()) {
+    queueSuggestionRefresh();
+  }
 }
 
 onMounted(() => {
@@ -413,12 +584,19 @@ onMounted(() => {
     libraryIndexUpdatedEvent,
     semanticIndexUpdatedHandler,
   );
+  const warmIndex = getCachedSemanticIndex();
+  if (warmIndex.length) {
+    applySemanticIndex(warmIndex);
+  }
   if (!searchTerm.value.trim()) {
     showTagCloud();
+  } else {
+    queueSuggestionRefresh();
   }
 });
 
 onBeforeUnmount(() => {
+  clearSuggestionLoad();
   stopTagUsageListener();
   window.removeEventListener(
     libraryIndexUpdatedEvent,
@@ -467,5 +645,73 @@ onBeforeUnmount(() => {
 .flatnotes-tag-cloud-item:focus-visible {
   text-decoration: underline;
   text-underline-offset: 0.2rem;
+}
+
+.flatnotes-search-suggestions {
+  position: absolute;
+  z-index: 20;
+  width: 100%;
+  max-height: 14rem;
+  margin-top: 0.35rem;
+  overflow-y: auto;
+  border: 1px solid rgb(var(--theme-border));
+  border-radius: 0.34rem;
+  background: rgb(var(--theme-background-elevated));
+  box-shadow: 0 0.55rem 1.4rem rgb(0 0 0 / 0.18);
+}
+
+.flatnotes-search-suggestion {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  min-height: 2.15rem;
+  padding: 0.38rem 0.62rem;
+  border: 0;
+  border-bottom: 1px solid rgb(var(--theme-border) / 0.58);
+  color: rgb(var(--theme-text));
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.flatnotes-search-suggestion:last-child {
+  border-bottom: 0;
+}
+
+.flatnotes-search-suggestion:hover,
+.flatnotes-search-suggestion:focus-visible,
+.flatnotes-search-suggestion.is-selected {
+  background: rgb(var(--theme-background));
+  outline: none;
+}
+
+.flatnotes-search-suggestion.is-selected .flatnotes-search-suggestion-title {
+  color: rgb(var(--theme-brand));
+}
+
+.flatnotes-search-suggestion-title {
+  overflow: hidden;
+  font-size: 0.88rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flatnotes-search-suggestion-tags {
+  max-width: 12rem;
+  overflow: hidden;
+  color: rgb(var(--theme-text-muted));
+  font-size: 0.7rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .flatnotes-search-suggestion-tags {
+    max-width: 7rem;
+  }
 }
 </style>
