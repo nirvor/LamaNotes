@@ -1,6 +1,6 @@
 services:
   flatnotes:
-    image: lamanotes:90b405d
+    image: lamanotes:dd31b12
     container_name: flatnotes
     env_file:
       - .env
