@@ -1,6 +1,6 @@
 services:
   flatnotes:
-    image: lamanotes:dd31b12
+    image: lamanotes:c32d4e9
     environment:
       NIRVNOTES_WINDOWS_UPDATE_DIR: /updates
     volumes:
