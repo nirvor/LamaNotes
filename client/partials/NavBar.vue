@@ -1,8 +1,16 @@
 <template>
-  <nav class="flatnotes-navbar mb-2 flex justify-end align-top md:mb-3">
+  <nav class="flatnotes-navbar flex justify-end align-top">
     <div
       class="flatnotes-navbar-actions flex grow flex-wrap items-center justify-end gap-1"
     >
+      <!-- Home -->
+      <RouterLink :to="{ name: 'home' }" class="flatnotes-navbar-action-link">
+        <CustomButton
+          :iconPath="mdilHome"
+          label="Home"
+          class="flatnotes-navbar-icon-only"
+        />
+      </RouterLink>
       <template v-for="action in leadingNoteActions" :key="action.key">
         <CustomButton
           v-if="action.visible !== false"
@@ -24,26 +32,14 @@
           ></div>
         </CustomButton>
       </template>
-      <!-- Home -->
-      <RouterLink :to="{ name: 'home' }">
-        <CustomButton
-          :iconPath="mdilHome"
-          label="Home"
-          class="flatnotes-navbar-icon-only"
-        />
-      </RouterLink>
       <!-- New Note -->
-      <RouterLink v-if="showNewButton" :to="{ name: 'new' }">
+      <RouterLink
+        v-if="showNewButton"
+        :to="{ name: 'new' }"
+        class="flatnotes-navbar-action-link"
+      >
         <CustomButton :iconPath="mdilPlusCircle" label="New Note" />
       </RouterLink>
-      <!-- Note Switcher -->
-      <CustomButton
-        v-if="showNoteSwitcherButton"
-        :iconPath="mdiBookMultipleOutline"
-        label="Notes"
-        class="flatnotes-navbar-icon-only"
-        @click="toggleNoteDrawer"
-      />
       <!-- Menu -->
       <CustomButton :iconPath="mdilMenu" label="Menu" @click="toggleMenu" />
       <PrimeMenu ref="menu" :model="menuItems" :popup="true" />
@@ -73,7 +69,7 @@
 </template>
 
 <script setup>
-import { mdiBookMultipleOutline, mdiUpdate } from "@mdi/js";
+import { mdiUpdate } from "@mdi/js";
 import {
   mdilLogout,
   mdilHome,
@@ -228,10 +224,6 @@ const trailingNoteActions = computed(() =>
   noteActions.value.filter((action) => action.placement === "end"),
 );
 
-const showNoteSwitcherButton = computed(() => {
-  return globalStore.config.authType != null;
-});
-
 async function logOut() {
   await logOutSession().catch(() => {});
   clearApiCaches();
@@ -242,10 +234,6 @@ async function logOut() {
 
 function toggleMenu(event) {
   menu.value.toggle(event);
-}
-
-function toggleNoteDrawer() {
-  window.dispatchEvent(new CustomEvent("flatnotes:toggle-note-drawer"));
 }
 
 async function openNewWindow() {
@@ -291,8 +279,16 @@ function showLogOutButton() {
   z-index: 35;
   margin-inline: -0.45rem;
   padding-inline: 0.45rem;
+  margin-bottom: 0.35rem;
   background-color: rgb(var(--theme-background));
   isolation: isolate;
+}
+
+.flatnotes-navbar-action-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  line-height: 1;
 }
 
 @media print {

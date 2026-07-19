@@ -37,6 +37,7 @@ const noteLeadHeroClass = "flatnotes-note-lead-hero";
 const noteLeadHeroImageClass = "flatnotes-note-lead-hero-image";
 const noteLeadHiddenTitleClass = "flatnotes-note-hidden-title";
 const noteLeadSourceHiddenClass = "flatnotes-note-lead-source-hidden";
+const sectionDividerClass = "flatnotes-section-divider";
 const bottomTagsClass = "flatnotes-bottom-tags";
 const bottomTagChipClass = "flatnotes-bottom-tag-chip";
 const taskCheckboxClass = "flatnotes-task-checkbox";
@@ -1129,6 +1130,20 @@ export function enhanceBottomTags(rootElement) {
   tagElements.slice(1).forEach((element) => element.remove());
 }
 
+export function enhanceSectionDividers(rootElement) {
+  const horizontalRules = Array.from(rootElement.querySelectorAll("hr"));
+  horizontalRules.forEach((rule) => {
+    if (!rule.isConnected || rule.nextElementSibling?.tagName !== "HR") {
+      return;
+    }
+
+    rule.classList.add(sectionDividerClass);
+    while (rule.nextElementSibling?.tagName === "HR") {
+      rule.nextElementSibling.remove();
+    }
+  });
+}
+
 function getCodeText(preElement) {
   const codeElement = preElement.querySelector("code");
   return codeElement ? codeElement.textContent : preElement.textContent;
@@ -1656,6 +1671,7 @@ export async function enhanceRenderedMarkdown(rootElement, options = {}) {
   if (options.noteLead !== false) {
     enhanceNoteLead(rootElement, options);
   }
+  enhanceSectionDividers(rootElement);
   enhanceBottomTags(rootElement);
   enhanceTaskListCheckboxes(rootElement, options.taskList);
   await Promise.all([

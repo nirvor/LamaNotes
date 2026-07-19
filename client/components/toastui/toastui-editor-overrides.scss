@@ -206,6 +206,10 @@
     border-top: 1px solid rgb(var(--theme-border) / 0.82);
   }
 
+  hr.flatnotes-section-divider {
+    border-top-color: rgb(var(--theme-heading) / 0.82);
+  }
+
   table {
     display: block;
     width: max-content;

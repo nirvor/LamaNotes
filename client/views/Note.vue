@@ -1388,30 +1388,55 @@ function getCopyMenuItems() {
   return items;
 }
 
-function updateNoteActions() {
-  const publishAction = {
+function getPublicationMenuItem() {
+  if (
+    !canModify.value ||
+    editMode.value ||
+    isNewNote.value ||
+    !isHtmlFormat.value
+  ) {
+    return null;
+  }
+
+  return {
     publish: {
-      key: "publish",
       label: "Publish",
-      iconPath: mdiCloudUploadOutline,
+      icon: mdiCloudUploadOutline,
     },
     publishing: {
-      key: "publishing",
       label: "Publishing...",
-      iconPath: mdiCloudUploadOutline,
+      icon: mdiCloudUploadOutline,
       disabled: true,
     },
     show: {
-      key: "show-online",
       label: "Show online",
-      iconPath: mdiWeb,
+      icon: mdiWeb,
     },
     update: {
-      key: "update-online",
       label: "Update online",
-      iconPath: mdiSync,
+      icon: mdiSync,
     },
   }[publicationMode.value];
+}
+
+function getNoteMenuItems() {
+  const publicationItem = getPublicationMenuItem();
+  const copyItems = getCopyMenuItems();
+  if (!publicationItem) {
+    return copyItems;
+  }
+
+  return [
+    {
+      ...publicationItem,
+      disabled: publicationItem.disabled || publishBusy.value,
+      command: publicationActionHandler,
+    },
+    ...(copyItems.length ? [{ separator: true }, ...copyItems] : []),
+  ];
+}
+
+function updateNoteActions() {
   globalStore.setNoteActions([
     {
       key: "copy",
@@ -1420,18 +1445,6 @@ function updateNoteActions() {
       visible: !editMode.value && !isNewNote.value && Boolean(note.value.title),
       iconOnly: true,
       handler: () => copyNote(),
-    },
-    {
-      ...(publishAction || {}),
-      key: publishAction?.key || "publication-hidden",
-      visible:
-        Boolean(publishAction) &&
-        canModify.value &&
-        !editMode.value &&
-        !isNewNote.value &&
-        isHtmlFormat.value,
-      disabled: publishAction?.disabled || publishBusy.value,
-      handler: publicationActionHandler,
     },
     {
       key: "pin",
@@ -1470,7 +1483,7 @@ function updateNoteActions() {
       handler: editMode.value ? () => saveHandler(true) : toggleEditModeHandler,
     },
   ]);
-  globalStore.setNoteMenuItems(getCopyMenuItems());
+  globalStore.setNoteMenuItems(getNoteMenuItems());
   globalStore.setNoteLayout({
     kind: noteLayoutKind.value,
   });

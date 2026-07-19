@@ -30,7 +30,6 @@
     >
       Cloud unavailable. Local files remain editable.
     </div>
-    <NoteTabs v-if="showNavBar" />
     <RouterView />
   </LoadingIndicator>
 </template>
@@ -69,7 +68,6 @@ import {
   saveDesktopRouteScroll,
 } from "./desktopSession.js";
 import NavBar from "./partials/NavBar.vue";
-import NoteTabs from "./partials/NoteTabs.vue";
 import LoadingIndicator from "./components/LoadingIndicator.vue";
 import router from "./router.js";
 
