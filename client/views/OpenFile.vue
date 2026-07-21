@@ -415,6 +415,7 @@ onMounted(() => {
   window.addEventListener("scroll", scheduleActiveScrollSave, {
     passive: true,
   });
+  window.addEventListener("nirvnotes:text-drop", insertExternalDroppedText);
 });
 
 watch(externalFileLaunch, consumeExternalLaunch, { immediate: true });
@@ -433,14 +434,47 @@ watchEffect(persistDesktopFiles);
 watchEffect(() => {
   setDesktopWindowTitle(activeFile.value?.name || "Open File");
 });
+watchEffect(() => {
+  document.body.classList.toggle(
+    "nirvnotes-text-drop-enabled",
+    Boolean(activeFile.value),
+  );
+});
 
 onUnmounted(() => {
   window.clearInterval(nativeWatcherTimer);
   window.clearTimeout(scrollSaveTimer);
   saveActiveScroll();
   window.removeEventListener("scroll", scheduleActiveScrollSave);
+  window.removeEventListener("nirvnotes:text-drop", insertExternalDroppedText);
+  document.body.classList.remove(
+    "nirvnotes-text-drop-enabled",
+    "nirvnotes-native-text-drag-active",
+  );
   globalStore.clearNoteActions();
 });
+
+async function insertExternalDroppedText(event) {
+  const text = String(event.detail?.text || "");
+  if (!activeFile.value || !text) {
+    return;
+  }
+
+  const wasEditing = editMode.value;
+  if (!wasEditing) {
+    setEditMode(true);
+    await nextTick();
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+  }
+  const inserted = editorTextarea.value?.insertDroppedText?.(text, {
+    clientX: event.detail?.clientX,
+    clientY: event.detail?.clientY,
+    fallback: wasEditing ? "selection" : "end",
+  });
+  if (inserted) {
+    showStatus("Dropped text inserted. Save when ready.");
+  }
+}
 
 function updateOpenFileActions() {
   const file = activeFile.value;

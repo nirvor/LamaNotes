@@ -268,7 +268,10 @@ class NativeShellIntegrationTests(unittest.TestCase):
 
         register_native_file_drop(window, api, "http://127.0.0.1:31992")
         loaded.items[0]()
-        dropped.items[0].callback(
+        handler = dropped.items[0]
+        self.assertFalse(handler.prevent_default)
+        self.assertFalse(handler.stop_propagation)
+        handler.callback(
             {
                 "dataTransfer": {
                     "files": [

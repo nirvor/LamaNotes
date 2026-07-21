@@ -163,7 +163,8 @@
     }
 }
 
-body.nirvnotes-native-file-drag-active::before {
+body.nirvnotes-native-file-drag-active::before,
+body.nirvnotes-native-text-drag-active::before {
     position: fixed;
     z-index: 10000;
     inset: 0.45rem;
@@ -174,7 +175,8 @@ body.nirvnotes-native-file-drag-active::before {
     pointer-events: none;
 }
 
-body.nirvnotes-native-file-drag-active::after {
+body.nirvnotes-native-file-drag-active::after,
+body.nirvnotes-native-text-drag-active::after {
     position: fixed;
     z-index: 10001;
     top: 50%;
@@ -182,9 +184,16 @@ body.nirvnotes-native-file-drag-active::after {
     min-width: 9rem;
     transform: translate(-50%, -50%);
     color: rgb(var(--theme-heading));
-    content: "Drop file to open";
     font-size: 0.82rem;
     font-weight: 600;
     text-align: center;
     pointer-events: none;
+}
+
+body.nirvnotes-native-file-drag-active::after {
+    content: "Drop file to open";
+}
+
+body.nirvnotes-native-text-drag-active::after {
+    content: "Drop text to insert";
 }

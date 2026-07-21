@@ -2025,8 +2025,8 @@ def register_native_file_drop(
             document = window.dom.document
             handler = DOMEventHandler(
                 handle_drop,
-                prevent_default=True,
-                stop_propagation=True,
+                prevent_default=False,
+                stop_propagation=False,
             )
             document.events.drop += handler
             setattr(window, "_nirvnotes_drop_binding", (document, handler))

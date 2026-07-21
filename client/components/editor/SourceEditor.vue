@@ -406,6 +406,33 @@ function insertText(text) {
   editorView.focus();
 }
 
+function insertDroppedText(text, options = {}) {
+  if (!editorView || !text) {
+    return false;
+  }
+
+  const selection = editorView.state.selection.main;
+  const coordinatePosition =
+    Number.isFinite(options.clientX) && Number.isFinite(options.clientY)
+      ? editorView.posAtCoords(
+          { x: options.clientX, y: options.clientY },
+          false,
+        )
+      : null;
+  const useSelection = options.fallback !== "end" && coordinatePosition == null;
+  const from =
+    coordinatePosition ??
+    (useSelection ? selection.from : editorView.state.doc.length);
+  const to = coordinatePosition ?? (useSelection ? selection.to : from);
+  editorView.dispatch({
+    changes: { from, to, insert: text },
+    selection: { anchor: from + text.length },
+    scrollIntoView: true,
+  });
+  editorView.focus();
+  return true;
+}
+
 function sessionStorageKey() {
   const key = String(props.sessionKey || "").trim();
   return key ? `nirvnotes:editor-session:${key}` : "";
@@ -562,6 +589,7 @@ defineExpose({
   getSearchText,
   getValue,
   isWysiwygMode,
+  insertDroppedText,
   selectSearchRange,
 });
 </script>

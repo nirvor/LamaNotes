@@ -17,6 +17,11 @@ import {
   saveDesktopRouteSession,
 } from "./desktopSession.js";
 import { loadStoredToken } from "./tokenStorage.js";
+import {
+  isFileTransfer,
+  isPlainTextTransfer,
+  readPlainTextTransfer,
+} from "./textDrop.js";
 import router from "/router.js";
 
 const app = createApp(App);
@@ -196,11 +201,18 @@ window.addEventListener("nirvnotes:native-file-drag-state", (event) => {
 });
 
 let nativeFileDragDepth = 0;
+let nativeTextDragDepth = 0;
+let internalDragActive = false;
 
 function isNativeFileDrag(event) {
+  return supportsNativeFileBridge() && isFileTransfer(event.dataTransfer);
+}
+
+function isExternalTextDrag(event) {
   return (
-    supportsNativeFileBridge() &&
-    Array.from(event.dataTransfer?.types || []).includes("Files")
+    !internalDragActive &&
+    document.body.classList.contains("nirvnotes-text-drop-enabled") &&
+    isPlainTextTransfer(event.dataTransfer)
   );
 }
 
@@ -208,17 +220,48 @@ function showNativeFileDropTarget(active) {
   document.body.classList.toggle("nirvnotes-native-file-drag-active", active);
 }
 
+function showNativeTextDropTarget(active) {
+  document.body.classList.toggle("nirvnotes-native-text-drag-active", active);
+}
+
+function clearDropTargets() {
+  nativeFileDragDepth = 0;
+  nativeTextDragDepth = 0;
+  showNativeFileDropTarget(false);
+  showNativeTextDropTarget(false);
+}
+
+window.addEventListener(
+  "dragstart",
+  () => {
+    internalDragActive = true;
+  },
+  true,
+);
+
+window.addEventListener(
+  "dragend",
+  () => {
+    internalDragActive = false;
+    clearDropTargets();
+  },
+  true,
+);
+
 window.addEventListener("dragenter", (event) => {
-  if (!isNativeFileDrag(event)) {
-    return;
+  if (isNativeFileDrag(event)) {
+    event.preventDefault();
+    nativeFileDragDepth += 1;
+    showNativeFileDropTarget(true);
+  } else if (isExternalTextDrag(event)) {
+    event.preventDefault();
+    nativeTextDragDepth += 1;
+    showNativeTextDropTarget(true);
   }
-  event.preventDefault();
-  nativeFileDragDepth += 1;
-  showNativeFileDropTarget(true);
 });
 
 window.addEventListener("dragover", (event) => {
-  if (!isNativeFileDrag(event)) {
+  if (!isNativeFileDrag(event) && !isExternalTextDrag(event)) {
     return;
   }
   event.preventDefault();
@@ -226,27 +269,52 @@ window.addEventListener("dragover", (event) => {
 });
 
 window.addEventListener("dragleave", (event) => {
-  if (!supportsNativeFileBridge()) {
-    return;
+  if (document.body.classList.contains("nirvnotes-native-file-drag-active")) {
+    nativeFileDragDepth = Math.max(0, nativeFileDragDepth - 1);
+    if (nativeFileDragDepth === 0 || event.relatedTarget === null) {
+      showNativeFileDropTarget(false);
+    }
   }
-  nativeFileDragDepth = Math.max(0, nativeFileDragDepth - 1);
-  if (nativeFileDragDepth === 0 || event.relatedTarget === null) {
-    showNativeFileDropTarget(false);
+  if (document.body.classList.contains("nirvnotes-native-text-drag-active")) {
+    nativeTextDragDepth = Math.max(0, nativeTextDragDepth - 1);
+    if (nativeTextDragDepth === 0 || event.relatedTarget === null) {
+      showNativeTextDropTarget(false);
+    }
   }
 });
 
 window.addEventListener("drop", (event) => {
-  if (!isNativeFileDrag(event)) {
+  if (isNativeFileDrag(event)) {
+    event.preventDefault();
+    clearDropTargets();
+    return;
+  }
+  if (!isExternalTextDrag(event)) {
+    clearDropTargets();
+    return;
+  }
+
+  const text = readPlainTextTransfer(event.dataTransfer);
+  clearDropTargets();
+  if (!text) {
     return;
   }
   event.preventDefault();
-  nativeFileDragDepth = 0;
-  showNativeFileDropTarget(false);
+  event.stopPropagation();
+  window.dispatchEvent(
+    new CustomEvent("nirvnotes:text-drop", {
+      detail: {
+        text,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      },
+    }),
+  );
 });
 
 window.addEventListener("blur", () => {
-  nativeFileDragDepth = 0;
-  showNativeFileDropTarget(false);
+  internalDragActive = false;
+  clearDropTargets();
 });
 
 window.addEventListener("nirvnotes:consume-native-launch-files", () => {
