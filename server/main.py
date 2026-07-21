@@ -1,5 +1,6 @@
 import json
 import re
+from html import escape
 from pathlib import Path
 from typing import List, Literal
 
@@ -14,13 +15,15 @@ from fastapi import (
 )
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 import api_messages
 from attachments.base import BaseAttachments
 from attachments.models import AttachmentCreateResponse
 from auth.base import BaseAuth
-from auth.models import Login, Token
+from auth.google_oauth import GoogleAuthError, GoogleOAuthService
+from auth.models import Login, NativeGoogleExchange, Token
 from auth.rate_limit import LoginRateLimiter
 from auth.scopes import (
     ATTACHMENTS_WRITE,
@@ -45,6 +48,11 @@ from publications.service import PublicationService
 
 global_config = GlobalConfig()
 auth: BaseAuth = global_config.load_auth()
+google_auth = (
+    GoogleOAuthService(global_config, auth)
+    if global_config.google_auth_enabled
+    else None
+)
 note_storage: BaseNotes = global_config.load_note_storage()
 attachment_storage: BaseAttachments = global_config.load_attachment_storage()
 publication_service = PublicationService(
@@ -97,9 +105,7 @@ async def add_static_cache_headers(request: Request, call_next):
     path = request.url.path
 
     if HASHED_ASSET_RE.search(path):
-        response.headers["Cache-Control"] = (
-            "public, max-age=31536000, immutable"
-        )
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     elif FONT_ASSET_RE.search(path):
         response.headers.setdefault(
             "Cache-Control",
@@ -198,6 +204,8 @@ if global_config.auth_type not in [AuthType.NONE, AuthType.READ_ONLY]:
 
     @router.post("/api/token", response_model=Token)
     def token(data: Login, request: Request, response: Response):
+        if not global_config.password_login_enabled:
+            raise HTTPException(404, "Password login is disabled.")
         client_key = request.client.host if request.client else "unknown"
         retry_after = login_rate_limiter.retry_after(client_key)
         if retry_after:
@@ -210,9 +218,7 @@ if global_config.auth_type not in [AuthType.NONE, AuthType.READ_ONLY]:
             result = auth.login(data)
         except ValueError:
             login_rate_limiter.record_failure(client_key)
-            raise HTTPException(
-                status_code=401, detail=api_messages.login_failed
-            )
+            raise HTTPException(status_code=401, detail=api_messages.login_failed)
         login_rate_limiter.record_success(client_key)
         response.set_cookie(
             key=global_config.session_cookie_name,
@@ -224,6 +230,102 @@ if global_config.auth_type not in [AuthType.NONE, AuthType.READ_ONLY]:
             samesite="strict",
         )
         response.headers["Cache-Control"] = "no-store"
+        return result
+
+    @router.get("/api/auth/google/start", include_in_schema=False)
+    def google_login_start(
+        flow: Literal["web", "native"] = "web",
+        next: str = "/",
+        loopback: str = "",
+        code_challenge: str = "",
+        client_state: str = "",
+    ):
+        if not google_auth:
+            raise HTTPException(404, "Google login is not enabled.")
+        try:
+            url = google_auth.authorization_url(
+                flow=flow,
+                next_path=next,
+                loopback_uri=loopback,
+                code_challenge=code_challenge,
+                client_state=client_state,
+            )
+        except GoogleAuthError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return RedirectResponse(url, status_code=302)
+
+    @router.get("/api/auth/google/callback", include_in_schema=False)
+    async def google_login_callback(
+        code: str = "",
+        state: str = "",
+        error: str = "",
+    ):
+        if not google_auth:
+            raise HTTPException(404, "Google login is not enabled.")
+        if error or not code or not state:
+            return HTMLResponse(
+                "Google login was cancelled or could not be completed.",
+                status_code=400,
+                headers={"Cache-Control": "no-store"},
+            )
+        try:
+            callback_payload = await google_auth.finish_callback(
+                code=code,
+                state=state,
+            )
+            if callback_payload.get("flow") == "native":
+                handoff = google_auth.create_native_handoff(callback_payload)
+                target = google_auth.native_redirect_uri(callback_payload, handoff)
+                return RedirectResponse(
+                    target,
+                    status_code=302,
+                    headers={"Cache-Control": "no-store"},
+                )
+
+            result = auth.issue_session(remember_me=True)
+            next_path = str(callback_payload.get("next", "/"))
+            escaped_next = escape(next_path, quote=True)
+            response = HTMLResponse(
+                content=(
+                    '<!doctype html><html lang="en"><meta charset="utf-8">'
+                    f'<meta http-equiv="refresh" content="0;url={escaped_next}">'
+                    "<title>NirvNotes</title><p>Login completed. "
+                    f'<a href="{escaped_next}">Continue</a></p></html>'
+                ),
+                headers={"Cache-Control": "no-store"},
+            )
+            response.set_cookie(
+                key=global_config.session_cookie_name,
+                value=result.access_token,
+                max_age=result.expires_in,
+                path=global_config.path_prefix or "/",
+                secure=global_config.session_cookie_secure,
+                httponly=True,
+                samesite="strict",
+            )
+            return response
+        except GoogleAuthError:
+            return HTMLResponse(
+                "This Google account is not allowed, or the login expired.",
+                status_code=401,
+                headers={"Cache-Control": "no-store"},
+            )
+
+    @router.post(
+        "/api/auth/google/native/exchange",
+        response_model=Token,
+        include_in_schema=False,
+    )
+    def google_native_exchange(data: NativeGoogleExchange):
+        if not google_auth:
+            raise HTTPException(404, "Google login is not enabled.")
+        try:
+            result = google_auth.exchange_native_handoff(
+                handoff=data.handoff,
+                verifier=data.verifier,
+            )
+        except GoogleAuthError as exc:
+            raise HTTPException(401, "The native Google login is invalid.") from exc
         return result
 
     @router.post("/api/logout", status_code=204)
@@ -264,9 +366,7 @@ def get_note(title: str):
     try:
         return note_storage.get(title)
     except ValueError:
-        raise HTTPException(
-            status_code=400, detail=api_messages.invalid_note_title
-        )
+        raise HTTPException(status_code=400, detail=api_messages.invalid_note_title)
     except FileNotFoundError:
         raise HTTPException(404, api_messages.note_not_found)
 
@@ -281,9 +381,7 @@ def get_note_context(title: str):
     try:
         return note_storage.get_context(title)
     except ValueError:
-        raise HTTPException(
-            status_code=400, detail=api_messages.invalid_note_title
-        )
+        raise HTTPException(status_code=400, detail=api_messages.invalid_note_title)
     except FileNotFoundError:
         raise HTTPException(404, api_messages.note_not_found)
 
@@ -298,9 +396,7 @@ def get_note_publication(title: str):
     try:
         return publication_service.get_state(title)
     except ValueError:
-        raise HTTPException(
-            status_code=400, detail=api_messages.invalid_note_title
-        )
+        raise HTTPException(status_code=400, detail=api_messages.invalid_note_title)
 
 
 if global_config.auth_type != AuthType.READ_ONLY:
@@ -321,9 +417,7 @@ if global_config.auth_type != AuthType.READ_ONLY:
                 detail=api_messages.invalid_note_title,
             )
         except FileExistsError:
-            raise HTTPException(
-                status_code=409, detail=api_messages.note_exists
-            )
+            raise HTTPException(status_code=409, detail=api_messages.note_exists)
 
     # Update Note
     @router.patch(
@@ -340,9 +434,7 @@ if global_config.auth_type != AuthType.READ_ONLY:
                 detail=api_messages.invalid_note_title,
             )
         except FileExistsError:
-            raise HTTPException(
-                status_code=409, detail=api_messages.note_exists
-            )
+            raise HTTPException(status_code=409, detail=api_messages.note_exists)
         except FileNotFoundError:
             raise HTTPException(404, api_messages.note_not_found)
 
@@ -366,9 +458,7 @@ if global_config.auth_type != AuthType.READ_ONLY:
                 headers={"Cache-Control": "no-store"},
             )
         except ValueError:
-            raise HTTPException(
-                status_code=400, detail=api_messages.invalid_note_title
-            )
+            raise HTTPException(status_code=400, detail=api_messages.invalid_note_title)
         status_code = 200 if result.state == "current" else 202
         return JSONResponse(
             status_code=status_code,
@@ -444,6 +534,8 @@ def get_config():
     """Retrieve server-side config required for the UI."""
     return GlobalConfigResponseModel(
         auth_type=global_config.auth_type,
+        google_auth_enabled=global_config.google_auth_enabled,
+        password_login_enabled=global_config.password_login_enabled,
         quick_access_hide=global_config.quick_access_hide,
         quick_access_title=global_config.quick_access_title,
         quick_access_term=global_config.quick_access_term,
@@ -478,9 +570,7 @@ def get_attachment(filename: str):
             detail=api_messages.invalid_attachment_filename,
         )
     except FileNotFoundError:
-        raise HTTPException(
-            status_code=404, detail=api_messages.attachment_not_found
-        )
+        raise HTTPException(status_code=404, detail=api_messages.attachment_not_found)
 
 
 if global_config.auth_type != AuthType.READ_ONLY:

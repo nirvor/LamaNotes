@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import contextlib
 import ctypes
 import hashlib
@@ -10,6 +11,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import mimetypes
 import os
+import secrets
 import socket
 import shutil
 import subprocess
@@ -27,7 +29,6 @@ from webview.menu import Menu, MenuAction, MenuSeparator
 import urllib3
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
-
 
 DEFAULT_URL = "https://notes.thuber.org"
 APP_NAME = "NirvNotes"
@@ -176,10 +177,7 @@ class CredentialStore:
                 )
             except (OSError, ValueError, json.JSONDecodeError, UnicodeError):
                 return ""
-        if (
-            not isinstance(payload, dict)
-            or payload.get("sourceUrl") != self.source_url
-        ):
+        if not isinstance(payload, dict) or payload.get("sourceUrl") != self.source_url:
             return ""
         return str(payload.get("token", ""))
 
@@ -415,6 +413,9 @@ class NirvNotesApi:
         self._update_base_url = update_base_url.rstrip("/")
         self._source_url = source_url.rstrip("/")
         self._credential_store = credential_store
+        self._google_handoff_port = 0
+        self._pending_google_login: dict[str, Any] | None = None
+        self._google_login_lock = threading.Lock()
         self._update_status: dict[str, Any] | None = None
         self._update_checked_at = 0.0
         self._update_lock = threading.Lock()
@@ -432,6 +433,87 @@ class NirvNotesApi:
         if self._credential_store:
             self._credential_store.clear()
         return {"cleared": True}
+
+    def set_google_handoff_port(self, port: int) -> None:
+        self._google_handoff_port = int(port)
+
+    def start_google_login(self) -> dict[str, Any]:
+        if self._google_handoff_port <= 0:
+            return {
+                "opened": False,
+                "error": "The local login handoff is unavailable.",
+            }
+
+        verifier = secrets.token_urlsafe(64)
+        digest = hashlib.sha256(verifier.encode("ascii")).digest()
+        challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+        client_state = secrets.token_urlsafe(32)
+        loopback = f"http://127.0.0.1:{self._google_handoff_port}/auth/google/callback"
+        query = parse.urlencode(
+            {
+                "flow": "native",
+                "loopback": loopback,
+                "code_challenge": challenge,
+                "client_state": client_state,
+            }
+        )
+        url = f"{self._source_url}/api/auth/google/start?{query}"
+        with self._google_login_lock:
+            self._pending_google_login = {
+                "state": client_state,
+                "verifier": verifier,
+                "expires": time.monotonic() + 10 * 60,
+            }
+
+        result = self.open_external_url(url)
+        if not result.get("opened"):
+            with self._google_login_lock:
+                self._pending_google_login = None
+        return result
+
+    def complete_google_login(self, handoff: str, client_state: str) -> dict[str, Any]:
+        with self._google_login_lock:
+            pending = self._pending_google_login
+            self._pending_google_login = None
+        if (
+            not pending
+            or time.monotonic() > float(pending.get("expires", 0))
+            or not secrets.compare_digest(
+                str(pending.get("state", "")), str(client_state or "")
+            )
+        ):
+            return {
+                "ok": False,
+                "error": "The local login request is invalid or expired.",
+            }
+
+        payload = json.dumps(
+            {
+                "handoff": str(handoff or ""),
+                "verifier": str(pending.get("verifier", "")),
+            }
+        ).encode("utf-8")
+        exchange_request = request.Request(
+            f"{self._source_url}/api/auth/google/native/exchange",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with request.urlopen(exchange_request, timeout=15) as response:
+                result = json.loads(response.read().decode("utf-8"))
+            token = str(result.get("access_token", ""))
+            if not token or not self._credential_store:
+                raise ValueError("The server did not return a usable session.")
+            if not self._credential_store.set_token(token):
+                raise OSError("Windows could not protect the NirvNotes session.")
+        except (OSError, ValueError, UnicodeError) as exc:
+            logging.warning("native Google login exchange failed: %s", exc)
+            return {"ok": False, "error": "The secure login exchange failed."}
+
+        if self._window:
+            self._window.load_url(f"{self._update_base_url}/")
+        return {"ok": True}
 
     def consume_launch_files(self) -> list[dict[str, Any]]:
         payloads = self._pending_launch_files
@@ -679,11 +761,7 @@ class NirvNotesApi:
 
 def decode_text(raw: bytes) -> tuple[str, str, bool]:
     bom = raw.startswith(b"\xef\xbb\xbf")
-    encodings = (
-        ("utf-8-sig",)
-        if bom
-        else ("utf-8", "cp1252", "latin-1")
-    )
+    encodings = ("utf-8-sig",) if bom else ("utf-8", "cp1252", "latin-1")
     for encoding in encodings:
         try:
             content = raw.decode(encoding)
@@ -777,9 +855,7 @@ def normalize_app_route(value: Any) -> str:
 
 def load_client_metadata() -> dict[str, str]:
     try:
-        raw = Path(resource_path(CLIENT_METADATA_FILE)).read_text(
-            encoding="utf-8-sig"
-        )
+        raw = Path(resource_path(CLIENT_METADATA_FILE)).read_text(encoding="utf-8-sig")
         metadata = json.loads(raw)
         return {
             "version": str(metadata.get("version", "dev")),
@@ -798,15 +874,15 @@ def validate_update_manifest(manifest: dict[str, Any]) -> None:
     if filename != manifest["file"] or not filename.lower().endswith(".zip"):
         raise ValueError("Windows update package name is invalid.")
     sha256 = str(manifest["sha256"]).lower()
-    if len(sha256) != 64 or any(character not in "0123456789abcdef" for character in sha256):
+    if len(sha256) != 64 or any(
+        character not in "0123456789abcdef" for character in sha256
+    ):
         raise ValueError("Windows update hash is invalid.")
     if int(manifest["size"]) <= 0:
         raise ValueError("Windows update package size is invalid.")
 
 
-def is_update_available(
-    current: dict[str, str], manifest: dict[str, Any]
-) -> bool:
+def is_update_available(current: dict[str, str], manifest: dict[str, Any]) -> bool:
     current_commit = str(current.get("commit", "")).strip().lower()
     next_commit = str(manifest.get("commit", "")).strip().lower()
     if current_commit and next_commit:
@@ -984,7 +1060,9 @@ def find_current_process_window_rect(
     current_pid = os.getpid()
     candidates: list[dict[str, Any]] = []
 
-    enum_windows_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+    enum_windows_proc = ctypes.WINFUNCTYPE(
+        ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p
+    )
 
     def callback(hwnd: int, _lparam: int) -> bool:
         pid = ctypes.c_ulong()
@@ -1354,7 +1432,9 @@ class LocalProxyHandler(BaseHTTPRequestHandler):
         for chunk in response.stream(64 * 1024, decode_content=False):
             self.wfile.write(chunk)
 
-    def _send_buffered_response(self, status: int, headers: Any, payload: bytes) -> None:
+    def _send_buffered_response(
+        self, status: int, headers: Any, payload: bytes
+    ) -> None:
         self.send_response(status)
         for key, value in headers.items():
             if key.lower() in HOP_BY_HOP_HEADERS or key.lower() == "content-length":
@@ -1452,6 +1532,29 @@ class HandoffServer(ThreadingHTTPServer):
 class HandoffHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
+    def do_GET(self) -> None:
+        parsed = parse.urlsplit(self.path)
+        if parsed.path != "/auth/google/callback":
+            self._send_json(404, {"ok": False, "error": "not_found"})
+            return
+        query = parse.parse_qs(parsed.query)
+        handoff = (query.get("handoff") or [""])[0]
+        client_state = (query.get("state") or [""])[0]
+        result = self.server.api.complete_google_login(  # type: ignore[attr-defined]
+            handoff,
+            client_state,
+        )
+        if result.get("ok"):
+            self._send_html(
+                200,
+                "NirvNotes ist angemeldet. Dieses Fenster kann geschlossen werden.",
+            )
+        else:
+            self._send_html(
+                400,
+                "Die NirvNotes-Anmeldung ist abgelaufen oder fehlgeschlagen.",
+            )
+
     def do_POST(self) -> None:
         if self.path != "/open-files":
             self._send_json(404, {"ok": False, "error": "not_found"})
@@ -1499,6 +1602,23 @@ class HandoffHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(encoded)
 
+    def _send_html(self, status: int, message: str) -> None:
+        encoded = (
+            '<!doctype html><html lang="de"><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width">'
+            '<title>NirvNotes</title><body style="font:16px system-ui;'
+            'max-width:34rem;margin:12vh auto;padding:1rem">'
+            f"<p>{message}</p></body></html>"
+        ).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(encoded)
+
 
 def start_handoff_server(
     api: NirvNotesApi,
@@ -1533,7 +1653,9 @@ def start_instance_registration(command_port: int) -> threading.Event:
     try:
         write_record(started_at, last_active)
     except OSError:
-        logging.debug("could not write initial NirvNotes instance record", exc_info=True)
+        logging.debug(
+            "could not write initial NirvNotes instance record", exc_info=True
+        )
 
     def registration_loop() -> None:
         nonlocal last_active
@@ -1544,7 +1666,9 @@ def start_instance_registration(command_port: int) -> threading.Event:
             try:
                 write_record(now, last_active)
             except OSError:
-                logging.debug("could not write NirvNotes instance record", exc_info=True)
+                logging.debug(
+                    "could not write NirvNotes instance record", exc_info=True
+                )
             stop_event.wait(INSTANCE_HEARTBEAT_SECONDS)
 
         with contextlib.suppress(OSError):
@@ -1779,7 +1903,9 @@ def open_route(window: webview.Window, base_url: str, route: str) -> None:
     window.load_url(f"{base_url.rstrip('/')}{route}")
 
 
-def dispatch_native_launch_consumption(window: webview.Window, fallback_url: str) -> bool:
+def dispatch_native_launch_consumption(
+    window: webview.Window, fallback_url: str
+) -> bool:
     encoded_fallback_url = json.dumps(fallback_url)
     script = f"""
 (() => {{
@@ -1919,6 +2045,7 @@ def main() -> None:
     api._window = window
     window_ref["window"] = window
     handoff_server, handoff_port = start_handoff_server(api, browser_base_url)
+    api.set_google_handoff_port(handoff_port)
     instance_registration_stop = start_instance_registration(handoff_port)
     register_window_state_events(window, args.min_width, args.min_height)
     window_state_stop = start_window_state_persistence(args.min_width, args.min_height)

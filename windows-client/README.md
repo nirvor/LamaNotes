@@ -58,6 +58,10 @@ but does not fight Windows UserChoice protection.
 - Does not import external files into the VPS note folder.
 - Supports multiple independent windows. A second app launch gets its own local
   proxy port, and `New Window` opens the current NirvNotes route natively.
+- Starts Google login in the normal system browser. The server returns a
+  short-lived PKCE-bound handoff to the app's loopback listener; the resulting
+  NirvNotes token is protected with Windows DPAPI and is never placed in the
+  embedded browser URL.
 
 ## Updates
 

@@ -1,7 +1,28 @@
 <template>
   <div class="flex h-full flex-col items-center justify-center">
     <form @submit.prevent="logIn" class="flex max-w-80 flex-col items-center">
+      <CustomButton
+        v-if="globalStore.config.googleAuthEnabled"
+        type="button"
+        :iconPath="mdiGoogle"
+        label="Continue with Google"
+        style="cta"
+        class="mb-4 w-full justify-center py-1.5"
+        @click="logInWithGoogle"
+      />
+      <div
+        v-if="
+          globalStore.config.googleAuthEnabled &&
+          globalStore.config.passwordLoginEnabled !== false
+        "
+        class="mb-4 flex w-full items-center gap-2 text-xs text-theme-text-muted"
+      >
+        <span class="h-px flex-1 bg-theme-border"></span>
+        <span>or</span>
+        <span class="h-px flex-1 bg-theme-border"></span>
+      </div>
       <TextInput
+        v-if="globalStore.config.passwordLoginEnabled !== false"
         v-model="username"
         id="username"
         placeholder="Username"
@@ -10,6 +31,7 @@
         required
       />
       <TextInput
+        v-if="globalStore.config.passwordLoginEnabled !== false"
         v-model="password"
         id="password"
         placeholder="Password"
@@ -19,7 +41,10 @@
         required
       />
       <TextInput
-        v-if="globalStore.config.authType == authTypes.totp"
+        v-if="
+          globalStore.config.passwordLoginEnabled !== false &&
+          globalStore.config.authType == authTypes.totp
+        "
         v-model="totp"
         id="one-time-code"
         placeholder="2FA Code"
@@ -27,7 +52,10 @@
         autocomplete="one-time-code"
         required
       />
-      <div class="mb-4 flex">
+      <div
+        v-if="globalStore.config.passwordLoginEnabled !== false"
+        class="mb-4 flex"
+      >
         <input
           type="checkbox"
           id="remember-me"
@@ -36,12 +64,17 @@
         />
         <label for="remember-me">Remember Me</label>
       </div>
-      <CustomButton :iconPath="mdilLogin" label="Log In" />
+      <CustomButton
+        v-if="globalStore.config.passwordLoginEnabled !== false"
+        :iconPath="mdilLogin"
+        label="Log In"
+      />
     </form>
   </div>
 </template>
 
 <script setup>
+import { mdiGoogle } from "@mdi/js";
 import { mdilLogin } from "@mdi/light-js";
 import { useToast } from "primevue/usetoast";
 import { ref } from "vue";
@@ -94,6 +127,35 @@ function logIn() {
         apiErrorHandler(error, toast);
       }
     });
+}
+
+function logInWithGoogle() {
+  if (desktopShell.enabled && window.pywebview?.api?.start_google_login) {
+    Promise.resolve(window.pywebview.api.start_google_login())
+      .then((result) => {
+        if (!result?.opened) {
+          throw new Error(result?.error || "Could not open Google login.");
+        }
+      })
+      .catch(() => {
+        toast.add(
+          getToastOptions(
+            "Could not open the secure browser login.",
+            "Google Login Failed",
+            "error",
+          ),
+        );
+      });
+    return;
+  }
+
+  const nextPath =
+    typeof props.redirect === "string" && props.redirect.startsWith("/")
+      ? props.redirect
+      : "/";
+  window.location.assign(
+    `api/auth/google/start?flow=web&next=${encodeURIComponent(nextPath)}`,
+  );
 }
 
 // Redirect to home if authentication is disabled.

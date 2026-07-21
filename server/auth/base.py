@@ -17,6 +17,11 @@ class BaseAuth(ABC):
         """Authenticate a user."""
         pass
 
+    @abstractmethod
+    def issue_session(self, remember_me: bool = True) -> Token:
+        """Issue a session after a trusted external identity check."""
+        pass
+
     def require(self, scope: str) -> Callable:
         def require_scope(
             principal: AuthPrincipal = Depends(self.authenticate),

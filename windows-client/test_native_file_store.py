@@ -5,9 +5,9 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from pathlib import Path
-from urllib import error, request
+from urllib import error, parse, request
 
 from nirvnotes_client import (
     ALLOWED_EXTENSIONS,
@@ -30,13 +30,9 @@ class NirvNotesApiTests(unittest.TestCase):
                 "https://notes.example",
             )
             with patch("nirvnotes_client.os.startfile") as startfile:
-                result = api.open_external_url(
-                    "https://pages.thuber.org/example/"
-                )
+                result = api.open_external_url("https://pages.thuber.org/example/")
             self.assertTrue(result["opened"])
-            startfile.assert_called_once_with(
-                "https://pages.thuber.org/example/"
-            )
+            startfile.assert_called_once_with("https://pages.thuber.org/example/")
         finally:
             store.close()
 
@@ -79,6 +75,66 @@ class NirvNotesApiTests(unittest.TestCase):
                 result = api.open_external_url("file:///C:/private.txt")
             self.assertFalse(result["opened"])
             startfile.assert_not_called()
+        finally:
+            store.close()
+
+    def test_google_login_uses_system_browser_pkce_and_dpapi_store(
+        self,
+    ) -> None:
+        class MemoryCredentialStore:
+            token = ""
+
+            def set_token(self, token: str) -> bool:
+                self.token = token
+                return True
+
+        class ExchangeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self) -> bytes:
+                return b'{"access_token":"native-session-token"}'
+
+        store = NativeFileStore()
+        credential_store = MemoryCredentialStore()
+        try:
+            api = NirvNotesApi(
+                store,
+                [],
+                "http://127.0.0.1:31992",
+                "https://notes.example",
+                credential_store=credential_store,
+            )
+            api.set_google_handoff_port(45678)
+            api._window = Mock()
+            with patch("nirvnotes_client.os.startfile") as startfile:
+                opened = api.start_google_login()
+
+            self.assertTrue(opened["opened"])
+            login_url = startfile.call_args.args[0]
+            query = parse.parse_qs(parse.urlsplit(login_url).query)
+            self.assertEqual(query["flow"], ["native"])
+            self.assertEqual(
+                query["loopback"],
+                ["http://127.0.0.1:45678/auth/google/callback"],
+            )
+            self.assertEqual(len(query["code_challenge"][0]), 43)
+
+            with patch(
+                "nirvnotes_client.request.urlopen",
+                return_value=ExchangeResponse(),
+            ):
+                completed = api.complete_google_login(
+                    "short-lived-handoff",
+                    query["client_state"][0],
+                )
+
+            self.assertTrue(completed["ok"])
+            self.assertEqual(credential_store.token, "native-session-token")
+            api._window.load_url.assert_called_once_with("http://127.0.0.1:31992/")
         finally:
             store.close()
 

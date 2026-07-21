@@ -7,6 +7,8 @@ export const desktopShell = reactive({
 
 export const desktopFallbackConfig = Object.freeze({
   authType: "password",
+  googleAuthEnabled: false,
+  passwordLoginEnabled: true,
   quickAccessHide: true,
   quickAccessTitle: "PINNED",
   quickAccessTerm: "#pinned",

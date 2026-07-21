@@ -39,11 +39,16 @@ class LocalAuth(BaseAuth):
         self.legacy_password = get_env(
             "FLATNOTES_PASSWORD", mandatory=False, default=""
         )
-        if not self.password_hash and not self.legacy_password:
+        self.password_login_enabled = self.config.password_login_enabled
+        if (
+            self.password_login_enabled
+            and not self.password_hash
+            and not self.legacy_password
+        ):
             raise RuntimeError(
                 "FLATNOTES_PASSWORD_HASH or FLATNOTES_PASSWORD must be set."
             )
-        if not self.password_hash:
+        if self.password_login_enabled and not self.password_hash:
             logger.warning(
                 "FLATNOTES_PASSWORD is a compatibility fallback. Migrate to "
                 "FLATNOTES_PASSWORD_HASH before exposing the service."
@@ -58,7 +63,7 @@ class LocalAuth(BaseAuth):
         self.api_tokens = self._load_api_tokens()
 
         self.is_totp_enabled = False
-        if self.config.auth_type == AuthType.TOTP:
+        if self.password_login_enabled and self.config.auth_type == AuthType.TOTP:
             self.is_totp_enabled = True
             self.totp_key = get_env("FLATNOTES_TOTP_KEY", mandatory=True)
             self.totp_key = b32encode(self.totp_key.encode("utf-8"))
@@ -67,6 +72,8 @@ class LocalAuth(BaseAuth):
             self._display_totp_enrolment()
 
     def login(self, data: Login) -> Token:
+        if not self.password_login_enabled:
+            raise ValueError("Password login is disabled.")
         username_correct = secrets.compare_digest(self.username, data.username.lower())
 
         supplied_password = data.password
@@ -90,9 +97,12 @@ class LocalAuth(BaseAuth):
         if self.is_totp_enabled:
             self.last_used_totp = current_totp
 
+        return self.issue_session(remember_me=data.remember_me)
+
+    def issue_session(self, remember_me: bool = True) -> Token:
         expiry = (
             timedelta(days=self.remember_expiry_days)
-            if data.remember_me
+            if remember_me
             else timedelta(hours=self.session_expiry_hours)
         )
         access_token = self._create_access_token(

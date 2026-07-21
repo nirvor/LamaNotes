@@ -33,6 +33,21 @@ npm run build
 Server tests use Python 3.11 and the dependencies declared in `Pipfile`.
 Windows client dependencies are listed in `windows-client/requirements.txt`.
 
+## Single-user Google login
+
+Google login is an optional second authentication path for one exact verified
+email address. Set `NIRVNOTES_GOOGLE_AUTH_ENABLED=true`, the Google client ID
+and secret, `NIRVNOTES_GOOGLE_ALLOWED_EMAIL`, and
+`NIRVNOTES_GOOGLE_PUBLIC_ORIGIN`. Register
+`<public-origin>/api/auth/google/callback` as the web OAuth redirect URI. Keep
+`NIRVNOTES_PASSWORD_LOGIN_ENABLED=true` during migration; it can be disabled
+after web and Windows-client login have both been accepted.
+
+Use the exact verified email for the controlled bootstrap login. Afterwards,
+store its Google `sub` as `NIRVNOTES_GOOGLE_ALLOWED_SUB` in the private server
+environment. Once set, both email and `sub` must match; do not print or commit
+the account identifier.
+
 ## History and attribution
 
 LamaNotes grew from the open-source flatnotes project by Adam Dullage. The new

@@ -36,6 +36,7 @@ def config() -> SimpleNamespace:
         remember_expiry_days=30,
         accept_legacy_tokens=False,
         session_cookie_name="lamanotes_session",
+        password_login_enabled=True,
     )
 
 
@@ -72,6 +73,24 @@ class LocalAuthTests(unittest.TestCase):
             auth = LocalAuth(config())
             with self.assertRaises(ValueError):
                 auth.login(Login(username="tom", password="wrong"))
+
+    def test_trusted_identity_can_issue_session_without_password_login(
+        self,
+    ) -> None:
+        google_only_config = config()
+        google_only_config.password_login_enabled = False
+        environment = {
+            **self.environment,
+            "FLATNOTES_PASSWORD_HASH": "",
+        }
+        with patch.dict(os.environ, environment, clear=False):
+            auth = LocalAuth(google_only_config)
+            token = auth.issue_session()
+            with self.assertRaises(ValueError):
+                auth.login(Login(username="tom", password=self.password))
+
+        principal = auth.authenticate(request_for(), token.access_token)
+        self.assertEqual(principal.subject, "tom")
 
     def test_api_token_has_only_configured_scopes(self) -> None:
         raw_token = "lmn_test-token-with-enough-entropy"

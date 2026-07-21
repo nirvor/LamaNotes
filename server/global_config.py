@@ -63,6 +63,59 @@ class GlobalConfig:
             default=300,
             cast_int=True,
         )
+        self.password_login_enabled: bool = get_env(
+            "NIRVNOTES_PASSWORD_LOGIN_ENABLED",
+            mandatory=False,
+            default=True,
+            cast_bool=True,
+        )
+        self.google_auth_enabled: bool = get_env(
+            "NIRVNOTES_GOOGLE_AUTH_ENABLED",
+            mandatory=False,
+            default=False,
+            cast_bool=True,
+        )
+        self.google_client_id: str = get_env(
+            "NIRVNOTES_GOOGLE_CLIENT_ID", mandatory=False, default=""
+        ).strip()
+        self.google_client_secret: str = get_env(
+            "NIRVNOTES_GOOGLE_CLIENT_SECRET", mandatory=False, default=""
+        ).strip()
+        self.google_allowed_email: str = (
+            get_env("NIRVNOTES_GOOGLE_ALLOWED_EMAIL", mandatory=False, default="")
+            .strip()
+            .lower()
+        )
+        self.google_allowed_sub: str = get_env(
+            "NIRVNOTES_GOOGLE_ALLOWED_SUB", mandatory=False, default=""
+        ).strip()
+        self.google_public_origin: str = get_env(
+            "NIRVNOTES_GOOGLE_PUBLIC_ORIGIN", mandatory=False, default=""
+        ).rstrip("/")
+        if self.google_auth_enabled:
+            if self.auth_type in (AuthType.NONE, AuthType.READ_ONLY):
+                raise RuntimeError(
+                    "Google auth requires a writable authenticated NirvNotes mode."
+                )
+            required_google_values = (
+                self.google_client_id,
+                self.google_client_secret,
+                self.google_allowed_email,
+                self.google_public_origin,
+            )
+            if not all(required_google_values):
+                raise RuntimeError(
+                    "Google auth requires client ID, client secret, allowed email, "
+                    "and public origin."
+                )
+            if not self.google_public_origin.startswith("https://"):
+                raise RuntimeError("Google auth public origin must use HTTPS.")
+        if (
+            self.auth_type not in (AuthType.NONE, AuthType.READ_ONLY)
+            and not self.password_login_enabled
+            and not self.google_auth_enabled
+        ):
+            raise RuntimeError("At least one NirvNotes login method must be enabled.")
         self.publish_base_url: str = get_env(
             "NIRVNOTES_PUBLISH_BASE_URL", mandatory=False, default=""
         )
@@ -181,6 +234,8 @@ class AuthType(str, Enum):
 
 class GlobalConfigResponseModel(CustomBaseModel):
     auth_type: AuthType
+    google_auth_enabled: bool
+    password_login_enabled: bool
     quick_access_hide: bool
     quick_access_title: str
     quick_access_term: str

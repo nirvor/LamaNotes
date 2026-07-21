@@ -19,6 +19,11 @@ class Token(BaseModel):
     expires_in: int
 
 
+class NativeGoogleExchange(BaseModel):
+    handoff: str
+    verifier: str
+
+
 @dataclass(frozen=True)
 class AuthPrincipal:
     subject: str
