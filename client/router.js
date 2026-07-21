@@ -3,7 +3,7 @@ import * as constants from "./constants.js";
 import { createRouter, createWebHistory } from "vue-router";
 
 import { authCheck, clearApiCaches } from "./api.js";
-import { desktopShell } from "./desktopShell.js";
+import { desktopShell, setDesktopWindowTitle } from "./desktopShell.js";
 import { clearStoredToken, getStoredToken } from "./tokenStorage.js";
 
 const loadHomeView = () => import("./views/Home.vue");
@@ -125,6 +125,17 @@ router.afterEach((to) => {
     title = "Open File";
   }
   document.title = title;
+  if (desktopShell.enabled) {
+    if (to.name === "note" && to.params.title) {
+      setDesktopWindowTitle(`${String(to.params.title)}.html`);
+    } else if (to.name === "new") {
+      setDesktopWindowTitle("New Note.html");
+    } else if (to.name === "openFile") {
+      setDesktopWindowTitle("Open File");
+    } else {
+      setDesktopWindowTitle("");
+    }
+  }
   if (to.name === "home") {
     prefetchHomeViews();
   }

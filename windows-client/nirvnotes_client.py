@@ -58,6 +58,8 @@ ALLOWED_EXTENSIONS = {
     ".toml",
     ".xml",
     ".log",
+    ".csv",
+    ".tex",
 }
 TEXT_TYPES = {
     ".md": "text/markdown",
@@ -70,6 +72,8 @@ TEXT_TYPES = {
     ".toml": "application/toml",
     ".xml": "application/xml",
     ".log": "text/plain",
+    ".csv": "text/csv",
+    ".tex": "application/x-tex",
 }
 HOP_BY_HOP_HEADERS = {
     "connection",
@@ -434,6 +438,13 @@ class NirvNotesApi:
             self._credential_store.clear()
         return {"cleared": True}
 
+    def set_window_title(self, label: str = "") -> dict[str, Any]:
+        normalized = " ".join(str(label or "").split()).strip()
+        title = APP_NAME if not normalized else f"{APP_NAME} - {normalized[:180]}"
+        if self._window:
+            self._window.set_title(title)
+        return {"updated": bool(self._window), "title": title}
+
     def set_google_handoff_port(self, port: int) -> None:
         self._google_handoff_port = int(port)
 
@@ -528,7 +539,7 @@ class NirvNotesApi:
             webview.OPEN_DIALOG,
             allow_multiple=True,
             file_types=(
-                "Text and config (*.md;*.txt;*.cfg;*.ini;*.json;*.yaml;*.yml;*.toml;*.xml;*.log)",
+                "Text and config (*.md;*.txt;*.cfg;*.ini;*.json;*.yaml;*.yml;*.toml;*.xml;*.log;*.csv;*.tex)",
             ),
         )
         return self._file_store.payloads_for_paths(list(paths or []))

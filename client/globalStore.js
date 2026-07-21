@@ -6,6 +6,9 @@ export const useGlobalStore = defineStore("global", () => {
   const noteActions = ref([]);
   const noteLayoutKind = ref("default");
   const noteMenuItems = ref([]);
+  const showLineNumbers = ref(
+    localStorage.getItem("nirvnotes:show-line-numbers") === "true",
+  );
 
   function setNoteActions(actions = []) {
     noteActions.value = actions;
@@ -25,14 +28,24 @@ export const useGlobalStore = defineStore("global", () => {
     noteLayoutKind.value = "default";
   }
 
+  function toggleLineNumbers() {
+    showLineNumbers.value = !showLineNumbers.value;
+    localStorage.setItem(
+      "nirvnotes:show-line-numbers",
+      String(showLineNumbers.value),
+    );
+  }
+
   return {
     config,
     noteActions,
     noteLayoutKind,
     noteMenuItems,
+    showLineNumbers,
     setNoteActions,
     setNoteLayout,
     setNoteMenuItems,
+    toggleLineNumbers,
     clearNoteActions,
   };
 });

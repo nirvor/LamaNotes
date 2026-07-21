@@ -20,6 +20,26 @@ from nirvnotes_client import (
 
 
 class NirvNotesApiTests(unittest.TestCase):
+    def test_window_title_is_compact_and_native(self) -> None:
+        store = NativeFileStore()
+        try:
+            api = NirvNotesApi(
+                store,
+                [],
+                "https://notes.example",
+                "https://notes.example",
+            )
+            api._window = Mock()
+
+            result = api.set_window_title("  sample.csv  ")
+
+            self.assertTrue(result["updated"])
+            api._window.set_title.assert_called_once_with(
+                "NirvNotes - sample.csv",
+            )
+        finally:
+            store.close()
+
     def test_external_public_url_opens_in_system_browser(self) -> None:
         store = NativeFileStore()
         try:
@@ -220,6 +240,23 @@ class NativeFileStoreTests(unittest.TestCase):
         self.assertEqual(payload["extension"], "yaml")
         self.assertEqual(payload["type"], "application/yaml")
         self.assertEqual(payload["content"], "enabled: true\n")
+
+    def test_csv_and_tex_are_opened_as_raw_source(self) -> None:
+        csv_path = self.root / "measurements.csv"
+        tex_path = self.root / "formula.tex"
+        csv_path.write_text("name,value\nalpha,3.5\n", encoding="utf-8")
+        tex_path.write_text("\\\\section{Result}\n", encoding="utf-8")
+
+        csv_payload, tex_payload = self.store.payloads_for_paths(
+            [str(csv_path), str(tex_path)]
+        )
+
+        self.assertIn(".csv", ALLOWED_EXTENSIONS)
+        self.assertIn(".tex", ALLOWED_EXTENSIONS)
+        self.assertEqual(csv_payload["type"], "text/csv")
+        self.assertEqual(csv_payload["content"], "name,value\nalpha,3.5\n")
+        self.assertEqual(tex_payload["type"], "application/x-tex")
+        self.assertEqual(tex_payload["content"], "\\\\section{Result}\n")
 
     def _wait_for_change(self, file_id: str) -> dict:
         deadline = time.monotonic() + 3

@@ -18,7 +18,12 @@
       @close="closeFind"
     />
 
-    <div class="flatnotes-open-file-heading">
+    <div
+      class="flatnotes-open-file-heading"
+      :class="{
+        'flatnotes-open-file-heading-desktop': desktopShell.enabled,
+      }"
+    >
       <div class="min-w-0">
         <div class="flatnotes-open-file-kicker-line">
           <span class="flatnotes-open-file-kicker">
@@ -34,7 +39,7 @@
             <strong>{{ item.value }}</strong>
           </span>
         </div>
-        <h1 class="flatnotes-open-file-title">
+        <h1 v-if="!desktopShell.enabled" class="flatnotes-open-file-title">
           {{ activeFile ? activeFile.name : "Open a local file" }}
         </h1>
       </div>
@@ -44,7 +49,7 @@
       ref="fileInput"
       type="file"
       class="hidden"
-      accept=".md,.txt,.cfg,.ini,.json,.yaml,.yml,.toml,.xml,.log,text/markdown,text/plain,application/json,application/yaml,application/xml"
+      accept=".md,.txt,.cfg,.ini,.json,.yaml,.yml,.toml,.xml,.log,.csv,.tex,text/markdown,text/plain,text/csv,application/json,application/yaml,application/xml,application/x-tex"
       multiple
       @change="fileInputChanged"
     />
@@ -130,11 +135,17 @@
         v-model="activeFile.draftContent"
         :language="editorLanguage"
         :wrap="editorWrap"
+        :show-line-numbers="globalStore.showLineNumbers"
         :session-key="editorSessionKey"
         :aria-label="`Edit ${activeFile.name}`"
         @change="activeFileChangedHandler"
         @keydown="documentKeydownHandler"
         @ready="openFileEditorReadyHandler"
+      />
+
+      <CsvTablePreview
+        v-else-if="activeFile && activeFile.previewMode === 'csv'"
+        :source="activeFile.draftContent"
       />
 
       <pre
@@ -241,6 +252,7 @@ import { useToast } from "primevue/usetoast";
 
 import { apiErrorHandler, createNote } from "../api.js";
 import DocumentFindBar from "../components/DocumentFindBar.vue";
+import CsvTablePreview from "../components/CsvTablePreview.vue";
 import IconLabel from "../components/IconLabel.vue";
 import { useDocumentFind } from "../documentFind.js";
 import { useDocumentSession } from "../documents/documentSession.js";
@@ -249,6 +261,7 @@ import {
   clearDesktopFileSession,
   saveDesktopFileSession,
 } from "../desktopSession.js";
+import { desktopShell, setDesktopWindowTitle } from "../desktopShell.js";
 import {
   externalFileLaunch,
   supportsFileHandlingLaunchQueue,
@@ -337,7 +350,7 @@ const editorLanguage = computed(() => {
   return extension === "md" ? "markdown" : extension;
 });
 const editorWrap = computed(() =>
-  ["md", "txt", "log"].includes(activeFile.value?.extension),
+  ["md", "txt", "log", "tex"].includes(activeFile.value?.extension),
 );
 const editorSessionKey = computed(() =>
   activeFile.value ? `local:${activeFile.value.draftStorageKey}` : "",
@@ -347,10 +360,12 @@ const metadataItems = computed(() => {
     return [];
   }
 
-  const items = [
-    { label: "type", value: activeFile.value.extension || "text" },
-    { label: "size", value: formatBytes(activeFile.value.size) },
-  ];
+  const items = desktopShell.enabled
+    ? [{ label: "size", value: formatBytes(activeFile.value.size) }]
+    : [
+        { label: "type", value: activeFile.value.extension || "text" },
+        { label: "size", value: formatBytes(activeFile.value.size) },
+      ];
   if (activeFile.value.encoding) {
     items.push({ label: "encoding", value: activeFile.value.encoding });
   }
@@ -400,6 +415,9 @@ watch(editorTextarea, () => {
 });
 watchEffect(updateOpenFileActions);
 watchEffect(persistDesktopFiles);
+watchEffect(() => {
+  setDesktopWindowTitle(activeFile.value?.name || "Open File");
+});
 
 onUnmounted(() => {
   window.clearInterval(nativeWatcherTimer);
@@ -533,6 +551,8 @@ async function chooseFile() {
             accept: {
               "text/markdown": [".md"],
               "text/plain": [".txt", ".cfg", ".ini", ".log"],
+              "text/csv": [".csv"],
+              "application/x-tex": [".tex"],
               "application/json": [".json"],
               "application/yaml": [".yaml", ".yml"],
               "application/toml": [".toml"],
@@ -633,9 +653,12 @@ async function fileToPreview(selectedFile) {
     extension,
     file.type,
   );
-  const previewMode = isMarkdownFile(extension, file.type)
-    ? "markdown"
-    : "plain";
+  const previewMode =
+    extension === "csv"
+      ? "csv"
+      : isMarkdownFile(extension, file.type)
+        ? "markdown"
+        : "plain";
 
   return {
     key:
@@ -842,7 +865,9 @@ function codeLanguageForExtension(extension = "") {
     return "ini";
   }
 
-  if (["json", "yaml", "yml", "toml", "xml"].includes(extension)) {
+  if (
+    ["json", "yaml", "yml", "toml", "xml", "csv", "tex"].includes(extension)
+  ) {
     return extension === "yml" ? "yaml" : extension;
   }
 
@@ -1200,6 +1225,14 @@ function showStatus(message, tone = "info") {
   min-width: 0;
   max-width: 100%;
   margin-bottom: 0.68rem;
+}
+
+.flatnotes-open-file-heading-desktop {
+  margin-bottom: 0.38rem;
+}
+
+.flatnotes-open-file-heading-desktop .flatnotes-open-file-kicker-line {
+  margin-bottom: 0;
 }
 
 .flatnotes-open-file-kicker-line {

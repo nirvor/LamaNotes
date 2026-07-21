@@ -69,13 +69,12 @@
 </template>
 
 <script setup>
-import { mdiUpdate } from "@mdi/js";
+import { mdiFormatListNumbered, mdiThemeLightDark, mdiUpdate } from "@mdi/js";
 import {
   mdilLogout,
   mdilHome,
   mdilMagnify,
   mdilMenu,
-  mdilMonitor,
   mdilNoteMultiple,
   mdilPlusBox,
   mdilPlusCircle,
@@ -144,9 +143,23 @@ const baseMenuItems = computed(() => {
         }),
     },
     {
-      label: "Toggle Theme",
-      icon: mdilMonitor,
-      command: toggleTheme,
+      label: "View options",
+      controls: [
+        {
+          label: "Toggle theme",
+          icon: mdiThemeLightDark,
+          command: toggleTheme,
+        },
+        {
+          label: globalStore.showLineNumbers
+            ? "Hide line numbers"
+            : "Show line numbers",
+          icon: mdiFormatListNumbered,
+          active: globalStore.showLineNumbers,
+          toggle: true,
+          command: globalStore.toggleLineNumbers,
+        },
+      ],
     },
     {
       separator: true,

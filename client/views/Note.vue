@@ -82,7 +82,10 @@
     <!-- Header -->
     <div class="min-w-0 max-w-full">
       <!-- Title -->
-      <div class="flatnotes-note-title-row">
+      <div
+        v-if="editMode || !desktopShell.enabled"
+        class="flatnotes-note-title-row"
+      >
         <div class="flatnotes-note-title-text">
           <span v-show="!editMode" :title="note.title">{{ note.title }}</span>
           <input
@@ -96,7 +99,7 @@
     </div>
 
     <hr
-      v-if="!editMode"
+      v-if="!editMode && !desktopShell.enabled"
       class="flatnotes-note-title-rule border-theme-border"
     />
 
@@ -135,6 +138,7 @@
         ref="contentEditor"
         :initialValue="getInitialEditorValue()"
         language="markdown"
+        :show-line-numbers="globalStore.showLineNumbers"
         :normalize-tags="true"
         :session-key="`cloud:${newTitle || note.title || 'new'}`"
         :aria-label="`Edit ${newTitle || note.title || 'note'}`"
@@ -235,6 +239,7 @@ import { authTypes } from "../constants.js";
 import { useDocumentSession } from "../documents/documentSession.js";
 import { createVpsNoteStorageAdapter } from "../documents/storageAdapters.js";
 import { useDocumentFind } from "../documentFind.js";
+import { desktopShell, setDesktopWindowTitle } from "../desktopShell.js";
 import { useGlobalStore } from "../globalStore.js";
 import { getToastOptions } from "../helpers.js";
 import { isCurrentTokenStored } from "../tokenStorage.js";
@@ -1489,6 +1494,17 @@ function updateNoteActions() {
   });
 }
 
+function libraryFilename() {
+  const title = editMode.value ? newTitle.value : note.value.title;
+  if (!title) {
+    return isNewNote.value ? "New Note.html" : "NirvNotes";
+  }
+  const extension = editorFormat.value || note.value.format || "html";
+  return String(title).toLowerCase().endsWith(`.${extension}`)
+    ? String(title)
+    : `${title}.${extension}`;
+}
+
 function isContentChanged() {
   return (
     newTitle.value != note.value.title ||
@@ -1521,6 +1537,7 @@ function getEditorContent() {
 }
 
 watchEffect(updateNoteActions);
+watchEffect(() => setDesktopWindowTitle(libraryFilename()));
 watch(
   () => props.title,
   () => {

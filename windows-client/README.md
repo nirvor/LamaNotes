@@ -47,9 +47,9 @@ but does not fight Windows UserChoice protection.
 - Uses persistent WebView2 storage under `%LOCALAPPDATA%\NirvNotes\WebView2`.
 - Writes startup diagnostics to `%LOCALAPPDATA%\NirvNotes\logs`.
 - Opens `.md`, `.txt`, `.cfg`, `.ini`, `.json`, `.yaml/.yml`, `.toml`, `.xml`,
-  and `.log` from Windows or the native menu.
-- Uses one compact CodeMirror editor with line numbers, syntax color, search,
-  keyboard undo/redo, and exact raw-source copy.
+  `.log`, `.csv`, and `.tex` from Windows or the native menu.
+- Uses one compact CodeMirror editor with optional line numbers, syntax color,
+  search, keyboard undo/redo, and exact raw-source copy.
 - Preserves UTF-8 BOM, Windows-1252, LF/CRLF, cursor, scroll, open files, edit
   mode, and the last window position.
 - Watches local files natively, reloads clean files automatically, and shows a

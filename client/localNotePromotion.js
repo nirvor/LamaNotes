@@ -35,6 +35,8 @@ function sourceMarkdown(file = {}) {
   const languageAliases = {
     cfg: "ini",
     log: "text",
+    csv: "csv",
+    tex: "tex",
     yml: "yaml",
   };
   const language = languageAliases[extension] || extension || "text";
@@ -44,7 +46,7 @@ function sourceMarkdown(file = {}) {
 
 export function localFileNoteTitle(filename = "") {
   const withoutExtension = String(filename).replace(
-    /\.(?:md|txt|cfg|ini|json|ya?ml|toml|xml|log)$/i,
+    /\.(?:md|txt|cfg|ini|json|ya?ml|toml|xml|log|csv|tex)$/i,
     "",
   );
   return (

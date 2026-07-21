@@ -26,6 +26,7 @@ import {
 } from "@codemirror/language";
 import { json } from "@codemirror/legacy-modes/mode/javascript";
 import { properties } from "@codemirror/legacy-modes/mode/properties";
+import { stex } from "@codemirror/legacy-modes/mode/stex";
 import { toml } from "@codemirror/legacy-modes/mode/toml";
 import { xml } from "@codemirror/legacy-modes/mode/xml";
 import { yaml } from "@codemirror/legacy-modes/mode/yaml";
@@ -51,7 +52,7 @@ const props = defineProps({
   initialValue: { type: String, default: "" },
   language: { type: String, default: "text" },
   wrap: { type: Boolean, default: true },
-  showLineNumbers: { type: Boolean, default: true },
+  showLineNumbers: { type: Boolean, default: false },
   normalizeTags: Boolean,
   sessionKey: { type: String, default: "" },
   ariaLabel: { type: String, default: "Source editor" },
@@ -66,6 +67,39 @@ const externalUpdate = Annotation.define();
 let editorView = null;
 let tagNormalizeTimer = null;
 let sessionSaveTimer = null;
+
+const csvLanguage = {
+  startState: () => ({ quoted: false }),
+  token(stream, state) {
+    if (state.quoted) {
+      while (!stream.eol()) {
+        if (stream.next() !== '"') {
+          continue;
+        }
+        if (stream.peek() === '"') {
+          stream.next();
+        } else {
+          state.quoted = false;
+          break;
+        }
+      }
+      return "string";
+    }
+    if (stream.peek() === '"') {
+      state.quoted = true;
+      stream.next();
+      return "string";
+    }
+    if (stream.match(/^[,;\t]/)) {
+      return "punctuation";
+    }
+    if (stream.match(/^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)/)) {
+      return "number";
+    }
+    stream.match(/^[^,;\t"]+/);
+    return null;
+  },
+};
 
 const sourceTheme = EditorView.theme({
   "&": {
@@ -217,6 +251,12 @@ function languageExtension(language = props.language) {
   }
   if (language === "xml") {
     return StreamLanguage.define(xml);
+  }
+  if (language === "tex" || language === "latex") {
+    return StreamLanguage.define(stex);
+  }
+  if (language === "csv") {
+    return StreamLanguage.define(csvLanguage);
   }
   return [];
 }

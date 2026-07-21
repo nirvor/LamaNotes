@@ -16,6 +16,26 @@ export const desktopFallbackConfig = Object.freeze({
   quickAccessLimit: 7,
 });
 
+let currentWindowLabel = "";
+
+export function setDesktopWindowTitle(label = "") {
+  if (!desktopShell.enabled) {
+    return;
+  }
+  const normalized = String(label || "")
+    .replace(/[\r\n\t]+/g, " ")
+    .trim();
+  document.title = normalized ? `NirvNotes - ${normalized}` : "NirvNotes";
+  if (normalized === currentWindowLabel) {
+    return;
+  }
+  currentWindowLabel = normalized;
+  const setter = window.pywebview?.api?.set_window_title;
+  if (setter) {
+    Promise.resolve(setter(normalized)).catch(() => {});
+  }
+}
+
 export function markCloudOnline() {
   if (desktopShell.enabled) {
     desktopShell.cloudOnline = true;

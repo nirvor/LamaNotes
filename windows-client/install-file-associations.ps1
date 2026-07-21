@@ -17,7 +17,7 @@ Set-Item -Path $CommandKey -Value "`"$ResolvedExe`" `"%1`""
 New-Item -Path $IconKey -Force | Out-Null
 Set-Item -Path $IconKey -Value "`"$ResolvedExe`",0"
 
-foreach ($Extension in ".md", ".txt", ".cfg", ".ini", ".json", ".yaml", ".yml", ".toml", ".xml", ".log") {
+foreach ($Extension in ".md", ".txt", ".cfg", ".ini", ".json", ".yaml", ".yml", ".toml", ".xml", ".log", ".csv", ".tex") {
   $ExtensionKey = "HKCU:\Software\Classes\$Extension\OpenWithProgids"
   New-Item -Path $ExtensionKey -Force | Out-Null
   New-ItemProperty -Path $ExtensionKey -Name $ProgId -Value ([byte[]]@()) -PropertyType Binary -Force | Out-Null

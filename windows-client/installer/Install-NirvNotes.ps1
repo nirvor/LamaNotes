@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 
 $AppName = "NirvNotes"
 $ProgId = "NirvNotes.TextFile"
-$Extensions = @(".md", ".txt", ".cfg", ".ini", ".json", ".yaml", ".yml", ".toml", ".xml", ".log")
+$Extensions = @(".md", ".txt", ".cfg", ".ini", ".json", ".yaml", ".yml", ".toml", ".xml", ".log", ".csv", ".tex")
 $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PackageVersion = "Win11 client"
 $PackageManifestPath = Join-Path $ScriptRoot "installer-manifest.json"
