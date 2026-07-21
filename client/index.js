@@ -188,6 +188,67 @@ window.addEventListener(
   openNativeFilesFromDialog,
 );
 
+window.addEventListener("nirvnotes:native-file-drag-state", (event) => {
+  document.body.classList.toggle(
+    "nirvnotes-native-file-drag-active",
+    Boolean(event.detail?.active),
+  );
+});
+
+let nativeFileDragDepth = 0;
+
+function isNativeFileDrag(event) {
+  return (
+    supportsNativeFileBridge() &&
+    Array.from(event.dataTransfer?.types || []).includes("Files")
+  );
+}
+
+function showNativeFileDropTarget(active) {
+  document.body.classList.toggle("nirvnotes-native-file-drag-active", active);
+}
+
+window.addEventListener("dragenter", (event) => {
+  if (!isNativeFileDrag(event)) {
+    return;
+  }
+  event.preventDefault();
+  nativeFileDragDepth += 1;
+  showNativeFileDropTarget(true);
+});
+
+window.addEventListener("dragover", (event) => {
+  if (!isNativeFileDrag(event)) {
+    return;
+  }
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "copy";
+});
+
+window.addEventListener("dragleave", (event) => {
+  if (!supportsNativeFileBridge()) {
+    return;
+  }
+  nativeFileDragDepth = Math.max(0, nativeFileDragDepth - 1);
+  if (nativeFileDragDepth === 0 || event.relatedTarget === null) {
+    showNativeFileDropTarget(false);
+  }
+});
+
+window.addEventListener("drop", (event) => {
+  if (!isNativeFileDrag(event)) {
+    return;
+  }
+  event.preventDefault();
+  nativeFileDragDepth = 0;
+  showNativeFileDropTarget(false);
+});
+
+window.addEventListener("blur", () => {
+  nativeFileDragDepth = 0;
+  showNativeFileDropTarget(false);
+});
+
 window.addEventListener("nirvnotes:consume-native-launch-files", () => {
   consumeNativeLaunchFilesNow();
 });

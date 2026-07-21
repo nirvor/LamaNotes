@@ -11,9 +11,13 @@ from urllib import error, parse, request
 
 from nirvnotes_client import (
     ALLOWED_EXTENSIONS,
+    SHARD_PATHW,
     CredentialStore,
     NativeFileStore,
     NirvNotesApi,
+    add_to_windows_recent_documents,
+    paths_from_native_drop_event,
+    register_native_file_drop,
     start_local_proxy,
     updater_process_creation_flags,
 )
@@ -159,6 +163,96 @@ class NirvNotesApiTests(unittest.TestCase):
             store.close()
 
 
+class NativeShellIntegrationTests(unittest.TestCase):
+    def test_drop_event_returns_unique_full_paths(self) -> None:
+        event = {
+            "dataTransfer": {
+                "files": [
+                    {"name": "alpha.md", "pywebviewFullPath": "C:/work/alpha.md"},
+                    {"name": "alpha.md", "pywebviewFullPath": "C:/work/alpha.md"},
+                    {"name": "missing.txt"},
+                    {"name": "beta.csv", "pywebviewFullPath": "C:/work/beta.csv"},
+                ]
+            }
+        }
+
+        self.assertEqual(
+            paths_from_native_drop_event(event),
+            ["C:/work/alpha.md", "C:/work/beta.csv"],
+        )
+
+    def test_windows_recent_document_uses_shell_api(self) -> None:
+        class RecentFunction:
+            argtypes = None
+            restype = None
+
+            def __init__(self) -> None:
+                self.calls = []
+
+            def __call__(self, *args) -> None:
+                self.calls.append(args)
+
+        recent_function = RecentFunction()
+        shell = Mock(SHAddToRecentDocs=recent_function)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sample.md"
+            path.write_text("# Sample\n", encoding="utf-8")
+
+            added = add_to_windows_recent_documents(
+                path,
+                shell32=shell,
+                platform="win32",
+            )
+
+        self.assertTrue(added)
+        self.assertEqual(len(recent_function.calls), 1)
+        self.assertEqual(recent_function.calls[0][0], SHARD_PATHW)
+
+    def test_windows_recent_document_is_noop_elsewhere(self) -> None:
+        self.assertFalse(
+            add_to_windows_recent_documents(
+                "sample.md",
+                shell32=Mock(),
+                platform="linux",
+            )
+        )
+
+    def test_native_drop_opens_only_the_first_file_in_current_window(self) -> None:
+        class CapturingEvent:
+            def __init__(self) -> None:
+                self.items = []
+
+            def __iadd__(self, item):
+                self.items.append(item)
+                return self
+
+        loaded = CapturingEvent()
+        dropped = CapturingEvent()
+        window = Mock()
+        window.events.loaded = loaded
+        window.dom.document.events.drop = dropped
+        api = Mock()
+        api.open_external_paths.return_value = 1
+
+        register_native_file_drop(window, api, "http://127.0.0.1:31992")
+        loaded.items[0]()
+        dropped.items[0].callback(
+            {
+                "dataTransfer": {
+                    "files": [
+                        {"pywebviewFullPath": "C:/work/first.md"},
+                        {"pywebviewFullPath": "C:/work/second.txt"},
+                    ]
+                }
+            }
+        )
+
+        api.open_external_paths.assert_called_once_with(
+            ["C:/work/first.md"],
+            "http://127.0.0.1:31992",
+        )
+
+
 class NativeFileStoreTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
@@ -257,6 +351,21 @@ class NativeFileStoreTests(unittest.TestCase):
         self.assertEqual(csv_payload["content"], "name,value\nalpha,3.5\n")
         self.assertEqual(tex_payload["type"], "application/x-tex")
         self.assertEqual(tex_payload["content"], "\\\\section{Result}\n")
+
+    def test_opened_file_is_forwarded_to_windows_recents(self) -> None:
+        path = self.root / "recent.md"
+        path.write_text("# Recent\n", encoding="utf-8")
+
+        with patch(
+            "nirvnotes_client.add_to_windows_recent_documents"
+        ) as add_recent:
+            payloads = self.store.payloads_for_paths(
+                [str(path)],
+                record_recent=True,
+            )
+
+        self.assertEqual(len(payloads), 1)
+        add_recent.assert_called_once_with(path)
 
     def _wait_for_change(self, file_id: str) -> dict:
         deadline = time.monotonic() + 3

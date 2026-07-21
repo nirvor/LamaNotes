@@ -151,8 +151,14 @@
       <pre
         v-else-if="activeFile && activeFile.previewMode === 'plain'"
         class="flatnotes-open-file-plain-preview"
-        >{{ activeFile.draftContent }}</pre
+        >{{ activeFile.previewContent }}</pre
       >
+      <p
+        v-if="activeFile?.largeFile && activeFile.previewTruncated && !editMode"
+        class="flatnotes-large-file-note"
+      >
+        Fast preview shortened. Edit opens the complete file.
+      </p>
 
       <ToastViewer
         v-else-if="activeFile"
@@ -269,6 +275,10 @@ import {
 } from "../externalFiles.js";
 import { useGlobalStore } from "../globalStore.js";
 import { getToastOptions } from "../helpers.js";
+import {
+  buildLargeFilePreview,
+  shouldUseLargeFileMode,
+} from "../largeFileMode.js";
 import { buildLocalLibraryNote } from "../localNotePromotion.js";
 
 const ToastViewer = defineAsyncComponent(
@@ -349,8 +359,10 @@ const editorLanguage = computed(() => {
   const extension = activeFile.value?.extension || "text";
   return extension === "md" ? "markdown" : extension;
 });
-const editorWrap = computed(() =>
-  ["md", "txt", "log", "tex"].includes(activeFile.value?.extension),
+const editorWrap = computed(
+  () =>
+    !activeFile.value?.largeFile &&
+    ["md", "txt", "log", "tex"].includes(activeFile.value?.extension),
 );
 const editorSessionKey = computed(() =>
   activeFile.value ? `local:${activeFile.value.draftStorageKey}` : "",
@@ -371,6 +383,9 @@ const metadataItems = computed(() => {
   }
   if (activeFile.value.lineEnding) {
     items.push({ label: "lines", value: activeFile.value.lineEnding });
+  }
+  if (activeFile.value.largeFile) {
+    items.push({ label: "view", value: "fast" });
   }
   return items;
 });
@@ -648,13 +663,16 @@ async function fileToPreview(selectedFile) {
   const content = await file.text();
   const nativeMetadata = nativePayload || handle?.metadata || {};
   const extension = getExtension(file.name);
-  const previewMarkdown = contentToPreviewMarkdown(
-    content,
-    extension,
-    file.type,
-  );
-  const previewMode =
-    extension === "csv"
+  const largeFile = shouldUseLargeFileMode(content, file.size);
+  const largePreview = largeFile
+    ? buildLargeFilePreview(content)
+    : { content, truncated: false };
+  const previewMarkdown = largeFile
+    ? ""
+    : contentToPreviewMarkdown(content, extension, file.type);
+  const previewMode = largeFile
+    ? "plain"
+    : extension === "csv"
       ? "csv"
       : isMarkdownFile(extension, file.type)
         ? "markdown"
@@ -675,7 +693,10 @@ async function fileToPreview(selectedFile) {
     draftStorageKey: localDraftStorageKey(file, handle),
     content,
     draftContent: content,
+    largeFile,
     previewMode,
+    previewContent: largePreview.content,
+    previewTruncated: largePreview.truncated,
     previewMarkdown,
     lastModified: file.lastModified,
     encoding: nativeMetadata.encoding || "",
@@ -906,11 +927,22 @@ function openFileEditorReadyHandler() {
 }
 
 function refreshPreview(file) {
-  file.previewMarkdown = contentToPreviewMarkdown(
-    file.draftContent,
-    file.extension,
-    file.type,
-  );
+  file.largeFile = shouldUseLargeFileMode(file.draftContent, file.size);
+  const largePreview = file.largeFile
+    ? buildLargeFilePreview(file.draftContent)
+    : { content: file.draftContent, truncated: false };
+  file.previewMode = file.largeFile
+    ? "plain"
+    : file.extension === "csv"
+      ? "csv"
+      : isMarkdownFile(file.extension, file.type)
+        ? "markdown"
+        : "plain";
+  file.previewContent = largePreview.content;
+  file.previewTruncated = largePreview.truncated;
+  file.previewMarkdown = file.largeFile
+    ? ""
+    : contentToPreviewMarkdown(file.draftContent, file.extension, file.type);
   file.previewRevision += 1;
 }
 
@@ -1267,6 +1299,15 @@ function showStatus(message, tone = "info") {
   color: rgb(var(--theme-text));
   font-size: clamp(1.18rem, 4.2vw, 1.5rem);
   line-height: 1.15;
+}
+
+.flatnotes-large-file-note {
+  margin: 0;
+  border-top: 1px solid rgb(var(--theme-border) / 0.72);
+  padding: 0.42rem 0.1rem;
+  color: rgb(var(--theme-text-very-muted));
+  font-size: 0.68rem;
+  line-height: 1.3;
 }
 
 .flatnotes-open-file-strip {

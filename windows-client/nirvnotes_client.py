@@ -25,6 +25,7 @@ from typing import Any
 from urllib import error, parse, request
 
 import webview
+from webview.dom import DOMEventHandler
 from webview.menu import Menu, MenuAction, MenuSeparator
 import urllib3
 from watchdog.events import FileSystemEventHandler
@@ -47,6 +48,7 @@ CLIENT_METADATA_FILE = "client-version.json"
 UPDATE_SCRIPT_FILE = "apply-update.ps1"
 CREDENTIAL_FILE = "auth-token.bin"
 CREDENTIAL_ENTROPY = b"NirvNotes desktop credential v1"
+SHARD_PATHW = 0x00000003
 ALLOWED_EXTENSIONS = {
     ".md",
     ".txt",
@@ -75,6 +77,58 @@ TEXT_TYPES = {
     ".csv": "text/csv",
     ".tex": "application/x-tex",
 }
+
+
+def add_to_windows_recent_documents(
+    raw_path: str | Path,
+    shell32: Any | None = None,
+    platform: str | None = None,
+) -> bool:
+    path = Path(raw_path).expanduser()
+    if (platform or sys.platform) != "win32" or not path.is_file():
+        return False
+
+    try:
+        shell = shell32 or ctypes.windll.shell32
+        add_recent = shell.SHAddToRecentDocs
+        add_recent.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+        add_recent.restype = None
+        path_pointer = ctypes.c_wchar_p(str(path.resolve()))
+        add_recent(
+            SHARD_PATHW,
+            ctypes.cast(path_pointer, ctypes.c_void_p),
+        )
+        logging.info("added local document to Windows recents name=%s", path.name)
+        return True
+    except (AttributeError, OSError, TypeError):
+        logging.warning(
+            "could not add local document to Windows recents name=%s",
+            path.name,
+            exc_info=True,
+        )
+        return False
+
+
+def paths_from_native_drop_event(event: Any) -> list[str]:
+    if not isinstance(event, dict):
+        return []
+    transfer = event.get("dataTransfer")
+    if not isinstance(transfer, dict):
+        return []
+
+    paths: list[str] = []
+    seen: set[str] = set()
+    for file_data in transfer.get("files", []):
+        if not isinstance(file_data, dict):
+            continue
+        raw_path = str(file_data.get("pywebviewFullPath", "")).strip()
+        normalized = os.path.normcase(raw_path)
+        if raw_path and normalized not in seen:
+            seen.add(normalized)
+            paths.append(raw_path)
+    return paths
+
+
 HOP_BY_HOP_HEADERS = {
     "connection",
     "content-length",
@@ -220,7 +274,11 @@ class NativeFileStore:
         self._observer: Observer | None = None
         self._event_handler = NativeFileEventHandler(self._mark_path_changed)
 
-    def payloads_for_paths(self, paths: list[str]) -> list[dict[str, Any]]:
+    def payloads_for_paths(
+        self,
+        paths: list[str],
+        record_recent: bool = False,
+    ) -> list[dict[str, Any]]:
         payloads = []
         for raw_path in paths:
             path = Path(raw_path).expanduser()
@@ -230,6 +288,8 @@ class NativeFileStore:
             payload = self._payload_for_path(path)
             if payload:
                 payloads.append(payload)
+                if record_recent:
+                    add_to_windows_recent_documents(path)
         return payloads
 
     def has_openable_path(self, paths: list[str]) -> bool:
@@ -412,7 +472,10 @@ class NirvNotesApi:
         credential_store: CredentialStore | None = None,
     ) -> None:
         self._file_store = file_store
-        self._pending_launch_files = file_store.payloads_for_paths(launch_paths)
+        self._pending_launch_files = file_store.payloads_for_paths(
+            launch_paths,
+            record_recent=True,
+        )
         self._window: webview.Window | None = None
         self._update_base_url = update_base_url.rstrip("/")
         self._source_url = source_url.rstrip("/")
@@ -542,7 +605,10 @@ class NirvNotesApi:
                 "Text and config (*.md;*.txt;*.cfg;*.ini;*.json;*.yaml;*.yml;*.toml;*.xml;*.log;*.csv;*.tex)",
             ),
         )
-        return self._file_store.payloads_for_paths(list(paths or []))
+        return self._file_store.payloads_for_paths(
+            list(paths or []),
+            record_recent=True,
+        )
 
     def save_native_file(
         self,
@@ -626,7 +692,10 @@ class NirvNotesApi:
         return self._file_store.has_openable_path(paths)
 
     def open_external_paths(self, paths: list[str], browser_base_url: str) -> int:
-        payloads = self._file_store.payloads_for_paths(paths)
+        payloads = self._file_store.payloads_for_paths(
+            paths,
+            record_recent=True,
+        )
         if not payloads:
             return 0
 
@@ -1897,8 +1966,59 @@ def startup_html() -> str:
 """.strip()
 
 
-def load_start_url_after_gui(window: webview.Window, start_url: str) -> None:
+def dispatch_native_file_drag_state(window: webview.Window, active: bool) -> None:
+    active_json = "true" if active else "false"
+    run_js(
+        window,
+        "window.dispatchEvent(new CustomEvent("
+        "'nirvnotes:native-file-drag-state', "
+        f"{{ detail: {{ active: {active_json} }} }}));",
+    )
+
+
+def register_native_file_drop(
+    window: webview.Window,
+    api: NirvNotesApi,
+    browser_base_url: str,
+) -> None:
+    def handle_drop(event: Any) -> None:
+        dispatch_native_file_drag_state(window, False)
+        paths = paths_from_native_drop_event(event)
+        if not paths:
+            return
+
+        # One dropped file replaces the current view. This keeps the interaction
+        # consistent with Windows "Open with" and avoids hidden tab creation.
+        opened = api.open_external_paths(paths[:1], browser_base_url)
+        if opened:
+            logging.info("opened local document from native drop")
+
+    def attach_to_page() -> None:
+        try:
+            document = window.dom.document
+            handler = DOMEventHandler(
+                handle_drop,
+                prevent_default=True,
+                stop_propagation=True,
+            )
+            document.events.drop += handler
+            setattr(window, "_nirvnotes_drop_binding", (document, handler))
+            logging.info("native file drop ready")
+        except Exception:
+            logging.warning("could not attach native file drop", exc_info=True)
+
+    window.events.loaded += attach_to_page
+    setattr(window, "_nirvnotes_drop_page_handler", attach_to_page)
+
+
+def load_start_url_after_gui(
+    window: webview.Window,
+    start_url: str,
+    api: NirvNotesApi,
+    browser_base_url: str,
+) -> None:
     logging.info("webview gui started")
+    register_native_file_drop(window, api, browser_base_url)
     logging.info("loading start url %s", start_url)
     window.load_url(start_url)
 
@@ -2063,7 +2183,7 @@ def main() -> None:
     try:
         webview.start(
             load_start_url_after_gui,
-            args=(window, start_url),
+            args=(window, start_url, api, browser_base_url),
             gui="edgechromium",
             debug=args.debug,
             private_mode=False,
