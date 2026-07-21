@@ -31,8 +31,15 @@ import { toml } from "@codemirror/legacy-modes/mode/toml";
 import { xml } from "@codemirror/legacy-modes/mode/xml";
 import { yaml } from "@codemirror/legacy-modes/mode/yaml";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
-import { Annotation, Compartment, EditorState } from "@codemirror/state";
 import {
+  Annotation,
+  Compartment,
+  EditorState,
+  StateEffect,
+  StateField,
+} from "@codemirror/state";
+import {
+  Decoration,
   drawSelection,
   dropCursor,
   EditorView,
@@ -67,6 +74,36 @@ const externalUpdate = Annotation.define();
 let editorView = null;
 let tagNormalizeTimer = null;
 let sessionSaveTimer = null;
+let textDropLineFrom = null;
+const setTextDropPosition = StateEffect.define();
+const textDropPositionField = StateField.define({
+  create() {
+    return Decoration.none;
+  },
+  update(value, transaction) {
+    value = value.map(transaction.changes);
+    for (const effect of transaction.effects) {
+      if (!effect.is(setTextDropPosition)) {
+        continue;
+      }
+      if (effect.value == null) {
+        return Decoration.none;
+      }
+      const position = Math.max(
+        0,
+        Math.min(Number(effect.value) || 0, transaction.state.doc.length),
+      );
+      const line = transaction.state.doc.lineAt(position);
+      return Decoration.set([
+        Decoration.line({ class: "cm-textDropTarget" }).range(line.from),
+      ]);
+    }
+    return value;
+  },
+  provide(field) {
+    return EditorView.decorations.from(field);
+  },
+});
 
 const csvLanguage = {
   startState: () => ({ quoted: false }),
@@ -124,6 +161,10 @@ const sourceTheme = EditorView.theme({
   ".cm-line": { padding: "0 0.48rem" },
   ".cm-cursor, .cm-dropCursor": {
     borderLeftColor: "rgb(var(--theme-brand))",
+  },
+  ".cm-textDropTarget": {
+    backgroundColor: "rgb(var(--theme-link) / 0.1)",
+    boxShadow: "inset 2px 0 0 rgb(var(--theme-heading) / 0.9)",
   },
   ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection":
     {
@@ -273,6 +314,7 @@ function editorExtensions() {
     history(),
     drawSelection(),
     dropCursor(),
+    textDropPositionField,
     EditorState.allowMultipleSelections.of(true),
     indentOnInput(),
     bracketMatching(),
@@ -411,6 +453,19 @@ function insertDroppedText(text, options = {}) {
     return false;
   }
 
+  const { from, to } = droppedTextRange(options);
+  textDropLineFrom = null;
+  editorView.dispatch({
+    changes: { from, to, insert: text },
+    selection: { anchor: from + text.length },
+    scrollIntoView: true,
+    effects: setTextDropPosition.of(null),
+  });
+  editorView.focus();
+  return true;
+}
+
+function droppedTextRange(options = {}) {
   const selection = editorView.state.selection.main;
   const coordinatePosition =
     Number.isFinite(options.clientX) && Number.isFinite(options.clientY)
@@ -423,14 +478,28 @@ function insertDroppedText(text, options = {}) {
   const from =
     coordinatePosition ??
     (useSelection ? selection.from : editorView.state.doc.length);
-  const to = coordinatePosition ?? (useSelection ? selection.to : from);
-  editorView.dispatch({
-    changes: { from, to, insert: text },
-    selection: { anchor: from + text.length },
-    scrollIntoView: true,
-  });
-  editorView.focus();
-  return true;
+  return {
+    from,
+    to: coordinatePosition ?? (useSelection ? selection.to : from),
+  };
+}
+
+function previewDroppedTextPosition(options = {}) {
+  if (!editorView) {
+    return null;
+  }
+  const { from } = droppedTextRange(options);
+  const line = editorView.state.doc.lineAt(from);
+  if (line.from !== textDropLineFrom) {
+    textDropLineFrom = line.from;
+    editorView.dispatch({ effects: setTextDropPosition.of(from) });
+  }
+  return { position: from, lineNumber: line.number };
+}
+
+function clearDroppedTextPosition() {
+  textDropLineFrom = null;
+  editorView?.dispatch({ effects: setTextDropPosition.of(null) });
 }
 
 function sessionStorageKey() {
@@ -584,12 +653,14 @@ onBeforeUnmount(() => {
 });
 
 defineExpose({
+  clearDroppedTextPosition,
   focusEditor,
   getMarkdown,
   getSearchText,
   getValue,
   isWysiwygMode,
   insertDroppedText,
+  previewDroppedTextPosition,
   selectSearchRange,
 });
 </script>

@@ -163,8 +163,7 @@
     }
 }
 
-body.nirvnotes-native-file-drag-active::before,
-body.nirvnotes-native-text-drag-active::before {
+body.nirvnotes-native-file-drag-active::before {
     position: fixed;
     z-index: 10000;
     inset: 0.45rem;
@@ -175,8 +174,7 @@ body.nirvnotes-native-text-drag-active::before {
     pointer-events: none;
 }
 
-body.nirvnotes-native-file-drag-active::after,
-body.nirvnotes-native-text-drag-active::after {
+body.nirvnotes-native-file-drag-active::after {
     position: fixed;
     z-index: 10001;
     top: 50%;
@@ -195,5 +193,25 @@ body.nirvnotes-native-file-drag-active::after {
 }
 
 body.nirvnotes-native-text-drag-active::after {
-    content: "Drop text to insert";
+    position: fixed;
+    z-index: 10001;
+    top: 0.62rem;
+    left: 50%;
+    max-width: min(12rem, calc(100vw - 2rem));
+    transform: translateX(-50%);
+    overflow: hidden;
+    border: 1px solid rgb(var(--theme-heading) / 0.52);
+    border-radius: 0.25rem;
+    padding: 0.24rem 0.48rem;
+    color: rgb(var(--theme-heading));
+    background: rgb(var(--theme-background-elevated) / 0.96);
+    box-shadow: 0 0.22rem 0.7rem rgb(0 0 0 / 0.16);
+    content: attr(data-nirvnotes-text-drop-label);
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1.15;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
 }

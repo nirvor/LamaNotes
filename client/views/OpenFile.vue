@@ -404,6 +404,10 @@ const statusIcon = computed(() =>
 let nativeWatcherTimer = null;
 let nativeWatcherBusy = false;
 let scrollSaveTimer = null;
+let textDropActivatedEditMode = false;
+let textDropEditorReady = null;
+let latestTextDropPosition = null;
+let textDropPreviewActive = false;
 
 onMounted(() => {
   if (!supportsFileHandlingLaunchQueue() && !supportsNativeFileBridge()) {
@@ -416,6 +420,11 @@ onMounted(() => {
     passive: true,
   });
   window.addEventListener("nirvnotes:text-drop", insertExternalDroppedText);
+  window.addEventListener(
+    "nirvnotes:text-drag-position",
+    previewExternalTextDrop,
+  );
+  window.addEventListener("nirvnotes:text-drag-end", endExternalTextDrop);
 });
 
 watch(externalFileLaunch, consumeExternalLaunch, { immediate: true });
@@ -442,17 +451,86 @@ watchEffect(() => {
 });
 
 onUnmounted(() => {
+  textDropPreviewActive = false;
   window.clearInterval(nativeWatcherTimer);
   window.clearTimeout(scrollSaveTimer);
   saveActiveScroll();
   window.removeEventListener("scroll", scheduleActiveScrollSave);
   window.removeEventListener("nirvnotes:text-drop", insertExternalDroppedText);
+  window.removeEventListener(
+    "nirvnotes:text-drag-position",
+    previewExternalTextDrop,
+  );
+  window.removeEventListener("nirvnotes:text-drag-end", endExternalTextDrop);
   document.body.classList.remove(
     "nirvnotes-text-drop-enabled",
     "nirvnotes-native-text-drag-active",
   );
+  delete document.body.dataset.nirvnotesTextDropLabel;
   globalStore.clearNoteActions();
 });
+
+async function ensureTextDropEditor() {
+  if (editMode.value && editorTextarea.value) {
+    return;
+  }
+  if (!textDropEditorReady) {
+    if (!editMode.value) {
+      textDropActivatedEditMode = true;
+      setEditMode(true);
+    }
+    textDropEditorReady = (async () => {
+      await nextTick();
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    })().finally(() => {
+      textDropEditorReady = null;
+    });
+  }
+  await textDropEditorReady;
+}
+
+async function previewExternalTextDrop(event) {
+  if (!activeFile.value) {
+    return;
+  }
+  textDropPreviewActive = true;
+  latestTextDropPosition = {
+    clientX: event.detail?.clientX,
+    clientY: event.detail?.clientY,
+  };
+  await ensureTextDropEditor();
+  if (!textDropPreviewActive || !latestTextDropPosition) {
+    return;
+  }
+  const target = editorTextarea.value?.previewDroppedTextPosition?.({
+    ...latestTextDropPosition,
+    fallback: textDropActivatedEditMode ? "end" : "selection",
+  });
+  if (target?.lineNumber) {
+    document.body.dataset.nirvnotesTextDropLabel = `Insert - line ${target.lineNumber}`;
+  }
+}
+
+function clearExternalTextDropPreview() {
+  editorTextarea.value?.clearDroppedTextPosition?.();
+  latestTextDropPosition = null;
+  delete document.body.dataset.nirvnotesTextDropLabel;
+}
+
+function endExternalTextDrop(event) {
+  textDropPreviewActive = false;
+  clearExternalTextDropPreview();
+  if (
+    !event.detail?.dropped &&
+    textDropActivatedEditMode &&
+    !activeFile.value?.dirty
+  ) {
+    documentSession.leaveEdit();
+  }
+  if (!event.detail?.dropped) {
+    textDropActivatedEditMode = false;
+  }
+}
 
 async function insertExternalDroppedText(event) {
   const text = String(event.detail?.text || "");
@@ -460,17 +538,15 @@ async function insertExternalDroppedText(event) {
     return;
   }
 
-  const wasEditing = editMode.value;
-  if (!wasEditing) {
-    setEditMode(true);
-    await nextTick();
-    await new Promise((resolve) => window.requestAnimationFrame(resolve));
-  }
+  const startedInViewMode = textDropActivatedEditMode || !editMode.value;
+  await ensureTextDropEditor();
   const inserted = editorTextarea.value?.insertDroppedText?.(text, {
     clientX: event.detail?.clientX,
     clientY: event.detail?.clientY,
-    fallback: wasEditing ? "selection" : "end",
+    fallback: startedInViewMode ? "end" : "selection",
   });
+  clearExternalTextDropPreview();
+  textDropActivatedEditMode = false;
   if (inserted) {
     showStatus("Dropped text inserted. Save when ready.");
   }

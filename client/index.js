@@ -203,6 +203,8 @@ window.addEventListener("nirvnotes:native-file-drag-state", (event) => {
 let nativeFileDragDepth = 0;
 let nativeTextDragDepth = 0;
 let internalDragActive = false;
+let textDragPositionFrame = null;
+let pendingTextDragPosition = null;
 
 function isNativeFileDrag(event) {
   return supportsNativeFileBridge() && isFileTransfer(event.dataTransfer);
@@ -222,13 +224,53 @@ function showNativeFileDropTarget(active) {
 
 function showNativeTextDropTarget(active) {
   document.body.classList.toggle("nirvnotes-native-text-drag-active", active);
+  if (active && !document.body.dataset.nirvnotesTextDropLabel) {
+    document.body.dataset.nirvnotesTextDropLabel = "Insert text";
+  }
 }
 
-function clearDropTargets() {
-  nativeFileDragDepth = 0;
+function dispatchTextDragEnd(dropped = false) {
+  const wasActive =
+    nativeTextDragDepth > 0 ||
+    document.body.classList.contains("nirvnotes-native-text-drag-active");
+  window.cancelAnimationFrame(textDragPositionFrame);
+  textDragPositionFrame = null;
+  pendingTextDragPosition = null;
   nativeTextDragDepth = 0;
-  showNativeFileDropTarget(false);
   showNativeTextDropTarget(false);
+  delete document.body.dataset.nirvnotesTextDropLabel;
+  if (wasActive) {
+    window.dispatchEvent(
+      new CustomEvent("nirvnotes:text-drag-end", { detail: { dropped } }),
+    );
+  }
+}
+
+function scheduleTextDragPosition(event) {
+  pendingTextDragPosition = {
+    clientX: event.clientX,
+    clientY: event.clientY,
+  };
+  if (textDragPositionFrame != null) {
+    return;
+  }
+  textDragPositionFrame = window.requestAnimationFrame(() => {
+    textDragPositionFrame = null;
+    if (!pendingTextDragPosition) {
+      return;
+    }
+    window.dispatchEvent(
+      new CustomEvent("nirvnotes:text-drag-position", {
+        detail: pendingTextDragPosition,
+      }),
+    );
+  });
+}
+
+function clearDropTargets(options = {}) {
+  nativeFileDragDepth = 0;
+  showNativeFileDropTarget(false);
+  dispatchTextDragEnd(Boolean(options.textDropped));
 }
 
 window.addEventListener(
@@ -257,15 +299,20 @@ window.addEventListener("dragenter", (event) => {
     event.preventDefault();
     nativeTextDragDepth += 1;
     showNativeTextDropTarget(true);
+    scheduleTextDragPosition(event);
   }
 });
 
 window.addEventListener("dragover", (event) => {
-  if (!isNativeFileDrag(event) && !isExternalTextDrag(event)) {
+  const textDrag = isExternalTextDrag(event);
+  if (!isNativeFileDrag(event) && !textDrag) {
     return;
   }
   event.preventDefault();
   event.dataTransfer.dropEffect = "copy";
+  if (textDrag) {
+    scheduleTextDragPosition(event);
+  }
 });
 
 window.addEventListener("dragleave", (event) => {
@@ -278,7 +325,7 @@ window.addEventListener("dragleave", (event) => {
   if (document.body.classList.contains("nirvnotes-native-text-drag-active")) {
     nativeTextDragDepth = Math.max(0, nativeTextDragDepth - 1);
     if (nativeTextDragDepth === 0 || event.relatedTarget === null) {
-      showNativeTextDropTarget(false);
+      dispatchTextDragEnd(false);
     }
   }
 });
@@ -295,12 +342,14 @@ window.addEventListener("drop", (event) => {
   }
 
   const text = readPlainTextTransfer(event.dataTransfer);
-  clearDropTargets();
   if (!text) {
+    clearDropTargets();
     return;
   }
   event.preventDefault();
   event.stopPropagation();
+  nativeFileDragDepth = 0;
+  showNativeFileDropTarget(false);
   window.dispatchEvent(
     new CustomEvent("nirvnotes:text-drop", {
       detail: {
@@ -310,6 +359,7 @@ window.addEventListener("drop", (event) => {
       },
     }),
   );
+  dispatchTextDragEnd(true);
 });
 
 window.addEventListener("blur", () => {
