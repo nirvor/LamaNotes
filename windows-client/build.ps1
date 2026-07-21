@@ -34,10 +34,19 @@ New-Item -ItemType Directory -Path $MetadataDir -Force | Out-Null
   builtAt = (Get-Date).ToString("s")
 } | ConvertTo-Json | Set-Content -LiteralPath $VersionMetadata -Encoding UTF8
 
+$ResolvedDist = [System.IO.Path]::GetFullPath($Dist).TrimEnd("\") + "\"
 Get-CimInstance Win32_Process |
   Where-Object {
-    $_.Name -eq "NirvNotes.exe" -or
-    ($_.Name -eq "msedgewebview2.exe" -and $_.CommandLine -like "*NirvNotes.exe*")
+    $ExecutablePath = if ($_.ExecutablePath) {
+      [System.IO.Path]::GetFullPath($_.ExecutablePath)
+    } else {
+      ""
+    }
+    ($_.Name -eq "NirvNotes.exe" -and $ExecutablePath.StartsWith(
+      $ResolvedDist,
+      [System.StringComparison]::OrdinalIgnoreCase
+    )) -or
+    ($_.Name -eq "msedgewebview2.exe" -and $_.CommandLine -like "*$ResolvedDist*")
   } |
   ForEach-Object {
     Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
