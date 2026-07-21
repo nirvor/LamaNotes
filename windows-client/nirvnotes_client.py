@@ -19,6 +19,7 @@ import sys
 import tempfile
 import threading
 import time
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -77,6 +78,31 @@ TEXT_TYPES = {
     ".csv": "text/csv",
     ".tex": "application/x-tex",
 }
+
+WINDOWS_UPDATE_REQUIRED_FILES = (
+    "app/NirvNotes.exe",
+    "app/_internal/client-version.json",
+    "app/_internal/webview/lib/runtimes/win-arm64/native/WebView2Loader.dll",
+    "app/_internal/webview/lib/runtimes/win-x64/native/WebView2Loader.dll",
+    "app/_internal/webview/lib/runtimes/win-x86/native/WebView2Loader.dll",
+)
+
+
+def validate_windows_update_archive(path: str | Path) -> None:
+    try:
+        with zipfile.ZipFile(Path(path)) as archive:
+            files = {
+                name.replace("\\", "/").rstrip("/")
+                for name in archive.namelist()
+            }
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise ValueError("Windows update package is not a valid ZIP archive.") from exc
+
+    missing = [name for name in WINDOWS_UPDATE_REQUIRED_FILES if name not in files]
+    if missing:
+        raise ValueError(
+            "Windows update package is incomplete: " + ", ".join(missing)
+        )
 
 
 def add_to_windows_recent_documents(
@@ -787,6 +813,7 @@ class NirvNotesApi:
                 raise ValueError("Downloaded update size does not match the manifest.")
             if sha256_file(temporary_path) != status["sha256"]:
                 raise ValueError("Downloaded update hash does not match the manifest.")
+            validate_windows_update_archive(temporary_path)
             temporary_path.replace(package_path)
 
             updater_source = Path(resource_path(UPDATE_SCRIPT_FILE))

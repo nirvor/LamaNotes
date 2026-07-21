@@ -5,6 +5,7 @@ import sys
 import tempfile
 import time
 import unittest
+import zipfile
 from unittest.mock import Mock, patch
 from pathlib import Path
 from urllib import error, parse, request
@@ -20,6 +21,7 @@ from nirvnotes_client import (
     register_native_file_drop,
     start_local_proxy,
     updater_process_creation_flags,
+    validate_windows_update_archive,
 )
 
 
@@ -164,6 +166,36 @@ class NirvNotesApiTests(unittest.TestCase):
 
 
 class NativeShellIntegrationTests(unittest.TestCase):
+    def test_windows_update_archive_requires_all_webview_runtimes(self) -> None:
+        required = (
+            "app/NirvNotes.exe",
+            "app/_internal/client-version.json",
+            "app/_internal/webview/lib/runtimes/win-arm64/native/WebView2Loader.dll",
+            "app/_internal/webview/lib/runtimes/win-x64/native/WebView2Loader.dll",
+            "app/_internal/webview/lib/runtimes/win-x86/native/WebView2Loader.dll",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            complete = Path(directory) / "complete.zip"
+            with zipfile.ZipFile(complete, "w") as archive:
+                for name in required:
+                    archive.writestr(name, b"payload")
+
+            validate_windows_update_archive(complete)
+
+            incomplete = Path(directory) / "incomplete.zip"
+            with zipfile.ZipFile(incomplete, "w") as archive:
+                for name in required:
+                    if "win-arm64" not in name:
+                        archive.writestr(name, b"payload")
+
+            with self.assertRaisesRegex(ValueError, "win-arm64"):
+                validate_windows_update_archive(incomplete)
+
+            malformed = Path(directory) / "malformed.zip"
+            malformed.write_bytes(b"not a zip")
+            with self.assertRaisesRegex(ValueError, "valid ZIP"):
+                validate_windows_update_archive(malformed)
+
     def test_drop_event_returns_unique_full_paths(self) -> None:
         event = {
             "dataTransfer": {
