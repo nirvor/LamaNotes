@@ -167,9 +167,13 @@ class GoogleOAuthService:
                     },
                 )
                 token_response.raise_for_status()
-                id_token = str(token_response.json().get("id_token", ""))
-                if not id_token:
-                    raise GoogleAuthError("Google did not return an ID token.")
+                token_payload = token_response.json()
+                id_token = str(token_payload.get("id_token", ""))
+                access_token = str(token_payload.get("access_token", ""))
+                if not id_token or not access_token:
+                    raise GoogleAuthError(
+                        "Google did not return the tokens required for verification."
+                    )
                 jwks_response = await client.get(GOOGLE_JWKS_ENDPOINT)
                 jwks_response.raise_for_status()
                 keys = jwks_response.json().get("keys", [])
@@ -187,6 +191,7 @@ class GoogleOAuthService:
                 algorithms=["RS256"],
                 audience=self.client_id,
                 options={"verify_iss": False},
+                access_token=access_token,
             )
         except (JWTError, KeyError, StopIteration, TypeError) as exc:
             raise GoogleAuthError("Google returned an invalid ID token.") from exc

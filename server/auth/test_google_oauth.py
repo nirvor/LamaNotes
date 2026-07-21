@@ -5,6 +5,7 @@ import base64
 import hashlib
 import unittest
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock, patch
 from urllib.parse import parse_qs, urlsplit
 
 from auth.google_oauth import (
@@ -92,6 +93,72 @@ class GoogleOAuthServiceTests(unittest.TestCase):
         )
         self.assertEqual(payload["flow"], "web")
         self.assertEqual(payload["next"], "/search")
+
+    def test_id_token_verification_receives_google_access_token(self) -> None:
+        token_response = Mock()
+        token_response.raise_for_status.return_value = None
+        token_response.json.return_value = {
+            "id_token": "google-id-token",
+            "access_token": "google-access-token",
+        }
+        jwks_response = Mock()
+        jwks_response.raise_for_status.return_value = None
+        jwks_response.json.return_value = {"keys": [{"kid": "key-id"}]}
+        client = AsyncMock()
+        client.post.return_value = token_response
+        client.get.return_value = jwks_response
+        context = Mock()
+        context.__aenter__ = AsyncMock(return_value=client)
+        context.__aexit__ = AsyncMock(return_value=None)
+        claims = {
+            "iss": "https://accounts.google.com",
+            "sub": "google-subject",
+            "email": "owner@example.com",
+            "email_verified": True,
+            "nonce": "expected-nonce",
+        }
+
+        with (
+            patch("auth.google_oauth.httpx.AsyncClient", return_value=context),
+            patch(
+                "auth.google_oauth.jwt.get_unverified_header",
+                return_value={"kid": "key-id"},
+            ),
+            patch("auth.google_oauth.jwt.decode", return_value=claims) as decode,
+        ):
+            identity = asyncio.run(
+                self.service._exchange_and_verify(
+                    code="authorization-code",
+                    nonce="expected-nonce",
+                )
+            )
+
+        self.assertEqual(identity.subject, "google-subject")
+        self.assertEqual(
+            decode.call_args.kwargs["access_token"],
+            "google-access-token",
+        )
+
+    def test_id_token_verification_requires_google_access_token(self) -> None:
+        token_response = Mock()
+        token_response.raise_for_status.return_value = None
+        token_response.json.return_value = {"id_token": "google-id-token"}
+        client = AsyncMock()
+        client.post.return_value = token_response
+        context = Mock()
+        context.__aenter__ = AsyncMock(return_value=client)
+        context.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("auth.google_oauth.httpx.AsyncClient", return_value=context):
+            with self.assertRaises(GoogleAuthError):
+                asyncio.run(
+                    self.service._exchange_and_verify(
+                        code="authorization-code",
+                        nonce="expected-nonce",
+                    )
+                )
+
+        client.get.assert_not_awaited()
 
     def test_identity_requires_exact_verified_email_and_nonce(self) -> None:
         valid_claims = {
