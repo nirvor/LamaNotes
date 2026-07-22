@@ -4,6 +4,7 @@ import { ref } from "vue";
 export const useGlobalStore = defineStore("global", () => {
   const config = ref({});
   const noteActions = ref([]);
+  const noteToolbarContext = ref(null);
   const noteLayoutKind = ref("default");
   const noteMenuItems = ref([]);
   const showLineNumbers = ref(
@@ -12,6 +13,10 @@ export const useGlobalStore = defineStore("global", () => {
 
   function setNoteActions(actions = []) {
     noteActions.value = actions;
+  }
+
+  function setNoteToolbarContext(context = null) {
+    noteToolbarContext.value = context;
   }
 
   function setNoteMenuItems(items = []) {
@@ -24,6 +29,7 @@ export const useGlobalStore = defineStore("global", () => {
 
   function clearNoteActions() {
     noteActions.value = [];
+    noteToolbarContext.value = null;
     noteMenuItems.value = [];
     noteLayoutKind.value = "default";
   }
@@ -39,10 +45,12 @@ export const useGlobalStore = defineStore("global", () => {
   return {
     config,
     noteActions,
+    noteToolbarContext,
     noteLayoutKind,
     noteMenuItems,
     showLineNumbers,
     setNoteActions,
+    setNoteToolbarContext,
     setNoteLayout,
     setNoteMenuItems,
     toggleLineNumbers,

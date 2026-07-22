@@ -3,6 +3,29 @@
     <div
       class="lamanotes-navbar-actions flex grow flex-wrap items-center justify-end gap-1"
     >
+      <div
+        v-if="noteToolbarContext"
+        class="lamanotes-navbar-context"
+        :title="noteToolbarContext.title"
+      >
+        <span class="lamanotes-navbar-context-text">
+          {{ noteToolbarContext.label }}
+        </span>
+        <button
+          v-if="noteToolbarContext.action"
+          type="button"
+          class="lamanotes-navbar-context-action"
+          :title="noteToolbarContext.action.label"
+          :aria-label="noteToolbarContext.action.label"
+          @click="noteToolbarContext.action.handler"
+        >
+          <SvgIcon
+            type="mdi"
+            :path="noteToolbarContext.action.iconPath"
+            size="0.88rem"
+          />
+        </button>
+      </div>
       <!-- Home -->
       <RouterLink :to="{ name: 'home' }" class="lamanotes-navbar-action-link">
         <CustomButton
@@ -74,6 +97,7 @@
 </template>
 
 <script setup>
+import SvgIcon from "@jamescoyle/vue-icon";
 import { mdiFormatListNumbered, mdiThemeLightDark, mdiUpdate } from "@mdi/js";
 import {
   mdilLogout,
@@ -234,6 +258,7 @@ const showNewButton = computed(() => {
 });
 
 const noteActions = computed(() => globalStore.noteActions || []);
+const noteToolbarContext = computed(() => globalStore.noteToolbarContext);
 
 const leadingNoteActions = computed(() =>
   noteActions.value.filter((action) => action.placement !== "end"),
@@ -300,6 +325,10 @@ function showLogOutButton() {
   position: sticky;
   top: 0;
   z-index: 35;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   margin-inline: -0.45rem;
   padding-inline: 0.45rem;
   margin-bottom: 0.35rem;
@@ -312,6 +341,55 @@ function showLogOutButton() {
   align-items: center;
   align-self: center;
   line-height: 1;
+}
+
+.lamanotes-navbar-actions {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 100%;
+}
+
+.lamanotes-navbar-context {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  display: flex;
+  min-width: 0;
+  max-width: calc(100% - 16.8rem);
+  transform: translateY(-50%);
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.12rem;
+  color: rgb(var(--theme-text-very-muted));
+  font-size: 0.66rem;
+  line-height: 1;
+}
+
+.lamanotes-navbar-context-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lamanotes-navbar-context-action {
+  display: inline-grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 3px;
+  color: rgb(var(--theme-text-muted));
+  background: transparent;
+}
+
+.lamanotes-navbar-context-action:hover,
+.lamanotes-navbar-context-action:focus-visible {
+  color: rgb(var(--theme-heading));
+  background: rgb(var(--theme-background-elevated) / 0.72);
 }
 
 .lamanotes-navbar-action-badge {
@@ -338,6 +416,11 @@ function showLogOutButton() {
 }
 
 @media (max-width: 560px) {
+  .lamanotes-navbar-context {
+    max-width: calc(100% - 15.8rem);
+    font-size: 0.6rem;
+  }
+
   .lamanotes-navbar-actions {
     gap: 0.12rem;
   }

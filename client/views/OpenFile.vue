@@ -239,6 +239,7 @@ import {
   mdiAlertOutline,
   mdiCheck,
   mdiCheckCircleOutline,
+  mdiClipboardFileOutline,
   mdiClose,
   mdiCloudUploadOutline,
   mdiContentSaveAlertOutline,
@@ -267,6 +268,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useToast } from "primevue/usetoast";
 
 import { apiErrorHandler, createNote } from "../api.js";
+import { writePlainTextToClipboard } from "../clipboard.js";
 import DocumentFindBar from "../components/DocumentFindBar.vue";
 import CsvTablePreview from "../components/CsvTablePreview.vue";
 import IconLabel from "../components/IconLabel.vue";
@@ -291,6 +293,7 @@ import {
   shouldUseLargeFileMode,
 } from "../largeFileMode.js";
 import { buildLocalLibraryNote } from "../localNotePromotion.js";
+import { localFilePathContext } from "../localFilePath.js";
 import { reportNativeReady } from "../nativeTelemetry.js";
 import { createDebouncedWork } from "../performanceScheduling.js";
 
@@ -311,6 +314,7 @@ const activeKey = ref(null);
 const lastConsumedLaunchId = ref(null);
 const statusMessage = ref("");
 const statusTone = ref("info");
+const pathCopied = ref(false);
 const compareOpen = ref(false);
 const keepingFile = ref(false);
 const automationVisible = ref(false);
@@ -418,6 +422,22 @@ const metadataItems = computed(() => {
   }
   return items;
 });
+const toolbarPathContext = computed(() => {
+  const pathContext = localFilePathContext(activeFile.value?.path || "");
+  if (!pathContext) {
+    return null;
+  }
+
+  return {
+    label: pathContext.label,
+    title: pathContext.fullPath,
+    action: {
+      label: pathCopied.value ? "Full path copied" : "Copy full file path",
+      iconPath: pathCopied.value ? mdiCheck : mdiClipboardFileOutline,
+      handler: copyActiveFilePath,
+    },
+  };
+});
 const externalStateMessage = computed(() => {
   if (activeFile.value?.externalState === "deleted") {
     return "The original file was deleted outside LamaNotes.";
@@ -431,6 +451,7 @@ const statusIcon = computed(() =>
   statusTone.value === "error" ? mdiAlertCircleOutline : mdiCheckCircleOutline,
 );
 let nativeWatcherTimer = null;
+let pathCopyResetTimer = null;
 let nativeWatcherBusy = false;
 let scrollSaveTimer = null;
 let localLoadStartedAt = performance.now();
@@ -500,6 +521,7 @@ onUnmounted(() => {
   flushDraftPersistence();
   draftPersistence.cancel();
   window.clearInterval(nativeWatcherTimer);
+  window.clearTimeout(pathCopyResetTimer);
   window.clearTimeout(scrollSaveTimer);
   saveActiveScroll();
   window.removeEventListener("scroll", scheduleActiveScrollSave);
@@ -606,6 +628,7 @@ async function insertExternalDroppedText(event) {
 
 function updateOpenFileActions() {
   const file = activeFile.value;
+  globalStore.setNoteToolbarContext(toolbarPathContext.value);
   globalStore.setNoteActions([
     {
       key: "external-tools",
@@ -1535,6 +1558,30 @@ function getActiveFileCopyPayload() {
 
 function copyActiveFile() {
   return documentSession.copy("source");
+}
+
+async function copyActiveFilePath() {
+  const fullPath = localFilePathContext(activeFile.value?.path || "")?.fullPath;
+  if (!fullPath) {
+    return;
+  }
+
+  try {
+    await writePlainTextToClipboard(fullPath);
+    pathCopied.value = true;
+    window.clearTimeout(pathCopyResetTimer);
+    pathCopyResetTimer = window.setTimeout(() => {
+      pathCopied.value = false;
+    }, 1400);
+  } catch {
+    toast.add(
+      getToastOptions(
+        "Could not copy the full file path.",
+        "Copy Failed",
+        "error",
+      ),
+    );
+  }
 }
 
 function documentKeydownHandler(event) {
