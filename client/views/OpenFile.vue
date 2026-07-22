@@ -347,6 +347,8 @@ const {
     "",
   selectEditorRange: (from, to) =>
     editorTextarea.value?.selectSearchRange?.(from, to),
+  setEditorMatches: (matches, currentIndex) =>
+    editorTextarea.value?.setSearchMatches?.(matches, currentIndex),
   getViewRoot: () => openFileContent.value,
 });
 const canSaveActiveFile = computed(

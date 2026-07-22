@@ -13,6 +13,16 @@ test("document find is case insensitive and non-overlapping", () => {
     { start: 0, end: 2 },
     { start: 2, end: 4 },
   ]);
+  assert.deepEqual(
+    findTextMatches(
+      "Required workflow and REQUIRED WORKFLOW",
+      "rEqUiReD WoRkFlOw",
+    ),
+    [
+      { start: 0, end: 17 },
+      { start: 22, end: 39 },
+    ],
+  );
 });
 
 test("document find wraps in both directions", () => {

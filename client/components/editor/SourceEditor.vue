@@ -64,6 +64,7 @@ const props = defineProps({
   sessionKey: { type: String, default: "" },
   ariaLabel: { type: String, default: "Source editor" },
   addImageBlobHook: Function,
+  transformPastedText: Function,
 });
 
 const emit = defineEmits(["update:modelValue", "change", "keydown", "ready"]);
@@ -76,6 +77,7 @@ let tagNormalizeTimer = null;
 let sessionSaveTimer = null;
 let textDropLineFrom = null;
 const setTextDropPosition = StateEffect.define();
+const setDocumentFindMatches = StateEffect.define();
 const textDropPositionField = StateField.define({
   create() {
     return Decoration.none;
@@ -97,6 +99,47 @@ const textDropPositionField = StateField.define({
       return Decoration.set([
         Decoration.line({ class: "cm-textDropTarget" }).range(line.from),
       ]);
+    }
+    return value;
+  },
+  provide(field) {
+    return EditorView.decorations.from(field);
+  },
+});
+
+const documentFindMatchesField = StateField.define({
+  create() {
+    return Decoration.none;
+  },
+  update(value, transaction) {
+    value = value.map(transaction.changes);
+    for (const effect of transaction.effects) {
+      if (!effect.is(setDocumentFindMatches)) {
+        continue;
+      }
+      const matches = Array.isArray(effect.value?.matches)
+        ? effect.value.matches
+        : [];
+      const currentIndex = Number(effect.value?.currentIndex);
+      const length = transaction.state.doc.length;
+      const decorations = matches
+        .map((match, index) => {
+          const from = Math.max(0, Math.min(Number(match?.start) || 0, length));
+          const to = Math.max(
+            from,
+            Math.min(Number(match?.end) || from, length),
+          );
+          if (to <= from) {
+            return null;
+          }
+          const classes = ["cm-documentFindMatch"];
+          if (index === currentIndex) {
+            classes.push("cm-documentFindMatchActive");
+          }
+          return Decoration.mark({ class: classes.join(" ") }).range(from, to);
+        })
+        .filter(Boolean);
+      return Decoration.set(decorations, true);
     }
     return value;
   },
@@ -165,6 +208,19 @@ const sourceTheme = EditorView.theme({
   ".cm-textDropTarget": {
     backgroundColor: "rgb(var(--theme-link) / 0.1)",
     boxShadow: "inset 2px 0 0 rgb(var(--theme-heading) / 0.9)",
+  },
+  ".cm-documentFindMatch": {
+    borderRadius: "2px",
+    color: "rgb(var(--theme-heading))",
+    backgroundColor: "rgb(var(--theme-link) / 0.13)",
+  },
+  ".cm-documentFindMatchActive": {
+    color: "rgb(var(--theme-background))",
+    backgroundColor: "rgb(var(--theme-heading) / 0.94)",
+  },
+  ".cm-selectionMatch": {
+    color: "inherit",
+    backgroundColor: "rgb(var(--theme-link) / 0.13)",
   },
   ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection":
     {
@@ -315,6 +371,7 @@ function editorExtensions() {
     drawSelection(),
     dropCursor(),
     textDropPositionField,
+    documentFindMatchesField,
     EditorState.allowMultipleSelections.of(true),
     indentOnInput(),
     bracketMatching(),
@@ -351,10 +408,25 @@ function editorExtensions() {
         return event.defaultPrevented;
       },
       paste(event) {
-        return handleImageFiles(event.clipboardData?.files, event);
+        if (handleImageFiles(event.clipboardData, event)) {
+          return true;
+        }
+        if (!props.transformPastedText) {
+          return false;
+        }
+        const transformed = props.transformPastedText(
+          event.clipboardData?.getData("text/plain") || "",
+          getSelectedText(),
+        );
+        if (typeof transformed !== "string") {
+          return false;
+        }
+        event.preventDefault();
+        replaceSelection(transformed);
+        return true;
       },
       drop(event) {
-        return handleImageFiles(event.dataTransfer?.files, event);
+        return handleImageFiles(event.dataTransfer, event);
       },
     }),
   ];
@@ -413,11 +485,18 @@ function minimalTextChange(before, after) {
   };
 }
 
-function handleImageFiles(fileList, event) {
-  if (!props.addImageBlobHook || !fileList?.length) {
+function handleImageFiles(dataTransfer, event) {
+  if (!props.addImageBlobHook || !dataTransfer) {
     return false;
   }
-  const images = [...fileList].filter((file) => file.type.startsWith("image/"));
+  const files = [...(dataTransfer.files || [])];
+  const itemFiles = [...(dataTransfer.items || [])]
+    .filter((item) => item.type?.startsWith("image/"))
+    .map((item) => item.getAsFile?.())
+    .filter(Boolean);
+  const images = [...new Set([...files, ...itemFiles])].filter((file) =>
+    file.type?.startsWith("image/"),
+  );
   if (!images.length) {
     return false;
   }
@@ -446,6 +525,47 @@ function insertText(text) {
     scrollIntoView: true,
   });
   editorView.focus();
+}
+
+function getSelectionRange() {
+  const selection = editorView?.state.selection.main;
+  const length = editorView?.state.doc.length ?? initialContent().length;
+  return selection
+    ? { start: selection.from, end: selection.to }
+    : { start: length, end: length };
+}
+
+function getSelectedText() {
+  if (!editorView) {
+    return "";
+  }
+  const { start, end } = getSelectionRange();
+  return editorView.state.doc.sliceString(start, end);
+}
+
+function replaceSelection(text, options = {}) {
+  if (!editorView) {
+    return false;
+  }
+  const value = String(text ?? "");
+  const selection = editorView.state.selection.main;
+  const anchorOffset = Number.isFinite(options.anchorOffset)
+    ? options.anchorOffset
+    : value.length;
+  const headOffset = Number.isFinite(options.headOffset)
+    ? options.headOffset
+    : anchorOffset;
+  editorView.dispatch({
+    changes: { from: selection.from, to: selection.to, insert: value },
+    selection: {
+      anchor:
+        selection.from + Math.max(0, Math.min(anchorOffset, value.length)),
+      head: selection.from + Math.max(0, Math.min(headOffset, value.length)),
+    },
+    scrollIntoView: true,
+  });
+  editorView.focus();
+  return true;
 }
 
 function insertDroppedText(text, options = {}) {
@@ -500,6 +620,12 @@ function previewDroppedTextPosition(options = {}) {
 function clearDroppedTextPosition() {
   textDropLineFrom = null;
   editorView?.dispatch({ effects: setTextDropPosition.of(null) });
+}
+
+function setSearchMatches(matches = [], currentIndex = -1) {
+  editorView?.dispatch({
+    effects: setDocumentFindMatches.of({ matches, currentIndex }),
+  });
 }
 
 function sessionStorageKey() {
@@ -656,12 +782,16 @@ defineExpose({
   clearDroppedTextPosition,
   focusEditor,
   getMarkdown,
+  getSelectedText,
+  getSelectionRange,
   getSearchText,
   getValue,
   isWysiwygMode,
   insertDroppedText,
   previewDroppedTextPosition,
+  replaceSelection,
   selectSearchRange,
+  setSearchMatches,
 });
 </script>
 

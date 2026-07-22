@@ -146,6 +146,7 @@ export function useDocumentFind({
   isEditing,
   getEditorText,
   selectEditorRange,
+  setEditorMatches,
   getViewRoot,
 } = {}) {
   const visible = ref(false);
@@ -166,6 +167,7 @@ export function useDocumentFind({
       return;
     }
     if (isEditing?.()) {
+      setEditorMatches?.(matches.value, currentIndex.value);
       const match = matches.value[currentIndex.value];
       selectEditorRange?.(match.start, match.end);
       return;
@@ -186,6 +188,7 @@ export function useDocumentFind({
       if (!visible.value || !query.value) {
         matches.value = [];
         currentIndex.value = -1;
+        setEditorMatches?.([], -1);
         return;
       }
 
@@ -199,6 +202,7 @@ export function useDocumentFind({
 
       if (!matches.value.length) {
         currentIndex.value = -1;
+        setEditorMatches?.([], -1);
         return;
       }
       if (
@@ -231,6 +235,7 @@ export function useDocumentFind({
     currentIndex.value = -1;
     viewRanges = [];
     clearHighlights();
+    setEditorMatches?.([], -1);
     if (restoreFocus && previousFocus instanceof HTMLElement) {
       nextTick(() => previousFocus?.focus?.({ preventScroll: true }));
     }

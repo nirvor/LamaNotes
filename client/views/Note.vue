@@ -155,6 +155,7 @@
         :initialValue="getInitialEditorValue()"
         :note-title="newTitle"
         :addImageBlobHook="addImageBlobHook"
+        :show-line-numbers="globalStore.showLineNumbers"
         :show-kind-switch="isNewNote"
         @change="editorContentChangedHandler"
         @keydown="keydownHandler"
@@ -397,6 +398,8 @@ const {
   getEditorText: () => contentEditor.value?.getSearchText?.() || "",
   selectEditorRange: (from, to) =>
     contentEditor.value?.selectSearchRange?.(from, to),
+  setEditorMatches: (matches, currentIndex) =>
+    contentEditor.value?.setSearchMatches?.(matches, currentIndex),
   getViewRoot: () => noteContent.value,
 });
 

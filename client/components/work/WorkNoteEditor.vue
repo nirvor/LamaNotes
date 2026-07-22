@@ -55,17 +55,21 @@
       </button>
     </div>
 
-    <textarea
+    <SourceEditor
       v-show="!previewVisible"
-      ref="textarea"
+      ref="sourceEditor"
       v-model="markdown"
       class="flatnotes-work-editor-source"
-      rows="1"
-      spellcheck="false"
-      @input="contentInputHandler"
+      language="markdown"
+      :normalize-tags="true"
+      :show-line-numbers="showLineNumbers"
+      :add-image-blob-hook="addImageBlobHook"
+      :transform-pasted-text="transformPastedText"
+      aria-label="Edit work note"
+      @change="contentChangedHandler"
       @keydown="keydownHandler"
-      @paste="pasteHandler"
-    ></textarea>
+      @ready="editorReadyHandler"
+    />
 
     <div v-if="previewVisible" class="flatnotes-work-editor-preview">
       <ToastViewer
@@ -89,23 +93,12 @@ import {
   mdiEyeOutline,
   mdiFormatListChecks,
 } from "@mdi/js";
-import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-} from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 
 import NoteKindSwitch from "../NoteKindSwitch.vue";
+import SourceEditor from "../editor/SourceEditor.vue";
 import { writeMarkdownToClipboard } from "../../clipboard.js";
-import {
-  classifyPastedText,
-  getClipboardImageFile,
-  markdownForPaste,
-  markdownImageSnippet,
-} from "../paste/mediaPaste.js";
+import { classifyPastedText, markdownForPaste } from "../paste/mediaPaste.js";
 import ToastViewer from "../toastui/ToastViewer.vue";
 import {
   buildWorkNoteHtml,
@@ -121,6 +114,7 @@ const props = defineProps({
   initialValue: String,
   noteTitle: String,
   addImageBlobHook: Function,
+  showLineNumbers: Boolean,
   showKindSwitch: Boolean,
 });
 
@@ -129,9 +123,7 @@ const emit = defineEmits(["change", "keydown", "ready", "set-kind"]);
 const copied = ref(false);
 const markdown = ref(initialMarkdown());
 const previewVisible = ref(false);
-const textarea = ref();
-let tagNormalizeTimeout = null;
-let lastTagNormalizationUndo = null;
+const sourceEditor = ref();
 
 const previewKey = computed(() => `${previewVisible.value}-${markdown.value}`);
 
@@ -140,44 +132,12 @@ function initialMarkdown() {
   return raw.trim() ? raw : "";
 }
 
-function resizeTextarea() {
-  const element = textarea.value;
-  if (!element) {
-    return;
-  }
-
-  element.style.height = "auto";
-  element.style.height = `${element.scrollHeight}px`;
-}
-
-function selectedRange() {
-  const element = textarea.value;
-  if (!element) {
-    return { start: markdown.value.length, end: markdown.value.length };
-  }
-
-  return {
-    start: element.selectionStart,
-    end: element.selectionEnd,
-  };
-}
-
-function insertAtCursor(snippet) {
-  const element = textarea.value;
-  const { start, end } = selectedRange();
-  markdown.value = `${markdown.value.slice(0, start)}${snippet}${markdown.value.slice(end)}`;
-  requestAnimationFrame(() => {
-    resizeTextarea();
-    const nextPosition = start + snippet.length;
-    element?.focus();
-    element?.setSelectionRange(nextPosition, nextPosition);
-  });
-  emit("change");
+function insertAtCursor(snippet, options = {}) {
+  sourceEditor.value?.replaceSelection?.(snippet, options);
 }
 
 function insertCodeBlock() {
-  const { start, end } = selectedRange();
-  const selectedText = markdown.value.slice(start, end);
+  const selectedText = sourceEditor.value?.getSelectedText?.() || "";
   insertAtCursor(`\n\`\`\`text\n${selectedText}\n\`\`\`\n`);
 }
 
@@ -186,36 +146,12 @@ function insertChecklist() {
 }
 
 function selectedText() {
-  const { start, end } = selectedRange();
-  return markdown.value.slice(start, end);
+  return sourceEditor.value?.getSelectedText?.() || "";
 }
 
-function insertImageFile(file) {
-  if (!file || !props.addImageBlobHook) {
-    return false;
-  }
-
-  props.addImageBlobHook(file, (url, altText) => {
-    insertAtCursor(markdownImageSnippet(url, altText));
-  });
-  return true;
-}
-
-function pasteHandler(event) {
-  const file = getClipboardImageFile(event.clipboardData);
-  if (file && insertImageFile(file)) {
-    event.preventDefault();
-    return;
-  }
-
-  const text = event.clipboardData?.getData("text/plain") || "";
+function transformPastedText(text) {
   const snippet = markdownForPaste(classifyPastedText(text), selectedText());
-  if (!snippet) {
-    return;
-  }
-
-  event.preventDefault();
-  insertAtCursor(snippet);
+  return snippet || null;
 }
 
 function setKind(kind) {
@@ -226,161 +162,17 @@ async function togglePreview() {
   previewVisible.value = !previewVisible.value;
   if (!previewVisible.value) {
     await nextTick();
-    resizeTextarea();
-    textarea.value?.focus();
+    sourceEditor.value?.focusEditor?.();
   }
 }
 
-function cursorIsInCodeFence(value, position) {
-  const beforeCursor = value.slice(0, position);
-  return (beforeCursor.match(/```/g) || []).length % 2 === 1;
-}
-
-function textContainsTag(value) {
-  return /(^|\s)#[a-zA-Z0-9][a-zA-Z0-9_-]*(?=\s|$)/.test(value);
-}
-
-function cursorJustClosedTag(value, position) {
-  const beforeCursor = value.slice(0, position);
-  return /(^|\s)#[a-zA-Z0-9][a-zA-Z0-9_-]*\s+$/.test(beforeCursor);
-}
-
-function shouldNormalizeTags(event) {
-  const element = event?.target;
-  const value = element?.value || markdown.value;
-  const position = element?.selectionStart ?? value.length;
-  if (cursorIsInCodeFence(value, position)) {
-    return false;
-  }
-
-  if (["insertFromPaste", "insertReplacementText"].includes(event?.inputType)) {
-    return textContainsTag(value);
-  }
-
-  if (
-    event?.data === " " ||
-    event?.data === "\n" ||
-    ["insertLineBreak", "insertParagraph"].includes(event?.inputType)
-  ) {
-    return cursorJustClosedTag(value, position);
-  }
-
-  return false;
-}
-
-function clearTagNormalizeTimeout() {
-  if (tagNormalizeTimeout != null) {
-    window.clearTimeout(tagNormalizeTimeout);
-    tagNormalizeTimeout = null;
-  }
-}
-
-function clearStaleTagUndo() {
-  if (
-    lastTagNormalizationUndo &&
-    markdown.value !== lastTagNormalizationUndo.after
-  ) {
-    lastTagNormalizationUndo = null;
-  }
-}
-
-function mapCursorAfterTagNormalization(value, position) {
-  const tagPattern = /(^|[ \t])#([a-zA-Z0-9][a-zA-Z0-9_-]*)([ \t]?)/g;
-  const tagOnlyLinePattern = /^\s*(?:#[a-zA-Z0-9][a-zA-Z0-9_-]*\s*)+$/;
-  const lines = value.slice(0, position).split("\n");
-  let inCodeFence = false;
-  const mappedLines = [];
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    const fenceLine = trimmed.startsWith("```");
-    if (fenceLine) {
-      mappedLines.push(line);
-      inCodeFence = !inCodeFence;
-      continue;
-    }
-
-    if (inCodeFence) {
-      mappedLines.push(line);
-      continue;
-    }
-
-    if (tagOnlyLinePattern.test(line)) {
-      continue;
-    }
-
-    mappedLines.push(
-      line.replace(tagPattern, (match, prefix) => {
-        return prefix;
-      }),
-    );
-  }
-
-  return mappedLines.join("\n").length;
-}
-
-function normalizeEditorTags({
-  restoreSelection = true,
-  recordUndo = false,
-} = {}) {
-  const element = textarea.value;
-  const selectionStart = element?.selectionStart ?? markdown.value.length;
-  const selectionEnd = element?.selectionEnd ?? selectionStart;
-  const before = markdown.value;
-  const normalized = normalizeWorkMarkdownTags(before);
-  if (!normalized.changed || normalized.markdown === markdown.value) {
-    return normalized.markdown;
-  }
-
-  if (recordUndo) {
-    lastTagNormalizationUndo = {
-      before,
-      after: normalized.markdown,
-      selectionStart,
-      selectionEnd,
-    };
-  }
-
-  markdown.value = normalized.markdown;
-  nextTick(() => {
-    resizeTextarea();
-    if (restoreSelection && element) {
-      const nextStart = Math.min(
-        mapCursorAfterTagNormalization(before, selectionStart),
-        markdown.value.length,
-      );
-      const nextEnd = Math.min(
-        mapCursorAfterTagNormalization(before, selectionEnd),
-        markdown.value.length,
-      );
-      element.setSelectionRange(nextStart, nextEnd);
-    }
-  });
-
-  return normalized.markdown;
-}
-
-function undoTagNormalization() {
-  const undo = lastTagNormalizationUndo;
-  if (!undo || markdown.value !== undo.after) {
-    return false;
-  }
-
-  markdown.value = undo.before;
-  lastTagNormalizationUndo = null;
-  nextTick(() => {
-    resizeTextarea();
-    textarea.value?.focus();
-    textarea.value?.setSelectionRange(undo.selectionStart, undo.selectionEnd);
-  });
-  emit("change");
-  return true;
+function normalizedMarkdown() {
+  return normalizeWorkMarkdownTags(markdown.value).markdown;
 }
 
 async function copyMarkdown() {
   try {
-    const normalizedMarkdown = normalizeEditorTags();
-    await writeMarkdownToClipboard(normalizedMarkdown);
+    await writeMarkdownToClipboard(normalizedMarkdown());
     copied.value = true;
     setTimeout(() => {
       copied.value = false;
@@ -390,34 +182,19 @@ async function copyMarkdown() {
   }
 }
 
-function contentInputHandler(event) {
-  markdown.value = event.target.value;
-  clearStaleTagUndo();
-  if (shouldNormalizeTags(event)) {
-    clearTagNormalizeTimeout();
-    normalizeEditorTags({ recordUndo: true });
-  }
-  resizeTextarea();
+function contentChangedHandler() {
   emit("change");
 }
 
 function keydownHandler(event) {
-  if (
-    (event.ctrlKey || event.metaKey) &&
-    event.key.toLowerCase() === "z" &&
-    !event.shiftKey &&
-    undoTagNormalization()
-  ) {
-    event.preventDefault();
-    return;
-  }
-
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "b") {
     event.preventDefault();
-    insertAtCursor("****");
-    const element = textarea.value;
-    const position = selectedRange().start - 2;
-    requestAnimationFrame(() => element?.setSelectionRange(position, position));
+    const selected = selectedText();
+    const snippet = `**${selected}**`;
+    insertAtCursor(snippet, {
+      anchorOffset: 2,
+      headOffset: 2 + selected.length,
+    });
     return;
   }
 
@@ -425,7 +202,7 @@ function keydownHandler(event) {
 }
 
 function getMarkdown() {
-  return normalizeEditorTags({ restoreSelection: false });
+  return normalizedMarkdown();
 }
 
 function getSearchText() {
@@ -433,57 +210,37 @@ function getSearchText() {
 }
 
 function selectSearchRange(from, to) {
-  const element = textarea.value;
-  if (!element) {
-    return;
-  }
-  const start = Math.max(0, Math.min(Number(from) || 0, markdown.value.length));
-  const end = Math.max(
-    start,
-    Math.min(Number(to) || start, markdown.value.length),
-  );
-  element.setSelectionRange(start, end);
-  const lineCount = markdown.value.slice(0, start).split("\n").length - 1;
-  const styles = getComputedStyle(element);
-  const lineHeight =
-    Number.parseFloat(styles.lineHeight) ||
-    Number.parseFloat(styles.fontSize) * 1.45;
-  element.scrollTop = Math.max(
-    0,
-    lineCount * lineHeight - element.clientHeight / 2,
-  );
+  sourceEditor.value?.selectSearchRange?.(from, to);
+}
+
+function setSearchMatches(matches, currentIndex) {
+  sourceEditor.value?.setSearchMatches?.(matches, currentIndex);
 }
 
 function getContent(title) {
   return buildWorkNoteHtml(
     title || props.noteTitle || "Untitled",
-    normalizeEditorTags({ restoreSelection: false }),
+    normalizedMarkdown(),
   );
 }
 
 function focusEditor() {
   previewVisible.value = false;
-  nextTick(() => textarea.value?.focus({ preventScroll: true }));
-  return textarea.value;
+  nextTick(() => sourceEditor.value?.focusEditor?.());
+  return sourceEditor.value?.focusEditor?.();
 }
 
 watch(
   () => props.initialValue,
-  async () => {
+  () => {
     markdown.value = initialMarkdown();
-    await nextTick();
-    resizeTextarea();
   },
 );
 
-onMounted(async () => {
-  await nextTick();
-  resizeTextarea();
-  textarea.value?.focus();
+function editorReadyHandler() {
+  sourceEditor.value?.focusEditor?.();
   emit("ready");
-});
-
-onBeforeUnmount(clearTagNormalizeTimeout);
+}
 
 defineExpose({
   focusEditor,
@@ -491,6 +248,7 @@ defineExpose({
   getMarkdown,
   getSearchText,
   selectSearchRange,
+  setSearchMatches,
 });
 </script>
 
@@ -546,17 +304,13 @@ defineExpose({
 .flatnotes-work-editor-source {
   min-height: 65vh;
   flex: 0 0 auto;
-  resize: none;
-  overflow-y: hidden;
-  padding: 0.68rem 0.82rem;
   border: 0;
-  color: rgb(var(--theme-text));
-  background-color: rgb(var(--theme-background));
-  font-family: Consolas, "Lucida Console", Monaco, "Andale Mono", monospace;
-  font-size: 0.9rem;
-  line-height: 1.45;
-  outline: none;
-  tab-size: 2;
+}
+
+.flatnotes-work-editor-source :deep(.cm-editor),
+.flatnotes-work-editor-source :deep(.cm-scroller),
+.flatnotes-work-editor-source :deep(.cm-content) {
+  min-height: 65vh;
 }
 
 .flatnotes-work-editor-preview {
