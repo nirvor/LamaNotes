@@ -4,12 +4,12 @@
 	@note_assets path /note-assets/*.png /note-assets/*.jpg /note-assets/*.jpeg /note-assets/*.gif /note-assets/*.webp /note-assets/*.svg
 	handle @note_assets {
 		uri strip_prefix /note-assets
-		root * /srv/flatnotes/data
+		root * /srv/lamanotes/data
 		file_server
 	}
 
 	handle {
-		reverse_proxy flatnotes:8080
+		reverse_proxy lamanotes:8080
 	}
 }
 

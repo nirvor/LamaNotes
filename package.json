@@ -1,8 +1,8 @@
 {
-  "name": "nirvnotes",
+  "name": "lamanotes",
   "version": "5.5.4",
   "type": "module",
-  "description": "An HTML-first, flat-folder note system for clean, media-rich, LLM-friendly personal knowledge work.",
+  "description": "A fast local-first Windows text editor with an explicit, media-rich HTML note library.",
   "main": "client/index.html",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -10,7 +10,15 @@
     "watch": "vite build --watch",
     "dev": "vite"
   },
-  "author": "Adam Dullage",
+  "author": "Thomas Huber",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nirvor/LamaNotes.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nirvor/LamaNotes/issues"
+  },
+  "homepage": "https://github.com/nirvor/LamaNotes#readme",
   "license": "MIT",
   "dependencies": {
     "@codemirror/commands": "6.10.4",

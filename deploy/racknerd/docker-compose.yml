@@ -1,7 +1,7 @@
 services:
-  flatnotes:
-    image: lamanotes:e9970c3
-    container_name: flatnotes
+  lamanotes:
+    image: ${LAMANOTES_IMAGE:-lamanotes:local}
+    container_name: lamanotes
     env_file:
       - .env
     volumes:
@@ -15,9 +15,9 @@ services:
 
   caddy:
     image: caddy:2-alpine
-    container_name: flatnotes-caddy
+    container_name: lamanotes-caddy
     depends_on:
-      - flatnotes
+      - lamanotes
     ports:
       - "192.3.199.119:80:80"
       - "192.3.199.119:443:443"
@@ -26,7 +26,7 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - /data/certs:/tailnet-certs:ro
-      - ./data:/srv/flatnotes/data:ro
+      - ./data:/srv/lamanotes/data:ro
       - caddy_data:/data
       - caddy_config:/config
     restart: unless-stopped

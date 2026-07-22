@@ -1,49 +1,44 @@
-# Contributing to flatnotes
+# Contributing to LamaNotes
 
-Thank you for your interest in contributing to flatnotes.
+LamaNotes is currently developed as a tightly scoped single-user product.
+Small bug fixes, performance work and focused usability improvements are a
+better fit than broad feature additions.
 
-At this time, **pull requests are disabled**. I really appreciate that people care enough about the project to want to improve it, so I want to explain why this is the case and how I’m approaching development.
+## Before changing code
 
-## Project principles
+Read [the product contract](docs/PRODUCT.md) and
+[the architecture](docs/ARCHITECTURE.md). A change normally fits when it:
 
-flatnotes is designed to be a **distraction-free** note‑taking app that puts your content first. A key principle of this is to avoid feature bloat and keep the app predictable and lightweight. Sticking to these principles often means saying “no” to new features, even good ones.
+- keeps local files at their original path;
+- preserves raw copied and saved content;
+- avoids automatic upload or synchronization;
+- keeps the Library flat and HTML-based;
+- reduces latency, ambiguity or permanent interface weight; and
+- remains useful on both a narrow Win11 window and the reading surface.
 
-## Why pull requests are disabled
+Features that introduce a vault hierarchy, knowledge graph, collaboration
+layer, background sync or a second project-management model are outside the
+current direction.
 
-There are two main reasons:
+## Issues and pull requests
 
-1. **Maintaining the project’s direction**
-  To keep flatnotes simple and consistent with its original design principles, I need to be very deliberate about any changes that go in. Reviewing and aligning external contributions with this vision can take a lot of time and discussion.
+Do not include credentials, private note content, host names or production
+configuration in an issue. Security problems belong in a private GitHub
+security advisory as described in [SECURITY.md](SECURITY.md).
 
-2. **Limited personal time**
-  I don’t have a lot of free time to work on flatnotes. The time I do have, I want to spend on:
+Unsolicited feature pull requests are not actively accepted. For a compact bug
+fix, first describe the visible problem, a reproducible case and the intended
+behaviour. Keep the eventual diff narrow and add tests at the behavioural
+boundary it changes.
 
-   - Maintenance
-   - Bug fixing
-   - Keeping existing features stable and reliable
+## Local validation
 
-  Managing and reviewing pull requests (even good ones) is often more time‑consuming than implementing small, focused changes myself.
+At minimum, run the checks relevant to the changed layer:
 
-Because of this, I’ve decided that for now it’s best to **disable pull requests** and keep development tightly scoped.
+```shell
+npm run build
+python -m compileall -q server windows-client
+```
 
-## How you can still help
-
-Even though PRs are disabled, there are still ways you can support the project:
-
-- **Report bugs**
-  Clear, reproducible bug reports are extremely helpful and directly support the maintenance focus of the project.
-
-- **Share feedback**
-  While I’m not looking to add lots of new features, feedback on existing behaviour, usability issues and suggestion are still valuable.
-
-- **Use and share flatnotes**
-  Simply using the app and recommending it to others helps keep the project alive and motivates further maintenance.
-
-- **Sponsorship**
-  If you find flatnotes useful, sponsoring the project is a great way to show support and helps justify the time I spend maintaining it.
-
-## Thank you
-
-I’m genuinely grateful to anyone who takes the time to engage with flatnotes, whether by using it, reporting issues, or just expressing interest in contributing. Even though I’m not accepting pull requests at this time, that interest means a lot and helps keep the project going.
-
-Thank you for your understanding.
+Frontend, server and Windows-client tests should also pass before a release.
+Changes affecting layout need a desktop and narrow-window visual check.

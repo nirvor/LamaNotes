@@ -1,15 +1,21 @@
 # RackNerd deployment
 
+The files in this directory define the LamaNotes target layout. Migrating an
+existing installation to these service, container and asset-path names is a
+separate backed-up operation. Do not mix that infrastructure rename with a
+normal application release.
+
 The production deployment keeps two routes to the same private app container:
 
 - `https://notes.thuber.org` is the normal HTTPS route for Windows and Android.
 - The Tailnet endpoint on port `8092` remains available for administration and rollback.
 
-Only Caddy publishes ports. The LamaNotes container stays on the Compose network
-and reads its secrets from `/srv/flatnotes/.env`. Interactive login can use the
-single-user Google OAuth path, with the password path kept temporarily for
-rollback. Passwords use an Argon2id hash; automation uses hashed, scoped API
-tokens. Raw credentials are never stored in this repository.
+Only Caddy publishes ports. The LamaNotes container stays on the Compose
+network and reads its secrets from the private runtime environment file.
+Interactive login can use the single-user Google OAuth path, with the password
+path kept temporarily for rollback. Passwords use an Argon2id hash; automation
+uses hashed, scoped API tokens. Raw credentials are never stored in this
+repository.
 
 The Google OAuth client remains server-side. The Windows app opens the system
 browser and uses a PKCE-bound loopback handoff; the client secret must never be
@@ -26,6 +32,7 @@ volumes and reads the existing Tailnet certificate from `/data/certs`.
 ## Rollout
 
 1. Build and smoke-test the exact Git commit as a tagged local Docker image.
+   Set `LAMANOTES_IMAGE` to that immutable tag for Compose.
 2. Back up `.env`, Compose, Caddy, and `data` under `/srv/backups`.
 3. Validate `docker compose config` and `caddy validate` with staged files.
 4. Recreate the app, verify the Tailnet route, then recreate Caddy.
@@ -38,11 +45,12 @@ volumes and reads the existing Tailnet certificate from `/data/certs`.
 ## Rollback
 
 Restore the timestamped `docker-compose.yml`, `docker-compose.override.yml`,
-`Caddyfile`, and `.env` backups in `/srv/flatnotes`, then run:
+`Caddyfile`, and environment backups in the production runtime directory, then
+run:
 
 ```sh
 docker compose config --quiet
-docker compose up -d --force-recreate flatnotes caddy
+docker compose up -d --force-recreate
 ```
 
 The previous image remains local during the canary period. DNS can be removed

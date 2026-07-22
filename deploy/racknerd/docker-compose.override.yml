@@ -1,6 +1,6 @@
 services:
-  flatnotes:
-    image: lamanotes:e9970c3
+  lamanotes:
+    image: ${LAMANOTES_IMAGE:-lamanotes:local}
     environment:
       NIRVNOTES_WINDOWS_UPDATE_DIR: /updates
     volumes:
