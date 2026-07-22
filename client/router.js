@@ -84,6 +84,9 @@ router.beforeEach(async (to) => {
   if (authChecked || to.name === "login") {
     return;
   }
+  if (desktopShell.enabled && to.name === "openFile" && !getStoredToken()) {
+    return;
+  }
   if (desktopShell.enabled && getStoredToken()) {
     authChecked = true;
     void authCheck().catch((error) => {

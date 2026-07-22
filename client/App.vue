@@ -69,6 +69,7 @@ import {
 } from "./desktopSession.js";
 import NavBar from "./partials/NavBar.vue";
 import LoadingIndicator from "./components/LoadingIndicator.vue";
+import { openNewNote } from "./newNoteNavigation.js";
 import router from "./router.js";
 
 const SearchModal = defineAsyncComponent(
@@ -93,7 +94,7 @@ Mousetrap.bind("/", () => {
 // 'CTRL + ALT/OPT + N' to create new note
 Mousetrap.bindGlobal("ctrl+alt+n", () => {
   if (route.name !== "login") {
-    router.push({ name: "new" });
+    openNewNote(router);
     return false;
   }
 });
@@ -156,7 +157,12 @@ function loadInitialConfig() {
       void getSemanticIndex().catch(() => {});
     })
     .catch((error) => {
-      if (isCloudNetworkError(error)) {
+      if (
+        isCloudNetworkError(error) ||
+        (desktopShell.enabled &&
+          route.name === "openFile" &&
+          error.response?.status === 401)
+      ) {
         globalStore.config = desktopFallbackConfig;
         markAppLoaded();
         return;

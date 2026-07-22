@@ -1,15 +1,59 @@
 <template>
-  <div
-    ref="editorHost"
-    class="flatnotes-source-editor"
-    :class="{
-      'flatnotes-source-editor-wrap': wrap,
-      'flatnotes-source-editor-no-gutter': !showLineNumbers,
-    }"
-  ></div>
+  <div class="flatnotes-source-editor-shell">
+    <div
+      ref="editorHost"
+      class="flatnotes-source-editor"
+      :class="{
+        'flatnotes-source-editor-wrap': wrap,
+        'flatnotes-source-editor-no-gutter': !showLineNumbers,
+      }"
+    ></div>
+    <div
+      v-if="pendingStructuredPaste"
+      class="flatnotes-structured-paste"
+      role="toolbar"
+      aria-label="Paste as"
+    >
+      <button
+        type="button"
+        class="flatnotes-structured-paste-active"
+        title="Keep raw text"
+        aria-label="Keep raw text"
+        @click="clearStructuredPaste"
+      >
+        <SvgIcon type="mdi" :path="mdiText" size="0.78rem" />
+        Raw
+      </button>
+      <button
+        v-for="option in pendingStructuredPaste.options"
+        :key="option.id"
+        type="button"
+        :title="`Paste as ${option.label.toLowerCase()}`"
+        :aria-label="`Paste as ${option.label.toLowerCase()}`"
+        @click="applyStructuredPaste(option)"
+      >
+        <SvgIcon
+          type="mdi"
+          :path="structuredPasteIcon(option.id)"
+          size="0.78rem"
+        />
+        {{ option.label }}
+      </button>
+      <button
+        type="button"
+        class="flatnotes-structured-paste-close"
+        title="Dismiss paste options"
+        aria-label="Dismiss paste options"
+        @click="clearStructuredPaste"
+      >
+        <SvgIcon type="mdi" :path="mdiClose" size="0.76rem" />
+      </button>
+    </div>
+  </div>
 </template>
 
 <script setup>
+import SvgIcon from "@jamescoyle/vue-icon";
 import {
   defaultKeymap,
   history,
@@ -50,8 +94,19 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
+import {
+  mdiClose,
+  mdiCodeTags,
+  mdiFormatQuoteClose,
+  mdiTable,
+  mdiText,
+} from "@mdi/js";
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
+import {
+  fitStructuredPasteToContext,
+  structuredPasteOptions,
+} from "../../structuredPaste.js";
 import { normalizeWorkMarkdownTags } from "../work/workNote.js";
 
 const props = defineProps({
@@ -65,6 +120,7 @@ const props = defineProps({
   ariaLabel: { type: String, default: "Source editor" },
   addImageBlobHook: Function,
   transformPastedText: Function,
+  structuredPaste: Boolean,
 });
 
 const emit = defineEmits(["update:modelValue", "change", "keydown", "ready"]);
@@ -75,7 +131,10 @@ const externalUpdate = Annotation.define();
 let editorView = null;
 let tagNormalizeTimer = null;
 let sessionSaveTimer = null;
+let structuredPasteTimer = null;
+let structuredPasteApplying = false;
 let textDropLineFrom = null;
+const pendingStructuredPaste = ref(null);
 const setTextDropPosition = StateEffect.define();
 const setDocumentFindMatches = StateEffect.define();
 const textDropPositionField = StateField.define({
@@ -392,6 +451,13 @@ function editorExtensions() {
       spellcheck: props.language === "markdown" || props.language === "text",
     }),
     EditorView.updateListener.of((update) => {
+      if (
+        update.docChanged &&
+        pendingStructuredPaste.value &&
+        !structuredPasteApplying
+      ) {
+        clearStructuredPaste();
+      }
       if (update.docChanged && !isExternalUpdate(update)) {
         const content = update.state.doc.toString();
         emit("update:modelValue", content);
@@ -411,11 +477,19 @@ function editorExtensions() {
         if (handleImageFiles(event.clipboardData, event)) {
           return true;
         }
+        const rawText = event.clipboardData?.getData("text/plain") || "";
+        if (
+          props.structuredPaste &&
+          ["markdown", "md"].includes(props.language) &&
+          insertStructuredPaste(rawText, event)
+        ) {
+          return true;
+        }
         if (!props.transformPastedText) {
           return false;
         }
         const transformed = props.transformPastedText(
-          event.clipboardData?.getData("text/plain") || "",
+          rawText,
           getSelectedText(),
         );
         if (typeof transformed !== "string") {
@@ -566,6 +640,93 @@ function replaceSelection(text, options = {}) {
   });
   editorView.focus();
   return true;
+}
+
+function replaceContent(text) {
+  if (!editorView) {
+    return false;
+  }
+  const value = String(text ?? "");
+  const current = editorView.state.doc.toString();
+  if (value === current) {
+    return false;
+  }
+  const selection = editorView.state.selection.main;
+  const anchor = Math.min(selection.anchor, value.length);
+  const head = Math.min(selection.head, value.length);
+  editorView.dispatch({
+    changes: { from: 0, to: current.length, insert: value },
+    selection: { anchor, head },
+    scrollIntoView: true,
+  });
+  editorView.focus();
+  return true;
+}
+
+function insertStructuredPaste(text, event) {
+  const options = structuredPasteOptions(text);
+  if (!editorView || !options.length) {
+    return false;
+  }
+
+  event.preventDefault();
+  clearStructuredPaste();
+  const selection = editorView.state.selection.main;
+  const value = String(text);
+  editorView.dispatch({
+    changes: { from: selection.from, to: selection.to, insert: value },
+    selection: { anchor: selection.from + value.length },
+    scrollIntoView: true,
+  });
+  pendingStructuredPaste.value = {
+    from: selection.from,
+    to: selection.from + value.length,
+    raw: value,
+    options,
+  };
+  structuredPasteTimer = window.setTimeout(clearStructuredPaste, 7000);
+  return true;
+}
+
+function applyStructuredPaste(option) {
+  const pending = pendingStructuredPaste.value;
+  if (!editorView || !pending) {
+    return;
+  }
+  const current = editorView.state.doc.sliceString(pending.from, pending.to);
+  if (current !== pending.raw) {
+    clearStructuredPaste();
+    return;
+  }
+
+  structuredPasteApplying = true;
+  const value = fitStructuredPasteToContext(
+    editorView.state.doc.toString(),
+    pending.from,
+    pending.to,
+    option.content || "",
+  );
+  editorView.dispatch({
+    changes: { from: pending.from, to: pending.to, insert: value },
+    selection: { anchor: pending.from + value.length },
+    scrollIntoView: true,
+  });
+  structuredPasteApplying = false;
+  clearStructuredPaste();
+  editorView.focus();
+}
+
+function clearStructuredPaste() {
+  window.clearTimeout(structuredPasteTimer);
+  pendingStructuredPaste.value = null;
+}
+
+function structuredPasteIcon(kind) {
+  return {
+    code: mdiCodeTags,
+    quote: mdiFormatQuoteClose,
+    table: mdiTable,
+  }[kind];
 }
 
 function insertDroppedText(text, options = {}) {
@@ -773,6 +934,7 @@ watch(
 onBeforeUnmount(() => {
   window.clearTimeout(tagNormalizeTimer);
   window.clearTimeout(sessionSaveTimer);
+  window.clearTimeout(structuredPasteTimer);
   saveSessionState();
   editorView?.destroy();
   editorView = null;
@@ -789,6 +951,7 @@ defineExpose({
   isWysiwygMode,
   insertDroppedText,
   previewDroppedTextPosition,
+  replaceContent,
   replaceSelection,
   selectSearchRange,
   setSearchMatches,
@@ -796,11 +959,65 @@ defineExpose({
 </script>
 
 <style scoped>
+.flatnotes-source-editor-shell {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
 .flatnotes-source-editor {
   width: 100%;
   min-width: 0;
   border-top: 1px solid rgb(var(--theme-border));
   border-bottom: 1px solid rgb(var(--theme-border));
+}
+
+.flatnotes-structured-paste {
+  position: sticky;
+  z-index: 12;
+  bottom: 0.42rem;
+  display: flex;
+  width: max-content;
+  max-width: calc(100% - 0.8rem);
+  min-height: 1.8rem;
+  align-items: center;
+  gap: 0.12rem;
+  margin: -2.25rem 0.4rem 0 auto;
+  padding: 0.16rem;
+  overflow-x: auto;
+  border: 1px solid rgb(var(--theme-border));
+  border-radius: 5px;
+  color: rgb(var(--theme-text-muted));
+  background: rgb(var(--theme-background-elevated) / 0.97);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 0.18);
+  backdrop-filter: blur(6px);
+}
+
+.flatnotes-structured-paste button {
+  display: inline-flex;
+  min-width: 1.55rem;
+  min-height: 1.42rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.22rem;
+  padding: 0.08rem 0.32rem;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-size: 0.68rem;
+}
+
+.flatnotes-structured-paste button:hover,
+.flatnotes-structured-paste button:focus-visible,
+.flatnotes-structured-paste-active {
+  border-color: rgb(var(--theme-border));
+  color: rgb(var(--theme-heading));
+  background: rgb(var(--theme-background));
+  outline: none;
+}
+
+.flatnotes-structured-paste .flatnotes-structured-paste-close {
+  padding-inline: 0.2rem;
 }
 
 .flatnotes-source-editor :deep(.cm-editor) {

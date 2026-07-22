@@ -30,16 +30,18 @@
             v-if="action.unsaved"
             class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-theme-brand"
           ></div>
+          <span v-if="action.badge" class="flatnotes-navbar-action-badge">
+            {{ action.badge }}
+          </span>
         </CustomButton>
       </template>
       <!-- New Note -->
-      <RouterLink
+      <CustomButton
         v-if="showNewButton"
-        :to="{ name: 'new' }"
-        class="flatnotes-navbar-action-link"
-      >
-        <CustomButton :iconPath="mdilPlusCircle" label="New Note" />
-      </RouterLink>
+        :iconPath="mdilPlusCircle"
+        label="New Note"
+        @click="createNewNote"
+      />
       <!-- Menu -->
       <CustomButton :iconPath="mdilMenu" label="Menu" @click="toggleMenu" />
       <PrimeMenu ref="menu" :model="menuItems" :popup="true" />
@@ -62,6 +64,9 @@
             v-if="action.unsaved"
             class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-theme-brand"
           ></div>
+          <span v-if="action.badge" class="flatnotes-navbar-action-badge">
+            {{ action.badge }}
+          </span>
         </CustomButton>
       </template>
     </div>
@@ -89,6 +94,7 @@ import PrimeMenu from "../components/PrimeMenu.vue";
 import { authTypes, params, searchSortOptions } from "../constants.js";
 import { useGlobalStore } from "../globalStore.js";
 import { getToastOptions, toggleTheme } from "../helpers.js";
+import { openNewNote } from "../newNoteNavigation.js";
 import {
   checkNativeClientUpdate,
   installNativeClientUpdate,
@@ -249,6 +255,10 @@ function toggleMenu(event) {
   menu.value.toggle(event);
 }
 
+function createNewNote() {
+  return openNewNote(router);
+}
+
 async function openNewWindow() {
   const targetRoute =
     router.currentRoute.value.name === "openFile"
@@ -301,6 +311,23 @@ function showLogOutButton() {
   display: inline-flex;
   align-items: center;
   align-self: center;
+  line-height: 1;
+}
+
+.flatnotes-navbar-action-badge {
+  position: absolute;
+  top: -0.12rem;
+  right: -0.08rem;
+  display: grid;
+  width: 0.76rem;
+  height: 0.76rem;
+  place-items: center;
+  border: 1px solid rgb(var(--theme-background));
+  border-radius: 3px;
+  color: rgb(var(--theme-background));
+  background: rgb(var(--theme-heading));
+  font-size: 0.48rem;
+  font-weight: 700;
   line-height: 1;
 }
 

@@ -79,6 +79,14 @@
       @close="closeFind"
     />
 
+    <DocumentAutomationModal
+      v-if="automationVisible"
+      v-model="automationVisible"
+      :source="automationSource"
+      :language="automationLanguage"
+      @apply="applyDocumentAutomation"
+    />
+
     <!-- Header -->
     <div class="min-w-0 max-w-full">
       <!-- Title -->
@@ -140,6 +148,7 @@
         language="markdown"
         :show-line-numbers="globalStore.showLineNumbers"
         :normalize-tags="true"
+        :structured-paste="true"
         :session-key="`cloud:${newTitle || note.title || 'new'}`"
         :aria-label="`Edit ${newTitle || note.title || 'note'}`"
         :addImageBlobHook="addImageBlobHook"
@@ -183,6 +192,7 @@
 import {
   mdiCloudUploadOutline,
   mdiCodeTags,
+  mdiCogOutline,
   mdiContentCopy,
   mdiLanguageHtml5,
   mdiLinkVariant,
@@ -259,6 +269,9 @@ import {
 const HtmlEditor = defineAsyncComponent(
   () => import("../components/html/HtmlEditor.vue"),
 );
+const DocumentAutomationModal = defineAsyncComponent(
+  () => import("../components/DocumentAutomationModal.vue"),
+);
 const HtmlViewer = defineAsyncComponent(
   () => import("../components/html/HtmlViewer.vue"),
 );
@@ -312,6 +325,8 @@ const noteLayoutKind = computed(() => {
 let contentChangedTimeout = null;
 let noteLoadStartedAt = performance.now();
 const contentEditor = ref();
+const automationVisible = ref(false);
+const automationSource = ref("");
 const editorKey = ref(0);
 const editorFormat = ref("html");
 const editorKind = ref("work");
@@ -344,6 +359,15 @@ const isPinned = computed(() =>
     "pinned",
     note.value.format || "html",
   ),
+);
+const canAutomateNote = computed(
+  () =>
+    editMode.value &&
+    (editorFormat.value === "markdown" ||
+      (editorFormat.value === "html" && editorKind.value === "work")),
+);
+const automationLanguage = computed(() =>
+  canAutomateNote.value ? "markdown" : "text",
 );
 const reservedFilenameCharacters = /[<>:"/\\|?*]/;
 const router = useRouter();
@@ -1447,6 +1471,18 @@ function getNoteMenuItems() {
 function updateNoteActions() {
   globalStore.setNoteActions([
     {
+      key: "tools",
+      label: "Note tools",
+      iconPath: mdiCogOutline,
+      badge: "A",
+      visible: canAutomateNote.value,
+      iconOnly: true,
+      handler: () => {
+        automationSource.value = contentEditor.value?.getMarkdown?.() || "";
+        automationVisible.value = true;
+      },
+    },
+    {
       key: "copy",
       label: "Copy",
       iconPath: mdiContentCopy,
@@ -1495,6 +1531,10 @@ function updateNoteActions() {
   globalStore.setNoteLayout({
     kind: noteLayoutKind.value,
   });
+}
+
+function applyDocumentAutomation(content) {
+  contentEditor.value?.replaceContent?.(content);
 }
 
 function libraryFilename() {

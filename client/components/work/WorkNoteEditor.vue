@@ -65,6 +65,7 @@
       :show-line-numbers="showLineNumbers"
       :add-image-blob-hook="addImageBlobHook"
       :transform-pasted-text="transformPastedText"
+      :structured-paste="true"
       aria-label="Edit work note"
       @change="contentChangedHandler"
       @keydown="keydownHandler"
@@ -217,6 +218,10 @@ function setSearchMatches(matches, currentIndex) {
   sourceEditor.value?.setSearchMatches?.(matches, currentIndex);
 }
 
+function replaceContent(value) {
+  return sourceEditor.value?.replaceContent?.(value);
+}
+
 function getContent(title) {
   return buildWorkNoteHtml(
     title || props.noteTitle || "Untitled",
@@ -247,6 +252,7 @@ defineExpose({
   getContent,
   getMarkdown,
   getSearchText,
+  replaceContent,
   selectSearchRange,
   setSearchMatches,
 });

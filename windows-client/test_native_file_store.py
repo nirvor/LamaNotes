@@ -26,6 +26,71 @@ from nirvnotes_client import (
 
 
 class NirvNotesApiTests(unittest.TestCase):
+    def test_create_native_file_uses_save_dialog_and_returns_writable_payload(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "draft.md"
+            store = NativeFileStore()
+            try:
+                api = NirvNotesApi(
+                    store,
+                    [],
+                    "https://notes.example",
+                    "https://notes.example",
+                )
+                api._window = Mock()
+                api._window.create_file_dialog.return_value = str(path)
+
+                result = api.create_native_file("Draft.md", "# Draft\n")
+
+                self.assertTrue(result["ok"])
+                self.assertTrue(result["writable"])
+                self.assertEqual(result["name"], "draft.md")
+                self.assertEqual(path.read_text(encoding="utf-8"), "# Draft\n")
+            finally:
+                store.close()
+
+    def test_create_native_file_can_be_cancelled(self) -> None:
+        store = NativeFileStore()
+        try:
+            api = NirvNotesApi(
+                store,
+                [],
+                "https://notes.example",
+                "https://notes.example",
+            )
+            api._window = Mock()
+            api._window.create_file_dialog.return_value = None
+
+            result = api.create_native_file("Draft.md", "")
+
+            self.assertTrue(result["cancelled"])
+        finally:
+            store.close()
+
+    def test_create_native_file_adds_the_suggested_extension(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "draft"
+            store = NativeFileStore()
+            try:
+                api = NirvNotesApi(
+                    store,
+                    [],
+                    "https://notes.example",
+                    "https://notes.example",
+                )
+                api._window = Mock()
+                api._window.create_file_dialog.return_value = str(path)
+
+                result = api.create_native_file("Draft.md", "# Draft\n")
+
+                self.assertTrue(result["ok"])
+                self.assertEqual(result["name"], "draft.md")
+                self.assertTrue(path.with_suffix(".md").is_file())
+            finally:
+                store.close()
+
     def test_window_title_is_compact_and_native(self) -> None:
         store = NativeFileStore()
         try:
@@ -318,6 +383,16 @@ class NativeFileStoreTests(unittest.TestCase):
             path.read_bytes(),
             b"\xef\xbb\xbfalpha\r\nbeta\r\ngamma\r\n",
         )
+        self.assertFalse(list(self.root.glob(f".{path.name}.*.tmp")))
+
+    def test_create_writes_new_utf8_file_atomically(self) -> None:
+        path = self.root / "new-note.md"
+
+        created = self.store.create(path, "# New note\n")
+
+        self.assertTrue(created["ok"])
+        self.assertEqual(created["content"], "# New note\n")
+        self.assertEqual(path.read_bytes(), b"# New note\n")
         self.assertFalse(list(self.root.glob(f".{path.name}.*.tmp")))
 
     def test_save_detects_external_version_conflict(self) -> None:

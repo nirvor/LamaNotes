@@ -66,7 +66,8 @@ async function restoreNativeFileSession() {
   if (
     !supportsNativeFileBridge() ||
     !["home", "openFile"].includes(currentRouteName) ||
-    routeWantsNativeLaunch()
+    routeWantsNativeLaunch() ||
+    routeWantsLocalDraft()
   ) {
     return false;
   }
@@ -130,6 +131,11 @@ async function consumeNativeLaunchFiles() {
 function routeWantsNativeLaunch() {
   const route = router.currentRoute.value;
   return route.name === "openFile" && route.query.nativeLaunch === "1";
+}
+
+function routeWantsLocalDraft() {
+  const route = router.currentRoute.value;
+  return route.name === "openFile" && route.query.new === "1";
 }
 
 function scheduleNativeLaunchFileConsumption() {

@@ -18,6 +18,14 @@
       @close="closeFind"
     />
 
+    <DocumentAutomationModal
+      v-if="automationVisible"
+      v-model="automationVisible"
+      :source="automationSource"
+      :language="editorLanguage"
+      @apply="applyDocumentAutomation"
+    />
+
     <div
       class="flatnotes-open-file-heading"
       :class="{
@@ -136,6 +144,7 @@
         :language="editorLanguage"
         :wrap="editorWrap"
         :show-line-numbers="globalStore.showLineNumbers"
+        :structured-paste="editorLanguage === 'markdown'"
         :session-key="editorSessionKey"
         :aria-label="`Edit ${activeFile.name}`"
         @change="activeFileChangedHandler"
@@ -235,6 +244,7 @@ import {
   mdiContentSaveAlertOutline,
   mdiContentSaveOutline,
   mdiContentCopy,
+  mdiCogOutline,
   mdiFileAlertOutline,
   mdiFileCompare,
   mdiFileDocumentOutline,
@@ -253,7 +263,7 @@ import {
   watch,
   watchEffect,
 } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useToast } from "primevue/usetoast";
 
 import { apiErrorHandler, createNote } from "../api.js";
@@ -270,6 +280,7 @@ import {
 import { desktopShell, setDesktopWindowTitle } from "../desktopShell.js";
 import {
   externalFileLaunch,
+  fileFromNativePayload,
   supportsFileHandlingLaunchQueue,
   supportsNativeFileBridge,
 } from "../externalFiles.js";
@@ -287,6 +298,9 @@ const ToastViewer = defineAsyncComponent(
 const SourceEditor = defineAsyncComponent(
   () => import("../components/editor/SourceEditor.vue"),
 );
+const DocumentAutomationModal = defineAsyncComponent(
+  () => import("../components/DocumentAutomationModal.vue"),
+);
 
 const editorTextarea = ref();
 const openFileContent = ref();
@@ -298,6 +312,9 @@ const statusMessage = ref("");
 const statusTone = ref("info");
 const compareOpen = ref(false);
 const keepingFile = ref(false);
+const automationVisible = ref(false);
+const automationSource = ref("");
+const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 const globalStore = useGlobalStore();
@@ -353,9 +370,10 @@ const {
 });
 const canSaveActiveFile = computed(
   () =>
-    Boolean(activeFile.value?.handle) &&
-    Boolean(activeFile.value?.dirty) &&
-    !documentSession.saving.value,
+    Boolean(
+      activeFile.value?.isNewDraft ||
+        (activeFile.value?.handle && activeFile.value?.dirty),
+    ) && !documentSession.saving.value,
 );
 const editorLanguage = computed(() => {
   const extension = activeFile.value?.extension || "text";
@@ -368,6 +386,9 @@ const editorWrap = computed(
 );
 const editorSessionKey = computed(() =>
   activeFile.value ? `local:${activeFile.value.draftStorageKey}` : "",
+);
+const canAutomateActiveFile = computed(() =>
+  ["md", "txt", "log", "json"].includes(activeFile.value?.extension),
 );
 const metadataItems = computed(() => {
   if (!activeFile.value) {
@@ -430,6 +451,15 @@ onMounted(() => {
 });
 
 watch(externalFileLaunch, consumeExternalLaunch, { immediate: true });
+watch(
+  () => [route.query.new, route.query.draft],
+  ([newDraft, draftId]) => {
+    if (newDraft === "1") {
+      createLocalDraft(String(draftId || "new"));
+    }
+  },
+  { immediate: true },
+);
 watch(editMode, () => {
   if (findVisible.value) {
     nextTick(refreshDocumentFind);
@@ -558,6 +588,19 @@ function updateOpenFileActions() {
   const file = activeFile.value;
   globalStore.setNoteActions([
     {
+      key: "external-tools",
+      label: "Note tools",
+      iconPath: mdiCogOutline,
+      badge: "A",
+      visible: Boolean(file && editMode.value && canAutomateActiveFile.value),
+      iconOnly: true,
+      handler: () => {
+        automationSource.value =
+          editorTextarea.value?.getValue?.() || file?.draftContent || "";
+        automationVisible.value = true;
+      },
+    },
+    {
       key: "external-edit",
       label: editMode.value ? "Done" : "Edit",
       iconPath: editMode.value ? mdiCheck : mdiPencilOutline,
@@ -569,7 +612,7 @@ function updateOpenFileActions() {
       key: "external-save",
       label: "Save",
       iconPath: mdiContentSaveOutline,
-      visible: Boolean(file?.handle && file?.dirty),
+      visible: Boolean(file?.isNewDraft || (file?.handle && file?.dirty)),
       disabled: !canSaveActiveFile.value,
       unsaved: Boolean(file?.dirty),
       iconOnly: true,
@@ -616,6 +659,10 @@ function updateOpenFileActions() {
   globalStore.setNoteLayout({ kind: "markdown" });
 }
 
+function applyDocumentAutomation(content) {
+  editorTextarea.value?.replaceContent?.(content);
+}
+
 async function keepActiveFileAsNote() {
   const file = activeFile.value;
   if (!file || keepingFile.value) {
@@ -637,6 +684,9 @@ async function keepActiveFileAsNote() {
         "success",
       ),
     );
+    if (file.isNewDraft) {
+      clearLocalDraftState(file);
+    }
     await router.push({
       name: "note",
       params: { title: created.title },
@@ -717,6 +767,9 @@ function closeExternalFile() {
 
   files.value.forEach((file) => {
     documentSession.clearDraft(file.draftStorageKey);
+    if (file.isNewDraft) {
+      localStorage.removeItem(localDraftNameKey(file.draftId));
+    }
   });
   files.value = [];
   activeKey.value = null;
@@ -768,6 +821,82 @@ async function loadFiles(selectedFiles, message) {
     showStatus(message);
     restoreActiveScroll();
   }
+}
+
+function createLocalDraft(draftId) {
+  const storageKey = `local:new:${draftId}`;
+  if (activeFile.value?.draftStorageKey === storageKey) {
+    return;
+  }
+  if (!confirmDiscardUnsavedChanges()) {
+    return;
+  }
+
+  closeFind({ restoreFocus: false });
+  saveActiveScroll();
+  const storedContent = documentSession.loadDraft(storageKey) || "";
+  const storedName = localStorage.getItem(localDraftNameKey(draftId));
+  const name = storedName || suggestedDraftName(storedContent);
+  const file = {
+    key: `draft:${draftId}`,
+    name,
+    path: "",
+    size: new Blob([storedContent]).size,
+    type: "text/markdown",
+    extension: "md",
+    handle: null,
+    draftStorageKey: storageKey,
+    content: "",
+    draftContent: storedContent,
+    largeFile: false,
+    previewMode: "markdown",
+    previewContent: storedContent,
+    previewTruncated: false,
+    previewMarkdown: storedContent,
+    lastModified: Date.now(),
+    encoding: "UTF-8",
+    lineEnding: "LF",
+    bom: false,
+    version: "",
+    dirty: Boolean(storedContent),
+    draftRestored: true,
+    externalState: "",
+    externalChange: null,
+    previewRevision: 0,
+    isNewDraft: true,
+    draftId,
+  };
+
+  files.value = [file];
+  activeKey.value = file.key;
+  clearDesktopFileSession();
+  documentSession.setDirty(file.dirty);
+  documentSession.enterEdit();
+  showStatus("Local draft. Save to choose its Windows file.");
+}
+
+function localDraftNameKey(draftId) {
+  return `nirvnotes:local-draft-name:${draftId}`;
+}
+
+function suggestedDraftName(content = "") {
+  const heading = String(content).match(
+    /^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/m,
+  )?.[1];
+  const title = String(heading || "New Note")
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 96);
+  return `${title || "New Note"}.md`;
+}
+
+function clearLocalDraftState(file) {
+  if (!file?.isNewDraft) {
+    return;
+  }
+  documentSession.clearDraft(file.draftStorageKey);
+  localStorage.removeItem(localDraftNameKey(file.draftId));
 }
 
 async function fileToPreview(selectedFile) {
@@ -1012,8 +1141,15 @@ function markActiveFileDirty() {
     return;
   }
 
-  activeFile.value.dirty =
-    activeFile.value.draftContent !== activeFile.value.content;
+  activeFile.value.dirty = activeFile.value.isNewDraft
+    ? Boolean(activeFile.value.draftContent)
+    : activeFile.value.draftContent !== activeFile.value.content;
+  if (activeFile.value.isNewDraft) {
+    const nextName = suggestedDraftName(activeFile.value.draftContent);
+    activeFile.value.name = nextName;
+    activeFile.value.size = new Blob([activeFile.value.draftContent]).size;
+    localStorage.setItem(localDraftNameKey(activeFile.value.draftId), nextName);
+  }
   documentSession.setDirty(activeFile.value.dirty);
   if (activeFile.value.dirty) {
     documentSession.saveDraft(activeFile.value.draftContent);
@@ -1087,6 +1223,31 @@ async function persistActiveFile({ force = false } = {}) {
     return false;
   }
 
+  if (!file.handle && file.isNewDraft && supportsNativeFileBridge()) {
+    const payload = await window.pywebview.api.create_native_file(
+      file.name,
+      file.draftContent,
+    );
+    if (payload?.cancelled) {
+      return false;
+    }
+    if (!payload?.ok) {
+      throw new Error(payload?.error || "The local file could not be created.");
+    }
+    const selectedFile = fileFromNativePayload(payload);
+    if (!selectedFile) {
+      throw new Error("The created local file could not be reopened.");
+    }
+    const savedFile = await fileToPreview(selectedFile);
+    clearLocalDraftState(file);
+    files.value = files.value.map((candidate) =>
+      candidate.key === file.key ? savedFile : candidate,
+    );
+    activeKey.value = savedFile.key;
+    refreshPreview(savedFile);
+    return selectedFile.file;
+  }
+
   if (!file.handle) {
     const error = new Error("Read-only: no writable file handle.");
     error.code = "read-only";
@@ -1142,6 +1303,9 @@ function confirmDiscardUnsavedChanges() {
 function persistDesktopFiles() {
   const nativeFiles = files.value.filter((file) => file.path);
   if (!nativeFiles.length) {
+    if (files.value.some((file) => file.isNewDraft)) {
+      clearDesktopFileSession();
+    }
     return;
   }
   saveDesktopFileSession({

@@ -372,6 +372,19 @@ class NativeFileStore:
             self._pending_changes.discard(file_id)
         return {"ok": True, **saved_payload}
 
+    def create(self, raw_path: str | Path, content: str) -> dict[str, Any]:
+        path = Path(raw_path).expanduser()
+        if path.suffix.lower() not in ALLOWED_EXTENSIONS:
+            raise ValueError("Choose a supported text-file extension.")
+
+        normalized_content = normalize_newlines(content)
+        atomic_write(path, normalized_content.encode("utf-8"))
+        payload = self._payload_for_path(path)
+        if not payload:
+            raise OSError("Created file could not be read back.")
+        add_to_windows_recent_documents(path)
+        return {"ok": True, **payload}
+
     def poll_changes(self) -> list[dict[str, Any]]:
         with self._lock:
             pending = list(self._pending_changes)
@@ -635,6 +648,32 @@ class NirvNotesApi:
             list(paths or []),
             record_recent=True,
         )
+
+    def create_native_file(
+        self,
+        suggested_name: str = "New Note.md",
+        content: str = "",
+    ) -> dict[str, Any]:
+        if not self._window:
+            return {"ok": False, "error": "Window is unavailable."}
+
+        safe_name = Path(str(suggested_name or "New Note.md")).name
+        if Path(safe_name).suffix.lower() not in ALLOWED_EXTENSIONS:
+            safe_name = f"{safe_name}.md"
+        selected = self._window.create_file_dialog(
+            webview.SAVE_DIALOG,
+            save_filename=safe_name,
+            file_types=(
+                "Text and config (*.md;*.txt;*.cfg;*.ini;*.json;*.yaml;*.yml;*.toml;*.xml;*.log;*.csv;*.tex)",
+            ),
+        )
+        if not selected:
+            return {"ok": False, "cancelled": True}
+        raw_path = selected[0] if isinstance(selected, (list, tuple)) else selected
+        selected_path = Path(raw_path)
+        if not selected_path.suffix:
+            selected_path = selected_path.with_suffix(Path(safe_name).suffix or ".md")
+        return self._file_store.create(selected_path, content)
 
     def save_native_file(
         self,
@@ -910,7 +949,8 @@ def normalized_path_key(path: Path) -> str:
 
 
 def atomic_write(path: Path, raw: bytes) -> None:
-    mode = path.stat().st_mode
+    path.parent.mkdir(parents=True, exist_ok=True)
+    mode = path.stat().st_mode if path.exists() else 0o600
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{path.name}.",
         suffix=".tmp",
@@ -2123,7 +2163,12 @@ def build_menu(window_ref: dict[str, webview.Window], base_url: str) -> list[Men
         Menu(
             APP_NAME,
             [
-                MenuAction("New note", lambda: go("/new")),
+                MenuAction(
+                    "New note",
+                    lambda: go(
+                        "/open-file?new=1&draft=" + secrets.token_urlsafe(12)
+                    ),
+                ),
                 MenuAction("All notes", lambda: go("/search?term=*&sort=2")),
                 MenuSeparator(),
                 MenuAction("Open local file...", dispatch_open_file_dialog),

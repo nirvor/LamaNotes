@@ -62,6 +62,10 @@ export function filesFromNativePayloads(payloads = []) {
     });
 }
 
+export function fileFromNativePayload(payload) {
+  return filesFromNativePayloads([payload])[0] || null;
+}
+
 function nativePayloadFile(payload) {
   return new File([payload.content || ""], payload.name || "external.txt", {
     type: payload.type || "text/plain",
