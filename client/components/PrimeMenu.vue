@@ -3,7 +3,7 @@
     <template #item="{ item, props }">
       <div
         v-if="item.controls"
-        class="flatnotes-menu-control-row"
+        class="lamanotes-menu-control-row"
         role="group"
         :aria-label="item.label"
       >
@@ -11,8 +11,8 @@
           v-for="control in item.controls"
           :key="control.label"
           type="button"
-          class="flatnotes-menu-control"
-          :class="{ 'flatnotes-menu-control-active': control.active }"
+          class="lamanotes-menu-control"
+          :class="{ 'lamanotes-menu-control-active': control.active }"
           :title="control.label"
           :aria-label="control.label"
           :aria-pressed="control.toggle ? Boolean(control.active) : undefined"
@@ -63,14 +63,14 @@ defineExpose({ toggle });
 </script>
 
 <style scoped>
-.flatnotes-menu-control-row {
+.lamanotes-menu-control-row {
   display: flex;
   align-items: center;
   gap: 0.3rem;
   padding: 0.08rem;
 }
 
-.flatnotes-menu-control {
+.lamanotes-menu-control {
   display: inline-grid;
   width: 2rem;
   height: 1.8rem;
@@ -81,15 +81,15 @@ defineExpose({ toggle });
   background: transparent;
 }
 
-.flatnotes-menu-control:hover,
-.flatnotes-menu-control:focus-visible {
+.lamanotes-menu-control:hover,
+.lamanotes-menu-control:focus-visible {
   border-color: rgb(var(--theme-border));
   color: rgb(var(--theme-text));
   background: rgb(var(--theme-background-elevated));
   outline: none;
 }
 
-.flatnotes-menu-control-active {
+.lamanotes-menu-control-active {
   color: rgb(var(--theme-brand));
   background: rgb(var(--theme-background-elevated) / 0.58);
 }

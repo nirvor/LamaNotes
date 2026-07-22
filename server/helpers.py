@@ -32,11 +32,23 @@ def strip_whitespace(value):
 
 
 def get_env(
-    key, mandatory=False, default=None, cast_int=False, cast_bool=False
+    key,
+    mandatory=False,
+    default=None,
+    cast_int=False,
+    cast_bool=False,
+    legacy_keys=(),
 ):
     """Get an environment variable. If `mandatory` is True and environment
     variable isn't set, exit the program"""
     value = os.environ.get(key)
+    source_key = key
+    if not value:
+        for legacy_key in legacy_keys:
+            value = os.environ.get(legacy_key)
+            if value:
+                source_key = legacy_key
+                break
     if mandatory and not value:
         logger.error(f"Environment variable {key} must be set.")
         sys.exit(1)
@@ -46,7 +58,7 @@ def get_env(
         try:
             value = int(value)
         except (TypeError, ValueError):
-            logger.error(f"Invalid value '{value}' for {key}.")
+            logger.error(f"Invalid value '{value}' for {source_key}.")
             sys.exit(1)
     if cast_bool:
         value = value.lower()
@@ -55,7 +67,7 @@ def get_env(
         elif value == "false":
             value = False
         else:
-            logger.error(f"Invalid value '{value}' for {key}.")
+            logger.error(f"Invalid value '{value}' for {source_key}.")
             sys.exit(1)
     return value
 

@@ -1,3 +1,4 @@
+import "./legacyMigration.js";
 import App from "/App.vue";
 import PrimeVue from "primevue/config";
 import ToastService from "primevue/toastservice";
@@ -54,7 +55,7 @@ async function publishNativeFiles(payloads, message, options = {}) {
 
   publishExternalFileLaunch(
     files,
-    message || "Opened from NirvNotes client.",
+    message || "Opened from LamaNotes client.",
     options,
   );
   await router.push({ name: "openFile" }).catch(() => {});
@@ -116,7 +117,7 @@ async function consumeNativeLaunchFiles() {
     return false;
   }
 
-  document.body.classList.add("nirvnotes-native-host");
+  document.body.classList.add("lamanotes-native-host");
   try {
     const payloads = await window.pywebview.api.consume_launch_files();
     return await publishNativeFiles(payloads, "Opened from Windows client.");
@@ -181,7 +182,7 @@ async function openNativeFilesFromDialog() {
 function syncWindowControlsOverlayClass() {
   const overlay = navigator.windowControlsOverlay;
   document.body.classList.toggle(
-    "flatnotes-window-controls-overlay",
+    "lamanotes-window-controls-overlay",
     Boolean(overlay?.visible),
   );
 }
@@ -195,13 +196,23 @@ if ("windowControlsOverlay" in navigator) {
 }
 
 window.addEventListener(
+  "lamanotes:open-native-file-dialog",
+  openNativeFilesFromDialog,
+);
+window.addEventListener(
   "nirvnotes:open-native-file-dialog",
   openNativeFilesFromDialog,
 );
 
+window.addEventListener("lamanotes:native-file-drag-state", (event) => {
+  document.body.classList.toggle(
+    "lamanotes-native-file-drag-active",
+    Boolean(event.detail?.active),
+  );
+});
 window.addEventListener("nirvnotes:native-file-drag-state", (event) => {
   document.body.classList.toggle(
-    "nirvnotes-native-file-drag-active",
+    "lamanotes-native-file-drag-active",
     Boolean(event.detail?.active),
   );
 });
@@ -219,35 +230,35 @@ function isNativeFileDrag(event) {
 function isExternalTextDrag(event) {
   return (
     !internalDragActive &&
-    document.body.classList.contains("nirvnotes-text-drop-enabled") &&
+    document.body.classList.contains("lamanotes-text-drop-enabled") &&
     isPlainTextTransfer(event.dataTransfer)
   );
 }
 
 function showNativeFileDropTarget(active) {
-  document.body.classList.toggle("nirvnotes-native-file-drag-active", active);
+  document.body.classList.toggle("lamanotes-native-file-drag-active", active);
 }
 
 function showNativeTextDropTarget(active) {
-  document.body.classList.toggle("nirvnotes-native-text-drag-active", active);
-  if (active && !document.body.dataset.nirvnotesTextDropLabel) {
-    document.body.dataset.nirvnotesTextDropLabel = "Insert text";
+  document.body.classList.toggle("lamanotes-native-text-drag-active", active);
+  if (active && !document.body.dataset.lamanotesTextDropLabel) {
+    document.body.dataset.lamanotesTextDropLabel = "Insert text";
   }
 }
 
 function dispatchTextDragEnd(dropped = false) {
   const wasActive =
     nativeTextDragDepth > 0 ||
-    document.body.classList.contains("nirvnotes-native-text-drag-active");
+    document.body.classList.contains("lamanotes-native-text-drag-active");
   window.cancelAnimationFrame(textDragPositionFrame);
   textDragPositionFrame = null;
   pendingTextDragPosition = null;
   nativeTextDragDepth = 0;
   showNativeTextDropTarget(false);
-  delete document.body.dataset.nirvnotesTextDropLabel;
+  delete document.body.dataset.lamanotesTextDropLabel;
   if (wasActive) {
     window.dispatchEvent(
-      new CustomEvent("nirvnotes:text-drag-end", { detail: { dropped } }),
+      new CustomEvent("lamanotes:text-drag-end", { detail: { dropped } }),
     );
   }
 }
@@ -266,7 +277,7 @@ function scheduleTextDragPosition(event) {
       return;
     }
     window.dispatchEvent(
-      new CustomEvent("nirvnotes:text-drag-position", {
+      new CustomEvent("lamanotes:text-drag-position", {
         detail: pendingTextDragPosition,
       }),
     );
@@ -322,13 +333,13 @@ window.addEventListener("dragover", (event) => {
 });
 
 window.addEventListener("dragleave", (event) => {
-  if (document.body.classList.contains("nirvnotes-native-file-drag-active")) {
+  if (document.body.classList.contains("lamanotes-native-file-drag-active")) {
     nativeFileDragDepth = Math.max(0, nativeFileDragDepth - 1);
     if (nativeFileDragDepth === 0 || event.relatedTarget === null) {
       showNativeFileDropTarget(false);
     }
   }
-  if (document.body.classList.contains("nirvnotes-native-text-drag-active")) {
+  if (document.body.classList.contains("lamanotes-native-text-drag-active")) {
     nativeTextDragDepth = Math.max(0, nativeTextDragDepth - 1);
     if (nativeTextDragDepth === 0 || event.relatedTarget === null) {
       dispatchTextDragEnd(false);
@@ -357,7 +368,7 @@ window.addEventListener("drop", (event) => {
   nativeFileDragDepth = 0;
   showNativeFileDropTarget(false);
   window.dispatchEvent(
-    new CustomEvent("nirvnotes:text-drop", {
+    new CustomEvent("lamanotes:text-drop", {
       detail: {
         text,
         clientX: event.clientX,
@@ -373,10 +384,14 @@ window.addEventListener("blur", () => {
   clearDropTargets();
 });
 
+window.addEventListener("lamanotes:consume-native-launch-files", () => {
+  consumeNativeLaunchFilesNow();
+});
 window.addEventListener("nirvnotes:consume-native-launch-files", () => {
   consumeNativeLaunchFilesNow();
 });
 
+window.__lamanotesConsumeNativeLaunchFiles = consumeNativeLaunchFilesNow;
 window.__nirvnotesConsumeNativeLaunchFiles = consumeNativeLaunchFilesNow;
 
 async function initializeNativeHost() {
@@ -386,8 +401,8 @@ async function initializeNativeHost() {
 
   nativeHostInitialized = true;
   await router.isReady();
-  document.body.classList.add("nirvnotes-native-host");
-  window.dispatchEvent(new CustomEvent("nirvnotes:native-ready"));
+  document.body.classList.add("lamanotes-native-host");
+  window.dispatchEvent(new CustomEvent("lamanotes:native-ready"));
   if (routeWantsNativeLaunch()) {
     await consumeNativeLaunchFilesNow();
   } else {
@@ -411,7 +426,7 @@ router.afterEach((to) => {
 });
 
 if (supportsNativeFileBridge()) {
-  document.body.classList.add("nirvnotes-native-host");
+  document.body.classList.add("lamanotes-native-host");
   window.addEventListener("load", scheduleNativeHostInitialization, {
     once: true,
   });
@@ -440,7 +455,7 @@ if ("serviceWorker" in navigator) {
     if (
       supportsNativeFileBridge() ||
       window.pywebview ||
-      document.body.classList.contains("nirvnotes-native-host")
+      document.body.classList.contains("lamanotes-native-host")
     ) {
       return;
     }

@@ -18,8 +18,8 @@ test("markdown snapshots stay HTML notes with a work category", () => {
     draftContent: "# Project\n\nCurrent state.\n",
   });
   assert.equal(note.format, "html");
-  assert.match(note.content, /flatnotes-note-kind" content="work"/);
-  assert.match(note.content, /flatnotes-tags" content="work"/);
+  assert.match(note.content, /lamanotes-note-kind" content="work"/);
+  assert.match(note.content, /lamanotes-tags" content="work"/);
   assert.match(note.content, /#work/);
   assert.doesNotMatch(note.content, /Work Note/);
 });

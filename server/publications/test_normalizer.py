@@ -40,7 +40,7 @@ class PublicProjectionTests(unittest.TestCase):
         self.assertNotIn("<template", projection.public_html)
         self.assertNotIn("<h1", projection.public_html)
         self.assertIn(
-            'data-flatnotes-component="summary"', projection.public_html
+            'data-lamanotes-component="summary"', projection.public_html
         )
         self.assertIn("Safe rendered result", projection.public_html)
         self.assertNotIn("position:fixed", projection.public_css)

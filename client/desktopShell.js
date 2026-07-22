@@ -1,7 +1,8 @@
 import { reactive } from "vue";
+import { PRODUCT_NAME, isDesktopHost } from "./brand.js";
 
 export const desktopShell = reactive({
-  enabled: Boolean(window.__NIRVNOTES_DESKTOP_SHELL__),
+  enabled: isDesktopHost(),
   cloudOnline: null,
 });
 
@@ -25,7 +26,9 @@ export function setDesktopWindowTitle(label = "") {
   const normalized = String(label || "")
     .replace(/[\r\n\t]+/g, " ")
     .trim();
-  document.title = normalized ? `NirvNotes - ${normalized}` : "NirvNotes";
+  document.title = normalized
+    ? `${PRODUCT_NAME} - ${normalized}`
+    : PRODUCT_NAME;
   if (normalized === currentWindowLabel) {
     return;
   }
@@ -54,6 +57,7 @@ export function isCloudNetworkError(error) {
   }
   return (
     !error?.response ||
+    error.response.headers?.["x-lamanotes-upstream"] === "offline" ||
     error.response.headers?.["x-nirvnotes-upstream"] === "offline"
   );
 }

@@ -2,6 +2,6 @@ services:
   lamanotes:
     image: ${LAMANOTES_IMAGE:-lamanotes:local}
     environment:
-      NIRVNOTES_WINDOWS_UPDATE_DIR: /updates
+      LAMANOTES_WINDOWS_UPDATE_DIR: /updates
     volumes:
       - ./client-updates:/updates:ro

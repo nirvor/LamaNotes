@@ -17,85 +17,112 @@ class GlobalConfig:
         self.path_prefix: str = self._load_path_prefix()
         self.windows_update_dir: str = self._load_windows_update_dir()
         legacy_session_days = get_env(
-            "FLATNOTES_SESSION_EXPIRY_DAYS",
+            "LAMANOTES_SESSION_EXPIRY_DAYS",
             mandatory=False,
             default=30,
             cast_int=True,
+            legacy_keys=("FLATNOTES_SESSION_EXPIRY_DAYS",),
         )
         self.session_expiry_hours: int = get_env(
-            "NIRVNOTES_SESSION_EXPIRY_HOURS",
+            "LAMANOTES_SESSION_EXPIRY_HOURS",
             mandatory=False,
             default=12,
             cast_int=True,
+            legacy_keys=("NIRVNOTES_SESSION_EXPIRY_HOURS",),
         )
         self.remember_expiry_days: int = get_env(
-            "NIRVNOTES_REMEMBER_EXPIRY_DAYS",
+            "LAMANOTES_REMEMBER_EXPIRY_DAYS",
             mandatory=False,
             default=legacy_session_days,
             cast_int=True,
+            legacy_keys=("NIRVNOTES_REMEMBER_EXPIRY_DAYS",),
         )
         self.session_cookie_name: str = get_env(
-            "NIRVNOTES_SESSION_COOKIE_NAME",
+            "LAMANOTES_SESSION_COOKIE_NAME",
             mandatory=False,
             default="lamanotes_session",
+            legacy_keys=("NIRVNOTES_SESSION_COOKIE_NAME",),
         )
         self.session_cookie_secure: bool = get_env(
-            "NIRVNOTES_SESSION_COOKIE_SECURE",
+            "LAMANOTES_SESSION_COOKIE_SECURE",
             mandatory=False,
             default=True,
             cast_bool=True,
+            legacy_keys=("NIRVNOTES_SESSION_COOKIE_SECURE",),
         )
         self.accept_legacy_tokens: bool = get_env(
-            "NIRVNOTES_ACCEPT_LEGACY_TOKENS",
+            "LAMANOTES_ACCEPT_LEGACY_TOKENS",
             mandatory=False,
             default=False,
             cast_bool=True,
+            legacy_keys=("NIRVNOTES_ACCEPT_LEGACY_TOKENS",),
         )
         self.login_rate_limit_attempts: int = get_env(
-            "NIRVNOTES_LOGIN_RATE_LIMIT_ATTEMPTS",
+            "LAMANOTES_LOGIN_RATE_LIMIT_ATTEMPTS",
             mandatory=False,
             default=8,
             cast_int=True,
+            legacy_keys=("NIRVNOTES_LOGIN_RATE_LIMIT_ATTEMPTS",),
         )
         self.login_rate_limit_window_seconds: int = get_env(
-            "NIRVNOTES_LOGIN_RATE_LIMIT_WINDOW_SECONDS",
+            "LAMANOTES_LOGIN_RATE_LIMIT_WINDOW_SECONDS",
             mandatory=False,
             default=300,
             cast_int=True,
+            legacy_keys=("NIRVNOTES_LOGIN_RATE_LIMIT_WINDOW_SECONDS",),
         )
         self.password_login_enabled: bool = get_env(
-            "NIRVNOTES_PASSWORD_LOGIN_ENABLED",
+            "LAMANOTES_PASSWORD_LOGIN_ENABLED",
             mandatory=False,
             default=True,
             cast_bool=True,
+            legacy_keys=("NIRVNOTES_PASSWORD_LOGIN_ENABLED",),
         )
         self.google_auth_enabled: bool = get_env(
-            "NIRVNOTES_GOOGLE_AUTH_ENABLED",
+            "LAMANOTES_GOOGLE_AUTH_ENABLED",
             mandatory=False,
             default=False,
             cast_bool=True,
+            legacy_keys=("NIRVNOTES_GOOGLE_AUTH_ENABLED",),
         )
         self.google_client_id: str = get_env(
-            "NIRVNOTES_GOOGLE_CLIENT_ID", mandatory=False, default=""
+            "LAMANOTES_GOOGLE_CLIENT_ID",
+            mandatory=False,
+            default="",
+            legacy_keys=("NIRVNOTES_GOOGLE_CLIENT_ID",),
         ).strip()
         self.google_client_secret: str = get_env(
-            "NIRVNOTES_GOOGLE_CLIENT_SECRET", mandatory=False, default=""
+            "LAMANOTES_GOOGLE_CLIENT_SECRET",
+            mandatory=False,
+            default="",
+            legacy_keys=("NIRVNOTES_GOOGLE_CLIENT_SECRET",),
         ).strip()
         self.google_allowed_email: str = (
-            get_env("NIRVNOTES_GOOGLE_ALLOWED_EMAIL", mandatory=False, default="")
+            get_env(
+                "LAMANOTES_GOOGLE_ALLOWED_EMAIL",
+                mandatory=False,
+                default="",
+                legacy_keys=("NIRVNOTES_GOOGLE_ALLOWED_EMAIL",),
+            )
             .strip()
             .lower()
         )
         self.google_allowed_sub: str = get_env(
-            "NIRVNOTES_GOOGLE_ALLOWED_SUB", mandatory=False, default=""
+            "LAMANOTES_GOOGLE_ALLOWED_SUB",
+            mandatory=False,
+            default="",
+            legacy_keys=("NIRVNOTES_GOOGLE_ALLOWED_SUB",),
         ).strip()
         self.google_public_origin: str = get_env(
-            "NIRVNOTES_GOOGLE_PUBLIC_ORIGIN", mandatory=False, default=""
+            "LAMANOTES_GOOGLE_PUBLIC_ORIGIN",
+            mandatory=False,
+            default="",
+            legacy_keys=("NIRVNOTES_GOOGLE_PUBLIC_ORIGIN",),
         ).rstrip("/")
         if self.google_auth_enabled:
             if self.auth_type in (AuthType.NONE, AuthType.READ_ONLY):
                 raise RuntimeError(
-                    "Google auth requires a writable authenticated NirvNotes mode."
+                    "Google auth requires a writable authenticated LamaNotes mode."
                 )
             required_google_values = (
                 self.google_client_id,
@@ -115,23 +142,31 @@ class GlobalConfig:
             and not self.password_login_enabled
             and not self.google_auth_enabled
         ):
-            raise RuntimeError("At least one NirvNotes login method must be enabled.")
+            raise RuntimeError("At least one LamaNotes login method must be enabled.")
         self.publish_base_url: str = get_env(
-            "NIRVNOTES_PUBLISH_BASE_URL", mandatory=False, default=""
+            "LAMANOTES_PUBLISH_BASE_URL",
+            mandatory=False,
+            default="",
+            legacy_keys=("NIRVNOTES_PUBLISH_BASE_URL",),
         )
         self.publish_token: str = get_env(
-            "NIRVNOTES_PUBLISH_TOKEN", mandatory=False, default=""
+            "LAMANOTES_PUBLISH_TOKEN",
+            mandatory=False,
+            default="",
+            legacy_keys=("NIRVNOTES_PUBLISH_TOKEN",),
         )
         self.public_base_url: str = get_env(
-            "NIRVNOTES_PUBLIC_BASE_URL",
+            "LAMANOTES_PUBLIC_BASE_URL",
             mandatory=False,
             default="https://pages.thuber.org",
+            legacy_keys=("NIRVNOTES_PUBLIC_BASE_URL",),
         )
         self.publish_timeout_seconds: int = get_env(
-            "NIRVNOTES_PUBLISH_TIMEOUT_SECONDS",
+            "LAMANOTES_PUBLISH_TIMEOUT_SECONDS",
             mandatory=False,
             default=20,
             cast_int=True,
+            legacy_keys=("NIRVNOTES_PUBLISH_TIMEOUT_SECONDS",),
         )
 
     def load_auth(self):
@@ -153,8 +188,13 @@ class GlobalConfig:
         return FileSystemAttachments()
 
     def _load_auth_type(self):
-        key = "FLATNOTES_AUTH_TYPE"
-        auth_type = get_env(key, mandatory=False, default=AuthType.PASSWORD.value)
+        key = "LAMANOTES_AUTH_TYPE"
+        auth_type = get_env(
+            key,
+            mandatory=False,
+            default=AuthType.PASSWORD.value,
+            legacy_keys=("FLATNOTES_AUTH_TYPE",),
+        )
         try:
             auth_type = AuthType(auth_type.lower())
         except ValueError:
@@ -168,30 +208,41 @@ class GlobalConfig:
         return auth_type
 
     def _quick_access_hide(self):
-        key = "FLATNOTES_QUICK_ACCESS_HIDE"
-        value = get_env(key, mandatory=False, default=False, cast_bool=True)
-        if value is False:
-            depricated_key = "FLATNOTES_HIDE_RECENTLY_MODIFIED"
-            value = get_env(
-                depricated_key, mandatory=False, default=False, cast_bool=True
-            )
-            if value is True:
-                logger.warning(
-                    f"{depricated_key} is depricated. Please use {key} instead."
-                )
-        return value
+        return get_env(
+            "LAMANOTES_QUICK_ACCESS_HIDE",
+            mandatory=False,
+            default=False,
+            cast_bool=True,
+            legacy_keys=(
+                "FLATNOTES_QUICK_ACCESS_HIDE",
+                "FLATNOTES_HIDE_RECENTLY_MODIFIED",
+            ),
+        )
 
     def _quick_access_title(self):
-        key = "FLATNOTES_QUICK_ACCESS_TITLE"
-        return get_env(key, mandatory=False, default="RECENTLY MODIFIED")
+        return get_env(
+            "LAMANOTES_QUICK_ACCESS_TITLE",
+            mandatory=False,
+            default="RECENTLY MODIFIED",
+            legacy_keys=("FLATNOTES_QUICK_ACCESS_TITLE",),
+        )
 
     def _quick_access_term(self):
-        key = "FLATNOTES_QUICK_ACCESS_TERM"
-        return get_env(key, mandatory=False, default="*")
+        return get_env(
+            "LAMANOTES_QUICK_ACCESS_TERM",
+            mandatory=False,
+            default="*",
+            legacy_keys=("FLATNOTES_QUICK_ACCESS_TERM",),
+        )
 
     def _quick_access_sort(self):
-        key = "FLATNOTES_QUICK_ACCESS_SORT"
-        value = get_env(key, mandatory=False, default="lastModified")
+        key = "LAMANOTES_QUICK_ACCESS_SORT"
+        value = get_env(
+            key,
+            mandatory=False,
+            default="lastModified",
+            legacy_keys=("FLATNOTES_QUICK_ACCESS_SORT",),
+        )
         valid_values = ["score", "title", "lastModified"]
         if value not in valid_values:
             logger.error(
@@ -203,12 +254,22 @@ class GlobalConfig:
         return value
 
     def _quick_access_limit(self):
-        key = "FLATNOTES_QUICK_ACCESS_LIMIT"
-        return get_env(key, mandatory=False, default=4, cast_int=True)
+        return get_env(
+            "LAMANOTES_QUICK_ACCESS_LIMIT",
+            mandatory=False,
+            default=4,
+            cast_int=True,
+            legacy_keys=("FLATNOTES_QUICK_ACCESS_LIMIT",),
+        )
 
     def _load_path_prefix(self):
-        key = "FLATNOTES_PATH_PREFIX"
-        value = get_env(key, mandatory=False, default="")
+        key = "LAMANOTES_PATH_PREFIX"
+        value = get_env(
+            key,
+            mandatory=False,
+            default="",
+            legacy_keys=("FLATNOTES_PATH_PREFIX",),
+        )
         if value and (not value.startswith("/") or value.endswith("/")):
             logger.error(
                 f"Invalid value '{value}' for {key}. "
@@ -219,9 +280,10 @@ class GlobalConfig:
 
     def _load_windows_update_dir(self):
         return get_env(
-            "NIRVNOTES_WINDOWS_UPDATE_DIR",
+            "LAMANOTES_WINDOWS_UPDATE_DIR",
             mandatory=False,
             default="",
+            legacy_keys=("NIRVNOTES_WINDOWS_UPDATE_DIR",),
         )
 
 

@@ -6,17 +6,22 @@ import tempfile
 import time
 import unittest
 import zipfile
+import json
 from unittest.mock import Mock, patch
 from pathlib import Path
 from urllib import error, parse, request
 
-from nirvnotes_client import (
+from lamanotes_client import (
     ALLOWED_EXTENSIONS,
+    LEGACY_CREDENTIAL_ENTROPY,
     SHARD_PATHW,
     CredentialStore,
     NativeFileStore,
-    NirvNotesApi,
+    LamaNotesApi,
     add_to_windows_recent_documents,
+    dpapi_protect,
+    dpapi_unprotect,
+    migrate_legacy_local_state,
     paths_from_native_drop_event,
     register_native_file_drop,
     start_local_proxy,
@@ -25,7 +30,7 @@ from nirvnotes_client import (
 )
 
 
-class NirvNotesApiTests(unittest.TestCase):
+class LamaNotesApiTests(unittest.TestCase):
     def test_create_native_file_uses_save_dialog_and_returns_writable_payload(
         self,
     ) -> None:
@@ -33,7 +38,7 @@ class NirvNotesApiTests(unittest.TestCase):
             path = Path(directory) / "draft.md"
             store = NativeFileStore()
             try:
-                api = NirvNotesApi(
+                api = LamaNotesApi(
                     store,
                     [],
                     "https://notes.example",
@@ -54,7 +59,7 @@ class NirvNotesApiTests(unittest.TestCase):
     def test_create_native_file_can_be_cancelled(self) -> None:
         store = NativeFileStore()
         try:
-            api = NirvNotesApi(
+            api = LamaNotesApi(
                 store,
                 [],
                 "https://notes.example",
@@ -74,7 +79,7 @@ class NirvNotesApiTests(unittest.TestCase):
             path = Path(directory) / "draft"
             store = NativeFileStore()
             try:
-                api = NirvNotesApi(
+                api = LamaNotesApi(
                     store,
                     [],
                     "https://notes.example",
@@ -94,7 +99,7 @@ class NirvNotesApiTests(unittest.TestCase):
     def test_window_title_is_compact_and_native(self) -> None:
         store = NativeFileStore()
         try:
-            api = NirvNotesApi(
+            api = LamaNotesApi(
                 store,
                 [],
                 "https://notes.example",
@@ -106,7 +111,7 @@ class NirvNotesApiTests(unittest.TestCase):
 
             self.assertTrue(result["updated"])
             api._window.set_title.assert_called_once_with(
-                "NirvNotes - sample.csv",
+                "LamaNotes - sample.csv",
             )
         finally:
             store.close()
@@ -114,13 +119,13 @@ class NirvNotesApiTests(unittest.TestCase):
     def test_external_public_url_opens_in_system_browser(self) -> None:
         store = NativeFileStore()
         try:
-            api = NirvNotesApi(
+            api = LamaNotesApi(
                 store,
                 [],
                 "https://notes.example",
                 "https://notes.example",
             )
-            with patch("nirvnotes_client.os.startfile") as startfile:
+            with patch("lamanotes_client.os.startfile") as startfile:
                 result = api.open_external_url("https://pages.thuber.org/example/")
             self.assertTrue(result["opened"])
             startfile.assert_called_once_with("https://pages.thuber.org/example/")
@@ -153,16 +158,72 @@ class NirvNotesApiTests(unittest.TestCase):
             store.clear()
             self.assertFalse(credential_path.exists())
 
+    @unittest.skipUnless(sys.platform == "win32", "Windows DPAPI only")
+    def test_legacy_auth_token_is_reprotected_for_lamanotes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            credential_path = Path(directory) / "credential.bin"
+            payload = json.dumps(
+                {
+                    "sourceUrl": "https://notes.example",
+                    "token": "existing-session-token",
+                },
+                separators=(",", ":"),
+            ).encode("utf-8")
+            credential_path.write_bytes(
+                dpapi_protect(payload, LEGACY_CREDENTIAL_ENTROPY)
+            )
+
+            store = CredentialStore(
+                "https://notes.example",
+                path=credential_path,
+            )
+            self.assertEqual(store.get_token(), "existing-session-token")
+            migrated_payload = json.loads(
+                dpapi_unprotect(credential_path.read_bytes()).decode("utf-8")
+            )
+            self.assertEqual(migrated_payload["token"], "existing-session-token")
+
+    def test_legacy_local_state_moves_without_overwriting_new_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            legacy = root / "NirvNotes"
+            target = root / "LamaNotes"
+            (legacy / "WebView2").mkdir(parents=True)
+            (legacy / "WebView2" / "Cookies").write_text(
+                "legacy-login",
+                encoding="utf-8",
+            )
+            (legacy / "window-state.json").write_text(
+                "legacy-window",
+                encoding="utf-8",
+            )
+            target.mkdir()
+            (target / "window-state.json").write_text(
+                "new-window",
+                encoding="utf-8",
+            )
+
+            self.assertTrue(migrate_legacy_local_state(root))
+            self.assertFalse(legacy.exists())
+            self.assertEqual(
+                (target / "WebView2" / "Cookies").read_text(encoding="utf-8"),
+                "legacy-login",
+            )
+            self.assertEqual(
+                (target / "window-state.json").read_text(encoding="utf-8"),
+                "new-window",
+            )
+
     def test_external_url_rejects_non_https(self) -> None:
         store = NativeFileStore()
         try:
-            api = NirvNotesApi(
+            api = LamaNotesApi(
                 store,
                 [],
                 "https://notes.example",
                 "https://notes.example",
             )
-            with patch("nirvnotes_client.os.startfile") as startfile:
+            with patch("lamanotes_client.os.startfile") as startfile:
                 result = api.open_external_url("file:///C:/private.txt")
             self.assertFalse(result["opened"])
             startfile.assert_not_called()
@@ -192,7 +253,7 @@ class NirvNotesApiTests(unittest.TestCase):
         store = NativeFileStore()
         credential_store = MemoryCredentialStore()
         try:
-            api = NirvNotesApi(
+            api = LamaNotesApi(
                 store,
                 [],
                 "http://127.0.0.1:31992",
@@ -201,7 +262,7 @@ class NirvNotesApiTests(unittest.TestCase):
             )
             api.set_google_handoff_port(45678)
             api._window = Mock()
-            with patch("nirvnotes_client.os.startfile") as startfile:
+            with patch("lamanotes_client.os.startfile") as startfile:
                 opened = api.start_google_login()
 
             self.assertTrue(opened["opened"])
@@ -215,7 +276,7 @@ class NirvNotesApiTests(unittest.TestCase):
             self.assertEqual(len(query["code_challenge"][0]), 43)
 
             with patch(
-                "nirvnotes_client.request.urlopen",
+                "lamanotes_client.request.urlopen",
                 return_value=ExchangeResponse(),
             ):
                 completed = api.complete_google_login(
@@ -233,6 +294,7 @@ class NirvNotesApiTests(unittest.TestCase):
 class NativeShellIntegrationTests(unittest.TestCase):
     def test_windows_update_archive_requires_all_webview_runtimes(self) -> None:
         required = (
+            "app/LamaNotes.exe",
             "app/NirvNotes.exe",
             "app/_internal/client-version.json",
             "app/_internal/webview/lib/runtimes/win-arm64/native/WebView2Loader.dll",
@@ -467,7 +529,7 @@ class NativeFileStoreTests(unittest.TestCase):
         path.write_text("# Recent\n", encoding="utf-8")
 
         with patch(
-            "nirvnotes_client.add_to_windows_recent_documents"
+            "lamanotes_client.add_to_windows_recent_documents"
         ) as add_recent:
             payloads = self.store.payloads_for_paths(
                 [str(path)],
@@ -495,7 +557,7 @@ class LocalProxyTests(unittest.TestCase):
                 request.urlopen(f"{local_url}/api/config", timeout=3)
             self.assertEqual(first_error.exception.code, 502)
             self.assertEqual(
-                first_error.exception.headers.get("X-NirvNotes-Upstream"),
+                first_error.exception.headers.get("X-LamaNotes-Upstream"),
                 "offline",
             )
 

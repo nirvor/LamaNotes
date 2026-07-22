@@ -97,7 +97,8 @@ FORBIDDEN_SVG_TAGS = {
     "style",
 }
 INTERNAL_ATTRIBUTE = re.compile(
-    r"^(?:data-nirvnotes-|nirvnotes-|data-work-source|data-work-markdown|"
+    r"^(?:data-lamanotes-|lamanotes-|data-nirvnotes-|nirvnotes-|"
+    r"data-work-source|data-work-markdown|"
     r"data-editor-source|data-draft)",
     re.IGNORECASE,
 )
@@ -110,7 +111,7 @@ MIME_EXTENSION = {
     "application/pdf": "pdf",
 }
 DEFAULT_PUBLIC_CSS = (
-    ".nirvnote-source>h1{font-size:clamp(2rem,5vw,3.4rem);"
+    ".lamanote-source>h1,.nirvnote-source>h1{font-size:clamp(2rem,5vw,3.4rem);"
     "line-height:1.06;letter-spacing:0}"
 )
 SVG_NAMESPACE = "http://www.w3.org/2000/svg"
@@ -162,7 +163,7 @@ class PublicProjection:
             page["requestedSlug"] = requested_slug
         return {
             "schemaVersion": 1,
-            "source": {"id": source_id, "system": "nirvnotes"},
+            "source": {"id": source_id, "system": "lamanotes"},
             "page": page,
             "content": {
                 "publicHtml": self.public_html,
@@ -276,10 +277,16 @@ class PublicProjectionBuilder:
 
     @staticmethod
     def _note_kind(soup: BeautifulSoup) -> str:
-        marker = soup.find("meta", attrs={"name": "flatnotes-note-kind"})
+        marker = soup.find(
+            "meta",
+            attrs={"name": {"lamanotes-note-kind", "flatnotes-note-kind"}},
+        )
         if str(marker.get("content") if marker else "").lower() == "work":
             return "work"
-        if soup.select_one("[data-flatnotes-note-kind='work']"):
+        if soup.select_one(
+            "[data-lamanotes-note-kind='work'],"
+            "[data-flatnotes-note-kind='work']"
+        ):
             return "work"
         return "research"
 
@@ -299,7 +306,10 @@ class PublicProjectionBuilder:
 
     def _tags(self, soup: BeautifulSoup) -> tuple[str, ...]:
         tags: set[str] = set()
-        for meta in soup.find_all("meta", attrs={"name": "flatnotes-tags"}):
+        for meta in soup.find_all(
+            "meta",
+            attrs={"name": {"lamanotes-tags", "flatnotes-tags"}},
+        ):
             tags.update(self._split_tags(str(meta.get("content") or "")))
         for element in soup.find_all(["p", "div", "footer"]):
             text = " ".join(element.stripped_strings).strip()
@@ -311,11 +321,11 @@ class PublicProjectionBuilder:
 
     def _description(self, soup: BeautifulSoup, title: str) -> str:
         candidates = []
-        for name in ("description", "flatnotes-summary"):
+        for name in ("description", "lamanotes-summary", "flatnotes-summary"):
             meta = soup.find("meta", attrs={"name": name})
             if meta:
                 candidates.append(str(meta.get("content") or ""))
-        summary = soup.select_one(".flatnote-summary")
+        summary = soup.select_one(".lamanote-summary, .flatnote-summary")
         if summary:
             candidates.append(summary.get_text(" ", strip=True))
         paragraph = soup.find("p")
@@ -370,6 +380,9 @@ class PublicProjectionBuilder:
             classes = {str(value).lower() for value in tag.get("class", [])}
             if classes.intersection(
                 {
+                    "lamanotes-editor-controls",
+                    "lamanotes-copy-control",
+                    "lamanotes-tag-controls",
                     "flatnotes-editor-controls",
                     "flatnotes-copy-control",
                     "flatnotes-tag-controls",
@@ -381,10 +394,13 @@ class PublicProjectionBuilder:
     def _public_root(self, soup: BeautifulSoup, note_kind: str) -> Tag:
         if note_kind == "work":
             source = soup.select_one(
+                "article[data-lamanotes-note-kind='work'],"
                 "article[data-flatnotes-note-kind='work']"
             )
             if source is None:
-                source = soup.select_one(".flatnote-work-rendered")
+                source = soup.select_one(
+                    ".lamanote-work-rendered, .flatnote-work-rendered"
+                )
         else:
             source = soup.find("body") or soup.select_one("article")
         if source is None:
@@ -393,14 +409,14 @@ class PublicProjectionBuilder:
         output_soup = BeautifulSoup("", "html.parser")
         article = output_soup.new_tag("article")
         article["class"] = [
-            "flatnote",
+            "lamanote",
             (
-                "flatnote-work-public"
+                "lamanote-work-public"
                 if note_kind == "work"
-                else "flatnote-research-public"
+                else "lamanote-research-public"
             ),
         ]
-        article["data-flatnotes-component"] = (
+        article["data-lamanotes-component"] = (
             "work-note" if note_kind == "work" else "research-note"
         )
         if isinstance(source, Tag) and source.name == "article":
@@ -415,7 +431,33 @@ class PublicProjectionBuilder:
         children = list(source.contents) if hasattr(source, "contents") else []
         for child in children:
             article.append(child.extract())
+        self._normalize_lamanotes_contract(article)
         return article
+
+    @staticmethod
+    def _normalize_lamanotes_contract(root: Tag) -> None:
+        for tag in [root, *root.find_all(True)]:
+            if tag.has_attr("data-flatnotes-component"):
+                tag["data-lamanotes-component"] = tag.get(
+                    "data-lamanotes-component",
+                    tag.get("data-flatnotes-component"),
+                )
+                del tag.attrs["data-flatnotes-component"]
+            classes = []
+            for value in tag.get("class", []):
+                normalized = str(value)
+                lower = normalized.lower()
+                if lower == "flatnotes":
+                    normalized = "lamanotes"
+                elif lower.startswith("flatnotes-"):
+                    normalized = f"lamanotes-{normalized[len('flatnotes-'):]}"
+                elif lower == "flatnote":
+                    normalized = "lamanote"
+                elif lower.startswith("flatnote-"):
+                    normalized = f"lamanote-{normalized[len('flatnote-'):]}"
+                classes.append(normalized)
+            if classes:
+                tag["class"] = list(dict.fromkeys(classes))
 
     def _sanitize_tree(self, root: Tag, title: str) -> None:
         first_h1 = root.find("h1")
@@ -445,12 +487,15 @@ class PublicProjectionBuilder:
                     del tag.attrs[attribute]
                     continue
                 if (
-                    lower.startswith("data-flatnotes-")
-                    and lower != "data-flatnotes-component"
+                    lower.startswith(("data-lamanotes-", "data-flatnotes-"))
+                    and lower != "data-lamanotes-component"
                 ):
                     del tag.attrs[attribute]
                     continue
-                if INTERNAL_ATTRIBUTE.match(lower):
+                if (
+                    lower != "data-lamanotes-component"
+                    and INTERNAL_ATTRIBUTE.match(lower)
+                ):
                     del tag.attrs[attribute]
                     continue
                 value = tag.attrs.get(attribute)
@@ -818,7 +863,7 @@ class PublicProjectionBuilder:
             follow_redirects=False,
             trust_env=False,
             headers={
-                "User-Agent": "NirvNotes-Publisher/1.0",
+                "User-Agent": "LamaNotes-Publisher/1.0",
                 "Accept": "image/*,application/pdf",
             },
         ) as client:

@@ -1,8 +1,10 @@
+import { isDesktopHost } from "./brand.js";
+
 const tokenStorageKey = "token";
 const persistentSessionKey = "lamanotes:persistent-session";
 
 function isDesktopShell() {
-  return Boolean(window.__NIRVNOTES_DESKTOP_SHELL__);
+  return isDesktopHost();
 }
 
 function persistNativeToken(token, persist) {

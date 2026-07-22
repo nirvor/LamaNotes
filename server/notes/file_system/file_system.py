@@ -51,6 +51,9 @@ LEGACY_MARKDOWN_EXT = ".md"
 NOTE_EXTENSIONS = (HTML_EXT, LEGACY_MARKDOWN_EXT)
 INDEX_SCHEMA_VERSION = "8"
 HTML_METADATA_ONLY_TAGS = {"pinned"}
+TAG_META_NAMES = {"lamanotes-tags", "flatnotes-tags"}
+NOTE_KIND_META_NAMES = {"lamanotes-note-kind", "flatnotes-note-kind"}
+SUMMARY_META_NAMES = {"description", "lamanotes-summary", "flatnotes-summary"}
 
 StemmingFoldingAnalyzer = StemmingAnalyzer() | CharsetFilter(accent_map)
 
@@ -66,7 +69,7 @@ class IndexSchema(SchemaClass):
 
 
 class NoteHtmlParser(HTMLParser):
-    """Extract searchable text and flatnotes metadata from HTML notes."""
+    """Extract searchable text and legacy-compatible note metadata."""
 
     BLOCK_TAGS = {
         "address",
@@ -123,7 +126,7 @@ class NoteHtmlParser(HTMLParser):
         attrs_dict = {key.lower(): value or "" for key, value in attrs}
         if (
             tag == "meta"
-            and attrs_dict.get("name", "").lower() == "flatnotes-tags"
+            and attrs_dict.get("name", "").lower() in TAG_META_NAMES
         ):
             self.meta_tags.update(
                 FileSystemNotes._split_tag_list(attrs_dict.get("content", ""))
@@ -200,21 +203,47 @@ class NoteSemanticParser(HTMLParser):
         "wbr",
     }
     COMPONENT_CLASSES = {
-        "flatnote-summary": "summary",
-        "flatnote-hero": "hero",
-        "flatnote-banner": "banner",
-        "flatnote-metrics": "metrics",
-        "flatnote-media-row": "media-row",
-        "flatnote-media-grid": "media-grid",
-        "flatnote-card-grid": "card-grid",
-        "flatnote-callout": "callout",
-        "flatnote-panel": "panel",
-        "flatnote-plot": "plot",
-        "flatnote-diagram": "diagram",
-        "flatnote-map": "map",
-        "flatnote-schematic": "schematic",
-        "flatnote-timeline": "timeline",
-        "flatnote-source-list": "sources",
+        **{
+            f"lamanote-{name}": component
+            for name, component in {
+                "summary": "summary",
+                "hero": "hero",
+                "banner": "banner",
+                "metrics": "metrics",
+                "media-row": "media-row",
+                "media-grid": "media-grid",
+                "card-grid": "card-grid",
+                "callout": "callout",
+                "panel": "panel",
+                "plot": "plot",
+                "diagram": "diagram",
+                "map": "map",
+                "schematic": "schematic",
+                "timeline": "timeline",
+                "source-list": "sources",
+            }.items()
+        },
+        **{
+            f"flatnote-{name}": component
+            for name, component in {
+                "summary": "summary",
+                "hero": "hero",
+                "banner": "banner",
+                "metrics": "metrics",
+                "media-row": "media-row",
+                "media-grid": "media-grid",
+                "card-grid": "card-grid",
+                "callout": "callout",
+                "panel": "panel",
+                "plot": "plot",
+                "diagram": "diagram",
+                "map": "map",
+                "schematic": "schematic",
+                "timeline": "timeline",
+                "source-list": "sources",
+            }.items()
+        },
+        "lamanotes-media-figure": "media",
         "flatnotes-media-figure": "media",
     }
 
@@ -247,14 +276,27 @@ class NoteSemanticParser(HTMLParser):
         attrs_dict = {key.lower(): value or "" for key, value in attrs}
         classes = set(attrs_dict.get("class", "").split())
         is_summary = bool(
-            {"flatnote-summary", "flatnotes-note-lead-abstract"} & classes
+            {
+                "lamanote-summary",
+                "lamanotes-note-lead-abstract",
+                "flatnote-summary",
+                "flatnotes-note-lead-abstract",
+            }
+            & classes
         )
-        is_source = "flatnote-source-list" in classes
+        is_source = bool(
+            {"lamanote-source-list", "flatnote-source-list"} & classes
+        )
 
         self._add_components(tag, attrs_dict, classes)
         self._read_meta(tag, attrs_dict)
         if (
-            attrs_dict.get("data-flatnotes-note-kind", "").strip().lower()
+            (
+                attrs_dict.get("data-lamanotes-note-kind")
+                or attrs_dict.get("data-flatnotes-note-kind", "")
+            )
+            .strip()
+            .lower()
             == "work"
         ):
             self.note_kind = "work"
@@ -394,7 +436,8 @@ class NoteSemanticParser(HTMLParser):
 
     def _add_components(self, tag: str, attrs_dict: dict, classes: Set[str]):
         explicit_components = FileSystemNotes._split_tag_list(
-            attrs_dict.get("data-flatnotes-component", "")
+            attrs_dict.get("data-lamanotes-component")
+            or attrs_dict.get("data-flatnotes-component", "")
         )
         for component in explicit_components:
             self.components[component] += 1
@@ -409,15 +452,15 @@ class NoteSemanticParser(HTMLParser):
             return
 
         name = attrs_dict.get("name", "").lower()
-        if name == "flatnotes-tags":
+        if name in TAG_META_NAMES:
             self.meta_tags.update(
                 FileSystemNotes._split_tag_list(attrs_dict.get("content", ""))
             )
-        elif name == "flatnotes-note-kind":
+        elif name in NOTE_KIND_META_NAMES:
             note_kind = attrs_dict.get("content", "").strip().lower()
             if note_kind == "work":
                 self.note_kind = "work"
-        elif name in {"description", "flatnotes-summary"}:
+        elif name in SUMMARY_META_NAMES:
             description = self._normalize(attrs_dict.get("content", ""))
             if description:
                 self.meta_description = description
@@ -458,7 +501,11 @@ class FileSystemNotes(BaseNotes):
     )
 
     def __init__(self):
-        self.storage_path = get_env("FLATNOTES_PATH", mandatory=True)
+        self.storage_path = get_env(
+            "LAMANOTES_PATH",
+            mandatory=True,
+            legacy_keys=("FLATNOTES_PATH",),
+        )
         if not os.path.exists(self.storage_path):
             raise NotADirectoryError(
                 f"'{self.storage_path}' is not a valid directory."
@@ -677,7 +724,7 @@ class FileSystemNotes(BaseNotes):
 
     @property
     def _index_path(self):
-        return os.path.join(self.storage_path, ".flatnotes")
+        return os.path.join(self.storage_path, ".lamanotes")
 
     def _path_from_title(
         self, title: str, note_format: NoteFormat = "html"

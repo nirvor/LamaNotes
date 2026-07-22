@@ -1,6 +1,6 @@
 <template>
-  <section class="flatnotes-csv-preview" aria-label="CSV table preview">
-    <div class="flatnotes-csv-summary">
+  <section class="lamanotes-csv-preview" aria-label="CSV table preview">
+    <div class="lamanotes-csv-summary">
       <span>{{ preview.rows.length }} rows</span>
       <span>{{ preview.columnCount }} columns</span>
       <span>{{ preview.delimiterLabel }} separated</span>
@@ -8,7 +8,7 @@
         >first {{ preview.rows.length }} shown</span
       >
     </div>
-    <div v-if="preview.columnCount" class="flatnotes-csv-scroll">
+    <div v-if="preview.columnCount" class="lamanotes-csv-scroll">
       <table>
         <thead>
           <tr>
@@ -22,7 +22,7 @@
             <td
               v-for="(cell, cellIndex) in row"
               :key="cellIndex"
-              :class="{ 'flatnotes-csv-number': isNumericCsvValue(cell) }"
+              :class="{ 'lamanotes-csv-number': isNumericCsvValue(cell) }"
             >
               {{ cell }}
             </td>
@@ -30,7 +30,7 @@
         </tbody>
       </table>
     </div>
-    <p v-else class="flatnotes-csv-empty">This CSV file is empty.</p>
+    <p v-else class="lamanotes-csv-empty">This CSV file is empty.</p>
   </section>
 </template>
 
@@ -47,12 +47,12 @@ const preview = computed(() => buildCsvPreview(props.source));
 </script>
 
 <style scoped>
-.flatnotes-csv-preview {
+.lamanotes-csv-preview {
   min-width: 0;
   border-block: 1px solid rgb(var(--theme-border));
 }
 
-.flatnotes-csv-summary {
+.lamanotes-csv-summary {
   display: flex;
   min-height: 1.8rem;
   flex-wrap: wrap;
@@ -65,7 +65,7 @@ const preview = computed(() => buildCsvPreview(props.source));
   text-transform: uppercase;
 }
 
-.flatnotes-csv-scroll {
+.lamanotes-csv-scroll {
   max-width: 100%;
   overflow-x: auto;
   scrollbar-width: thin;
@@ -104,12 +104,12 @@ tbody tr:nth-child(even) {
   background: rgb(var(--theme-background-elevated) / 0.28);
 }
 
-.flatnotes-csv-number {
+.lamanotes-csv-number {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-.flatnotes-csv-empty {
+.lamanotes-csv-empty {
   margin: 0;
   padding: 0.75rem 0.35rem;
   color: rgb(var(--theme-text-muted));

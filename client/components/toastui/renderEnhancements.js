@@ -14,34 +14,34 @@ import { writePlainTextToClipboard } from "../../clipboard.js";
 import { isSystemTag } from "../../systemTags.js";
 import { recordTagUse } from "../../tagUsage.js";
 
-const codeBlockWrapperClass = "flatnotes-code-block-wrapper";
-const codeCopyButtonClass = "flatnotes-code-copy-button";
-const copiedClass = "flatnotes-code-copy-button-copied";
-const failedClass = "flatnotes-code-copy-button-failed";
-const inlineArrowClass = "flatnotes-inline-arrow";
-const inlineLatexClass = "flatnotes-inline-latex";
-const mediaButtonClass = "flatnotes-media-button";
-const mediaFigureClass = "flatnotes-media-figure";
-const mediaImageClass = "flatnotes-media-image";
-const mediaLightboxClass = "flatnotes-media-lightbox";
-const mediaLightboxDrawerOpenClass = "flatnotes-media-lightbox-drawer-open";
+const codeBlockWrapperClass = "lamanotes-code-block-wrapper";
+const codeCopyButtonClass = "lamanotes-code-copy-button";
+const copiedClass = "lamanotes-code-copy-button-copied";
+const failedClass = "lamanotes-code-copy-button-failed";
+const inlineArrowClass = "lamanotes-inline-arrow";
+const inlineLatexClass = "lamanotes-inline-latex";
+const mediaButtonClass = "lamanotes-media-button";
+const mediaFigureClass = "lamanotes-media-figure";
+const mediaImageClass = "lamanotes-media-image";
+const mediaLightboxClass = "lamanotes-media-lightbox";
+const mediaLightboxDrawerOpenClass = "lamanotes-media-lightbox-drawer-open";
 const mediaLightboxMenuButtonOpenClass =
-  "flatnotes-media-lightbox-menu-button-open";
-const mediaLightboxOpenBodyClass = "flatnotes-media-lightbox-open";
+  "lamanotes-media-lightbox-menu-button-open";
+const mediaLightboxOpenBodyClass = "lamanotes-media-lightbox-open";
 const mermaidLanguage = "mermaid";
-const mermaidWrapperClass = "flatnotes-mermaid-wrapper";
-const mermaidDiagramClass = "flatnotes-mermaid-diagram";
-const noteLeadClass = "flatnotes-note-lead";
-const noteLeadAbstractClass = "flatnotes-note-lead-abstract";
-const noteLeadHeroClass = "flatnotes-note-lead-hero";
-const noteLeadHeroImageClass = "flatnotes-note-lead-hero-image";
-const noteLeadHiddenTitleClass = "flatnotes-note-hidden-title";
-const noteLeadSourceHiddenClass = "flatnotes-note-lead-source-hidden";
-const sectionDividerClass = "flatnotes-section-divider";
-const bottomTagsClass = "flatnotes-bottom-tags";
-const bottomTagChipClass = "flatnotes-bottom-tag-chip";
-const taskCheckboxClass = "flatnotes-task-checkbox";
-const taskCheckboxSavingClass = "flatnotes-task-checkbox-saving";
+const mermaidWrapperClass = "lamanotes-mermaid-wrapper";
+const mermaidDiagramClass = "lamanotes-mermaid-diagram";
+const noteLeadClass = "lamanotes-note-lead";
+const noteLeadAbstractClass = "lamanotes-note-lead-abstract";
+const noteLeadHeroClass = "lamanotes-note-lead-hero";
+const noteLeadHeroImageClass = "lamanotes-note-lead-hero-image";
+const noteLeadHiddenTitleClass = "lamanotes-note-hidden-title";
+const noteLeadSourceHiddenClass = "lamanotes-note-lead-source-hidden";
+const sectionDividerClass = "lamanotes-section-divider";
+const bottomTagsClass = "lamanotes-bottom-tags";
+const bottomTagChipClass = "lamanotes-bottom-tag-chip";
+const taskCheckboxClass = "lamanotes-task-checkbox";
+const taskCheckboxSavingClass = "lamanotes-task-checkbox-saving";
 const resetDelayMs = 1600;
 const maxInlineLatexLength = 500;
 const maxLeadSearchElements = 18;
@@ -65,7 +65,7 @@ const ignoredLatexSelector = [
   "script",
   "style",
   "textarea",
-  ".flatnotes-code-block-wrapper",
+  ".lamanotes-code-block-wrapper",
   ".katex",
 ].join(",");
 const ignoredArrowSelector = [
@@ -77,8 +77,8 @@ const ignoredArrowSelector = [
   "script",
   "style",
   "textarea",
-  ".flatnotes-code-block-wrapper",
-  ".flatnotes-bottom-tags",
+  ".lamanotes-code-block-wrapper",
+  ".lamanotes-bottom-tags",
   ".katex",
   `.${inlineArrowClass}`,
   `.${inlineLatexClass}`,
@@ -260,7 +260,7 @@ function setImageLightboxZoom(nextZoom) {
 
   mediaLightboxZoom = Math.min(4, Math.max(0.5, nextZoom));
   mediaLightboxElement.image.style.setProperty(
-    "--flatnotes-media-zoom",
+    "--lamanotes-media-zoom",
     String(mediaLightboxZoom),
   );
   mediaLightboxElement.resetZoomButton.setAttribute(
@@ -336,7 +336,7 @@ function attachImageLightboxGestures(overlay, drawer) {
     return (
       target instanceof Element &&
       target.closest(
-        ".flatnotes-media-lightbox-drawer, .flatnotes-media-lightbox-menu-button",
+        ".lamanotes-media-lightbox-drawer, .lamanotes-media-lightbox-menu-button",
       )
     );
   }
@@ -418,31 +418,31 @@ function createImageLightbox() {
   overlay.setAttribute("aria-label", "Media preview");
 
   const panel = document.createElement("div");
-  panel.className = "flatnotes-media-lightbox-panel";
+  panel.className = "lamanotes-media-lightbox-panel";
 
   const image = document.createElement("img");
-  image.className = "flatnotes-media-lightbox-image";
+  image.className = "lamanotes-media-lightbox-image";
   image.alt = "";
 
   const controls = document.createElement("div");
-  controls.className = "flatnotes-media-lightbox-controls";
+  controls.className = "lamanotes-media-lightbox-controls";
   const zoomOutButton = createIconButton({
-    className: "flatnotes-media-lightbox-control",
+    className: "lamanotes-media-lightbox-control",
     label: "Zoom out",
     path: mdiMagnifyMinusOutline,
   });
   const resetZoomButton = createIconButton({
-    className: "flatnotes-media-lightbox-control",
+    className: "lamanotes-media-lightbox-control",
     label: "Reset zoom",
     path: mdiFitToScreenOutline,
   });
   const zoomInButton = createIconButton({
-    className: "flatnotes-media-lightbox-control",
+    className: "lamanotes-media-lightbox-control",
     label: "Zoom in",
     path: mdiMagnifyPlusOutline,
   });
   const closeButton = createIconButton({
-    className: "flatnotes-media-lightbox-control",
+    className: "lamanotes-media-lightbox-control",
     label: "Close media preview",
     path: mdiClose,
   });
@@ -450,29 +450,29 @@ function createImageLightbox() {
 
   const drawerButton = createIconButton({
     className:
-      "flatnotes-media-lightbox-control flatnotes-media-lightbox-menu-button",
+      "lamanotes-media-lightbox-control lamanotes-media-lightbox-menu-button",
     label: "Open media actions",
     path: mdiInformationOutline,
   });
-  drawerButton.setAttribute("aria-controls", "flatnotes-media-lightbox-drawer");
+  drawerButton.setAttribute("aria-controls", "lamanotes-media-lightbox-drawer");
   drawerButton.setAttribute("aria-expanded", "false");
 
   const drawer = document.createElement("aside");
-  drawer.id = "flatnotes-media-lightbox-drawer";
-  drawer.className = "flatnotes-media-lightbox-drawer";
+  drawer.id = "lamanotes-media-lightbox-drawer";
+  drawer.className = "lamanotes-media-lightbox-drawer";
   drawer.setAttribute("aria-hidden", "true");
   drawer.setAttribute("aria-label", "Media actions");
   drawer.inert = true;
 
   const drawerHeader = document.createElement("div");
-  drawerHeader.className = "flatnotes-media-lightbox-drawer-header";
+  drawerHeader.className = "lamanotes-media-lightbox-drawer-header";
 
   const drawerTitle = document.createElement("div");
-  drawerTitle.className = "flatnotes-media-lightbox-drawer-title";
+  drawerTitle.className = "lamanotes-media-lightbox-drawer-title";
   drawerTitle.textContent = "Media";
 
   const drawerCloseButton = createIconButton({
-    className: "flatnotes-media-lightbox-drawer-close",
+    className: "lamanotes-media-lightbox-drawer-close",
     label: "Close media actions",
     path: mdiClose,
   });
@@ -480,22 +480,22 @@ function createImageLightbox() {
   drawerHeader.append(drawerTitle, drawerCloseButton);
 
   const captionBlock = document.createElement("div");
-  captionBlock.className = "flatnotes-media-lightbox-caption-block";
+  captionBlock.className = "lamanotes-media-lightbox-caption-block";
 
   const captionLabel = document.createElement("div");
-  captionLabel.className = "flatnotes-media-lightbox-caption-label";
+  captionLabel.className = "lamanotes-media-lightbox-caption-label";
   captionLabel.textContent = "Caption";
 
   const caption = document.createElement("div");
-  caption.className = "flatnotes-media-lightbox-caption";
+  caption.className = "lamanotes-media-lightbox-caption";
 
   captionBlock.append(captionLabel, caption);
 
   const actions = document.createElement("div");
-  actions.className = "flatnotes-media-lightbox-drawer-actions";
+  actions.className = "lamanotes-media-lightbox-drawer-actions";
 
   const originalLink = document.createElement("a");
-  originalLink.className = "flatnotes-media-lightbox-drawer-action";
+  originalLink.className = "lamanotes-media-lightbox-drawer-action";
   originalLink.target = "_blank";
   originalLink.rel = "noopener noreferrer";
   originalLink.setAttribute("aria-label", "Open original media");
@@ -506,14 +506,14 @@ function createImageLightbox() {
   );
 
   const copyButton = createIconButton({
-    className: "flatnotes-media-lightbox-drawer-action",
+    className: "lamanotes-media-lightbox-drawer-action",
     label: "Copy image link",
     path: mdiLinkVariant,
     text: "Copy link",
   });
 
   const closePreviewButton = createIconButton({
-    className: "flatnotes-media-lightbox-drawer-action",
+    className: "lamanotes-media-lightbox-drawer-action",
     label: "Close image preview",
     path: mdiClose,
     text: "Close preview",
@@ -579,7 +579,7 @@ function createImageLightbox() {
   });
 
   copyButton.addEventListener("click", async () => {
-    const url = copyButton.dataset.flatnotesImageUrl;
+    const url = copyButton.dataset.lamanotesImageUrl;
     if (!url) {
       return;
     }
@@ -644,11 +644,11 @@ function openImageLightbox(mediaElement) {
   image.alt = captionText || "Preview image";
   caption.textContent = captionText || "Image preview";
   caption.classList.toggle(
-    "flatnotes-media-lightbox-caption-muted",
+    "lamanotes-media-lightbox-caption-muted",
     !captionText,
   );
   originalLink.href = url;
-  copyButton.dataset.flatnotesImageUrl = url;
+  copyButton.dataset.lamanotesImageUrl = url;
   overlay.hidden = false;
   document.body.classList.add(mediaLightboxOpenBodyClass);
   setImageLightboxZoom(1);
@@ -696,7 +696,7 @@ function createMediaFigure(imageElement) {
 
 function decorateMediaImage(imageElement) {
   if (
-    imageElement.dataset.flatnotesMediaEnhanced === "true" ||
+    imageElement.dataset.lamanotesMediaEnhanced === "true" ||
     imageElement.closest(`.${mediaFigureClass}`) ||
     imageElement.closest("a") ||
     !getImageUrl(imageElement)
@@ -704,7 +704,7 @@ function decorateMediaImage(imageElement) {
     return;
   }
 
-  imageElement.dataset.flatnotesMediaEnhanced = "true";
+  imageElement.dataset.lamanotesMediaEnhanced = "true";
 
   if (isSoloImageParagraph(imageElement)) {
     const paragraph = imageElement.parentElement;
@@ -734,11 +734,11 @@ function decorateMediaImage(imageElement) {
 }
 
 function decorateMediaDiagram(svgElement) {
-  if (svgElement.dataset.flatnotesMediaEnhanced === "true") {
+  if (svgElement.dataset.lamanotesMediaEnhanced === "true") {
     return;
   }
 
-  svgElement.dataset.flatnotesMediaEnhanced = "true";
+  svgElement.dataset.lamanotesMediaEnhanced = "true";
   svgElement.classList.add(mediaImageClass);
   svgElement.setAttribute("role", "button");
   svgElement.setAttribute("tabindex", "0");
@@ -766,13 +766,13 @@ export function enhanceMediaImages(rootElement) {
   contentRoot
     .querySelectorAll(
       [
-        ".flatnotes-mermaid-diagram svg",
-        '[data-flatnotes-component="plot"] svg',
-        '[data-flatnotes-component="diagram"] svg',
-        '[data-flatnotes-component="map"] svg',
-        ".flatnote-plot svg",
-        ".flatnote-diagram svg",
-        ".flatnote-map svg",
+        ".lamanotes-mermaid-diagram svg",
+        '[data-lamanotes-component="plot"] svg',
+        '[data-lamanotes-component="diagram"] svg',
+        '[data-lamanotes-component="map"] svg',
+        ".lamanote-plot svg",
+        ".lamanote-diagram svg",
+        ".lamanote-map svg",
         "figure > svg",
       ].join(","),
     )
@@ -797,7 +797,7 @@ function getPrimaryContentContainer(contentRoot) {
   const children = getMeaningfulChildren(contentRoot);
   if (
     children.length === 1 &&
-    children[0].matches("article, main, .flatnote")
+    children[0].matches("article, main, .lamanote")
   ) {
     return children[0];
   }
@@ -956,7 +956,7 @@ function createLeadHero(sourceImage) {
 
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "flatnotes-note-lead-hero-button";
+  button.className = "lamanotes-note-lead-hero-button";
   button.setAttribute("aria-label", "Open hero image preview");
   button.setAttribute("title", "Open image preview");
 
@@ -998,7 +998,7 @@ export function enhanceNoteLead(rootElement, options = {}) {
 
   hideDuplicateMarkdownTitle(contentRoot, options.noteTitle);
 
-  if (contentRoot.querySelector(".flatnote-hero, .flatnote-banner")) {
+  if (contentRoot.querySelector(".lamanote-hero, .lamanote-banner")) {
     return;
   }
 
@@ -1118,7 +1118,7 @@ export function enhanceBottomTags(rootElement) {
   wrapper.setAttribute("aria-label", "Note tags");
 
   const chipRow = document.createElement("div");
-  chipRow.className = "flatnotes-bottom-tags-row";
+  chipRow.className = "lamanotes-bottom-tags-row";
   tags.forEach((tag) => chipRow.append(createBottomTagChip(tag)));
   wrapper.append(chipRow);
 
@@ -1205,18 +1205,18 @@ function setTaskCheckboxesBusy(rootElement, isBusy, taskListOptions) {
 
 function decorateTaskCheckbox(checkbox, index, rootElement, taskListOptions) {
   checkbox.classList.add(taskCheckboxClass);
-  checkbox.dataset.flatnotesTaskIndex = String(index);
+  checkbox.dataset.lamanotesTaskIndex = String(index);
   checkbox.disabled = !!taskListOptions.disabled || !taskListOptions.onToggle;
   checkbox.setAttribute(
     "title",
     checkbox.disabled ? "Open edit mode to change this item" : "Toggle item",
   );
 
-  if (checkbox.flatnotesTaskChangeHandler) {
-    checkbox.removeEventListener("change", checkbox.flatnotesTaskChangeHandler);
+  if (checkbox.lamanotesTaskChangeHandler) {
+    checkbox.removeEventListener("change", checkbox.lamanotesTaskChangeHandler);
   }
 
-  checkbox.flatnotesTaskChangeHandler = async () => {
+  checkbox.lamanotesTaskChangeHandler = async () => {
     if (checkbox.disabled || !taskListOptions.onToggle) {
       return;
     }
@@ -1237,7 +1237,7 @@ function decorateTaskCheckbox(checkbox, index, rootElement, taskListOptions) {
     }
   };
 
-  checkbox.addEventListener("change", checkbox.flatnotesTaskChangeHandler);
+  checkbox.addEventListener("change", checkbox.lamanotesTaskChangeHandler);
 }
 
 function ensureTaskCheckbox(taskItem) {
@@ -1479,7 +1479,7 @@ export function enhanceInlineArrows(rootElement) {
   }
 
   const contentRoot = rootElement.querySelector(
-    ".toastui-editor-contents:not(.flatnotes-html-contents)",
+    ".toastui-editor-contents:not(.lamanotes-html-contents)",
   );
   if (!contentRoot) {
     return;
@@ -1606,7 +1606,7 @@ async function renderMermaidBlock(preElement, mermaid) {
     return;
   }
 
-  const diagramId = `flatnotes-mermaid-${Date.now()}-${mermaidRenderCounter}`;
+  const diagramId = `lamanotes-mermaid-${Date.now()}-${mermaidRenderCounter}`;
   mermaidRenderCounter += 1;
 
   let renderedDiagram;

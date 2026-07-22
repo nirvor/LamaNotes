@@ -1,14 +1,14 @@
 <template>
-  <nav class="flatnotes-navbar flex justify-end align-top">
+  <nav class="lamanotes-navbar flex justify-end align-top">
     <div
-      class="flatnotes-navbar-actions flex grow flex-wrap items-center justify-end gap-1"
+      class="lamanotes-navbar-actions flex grow flex-wrap items-center justify-end gap-1"
     >
       <!-- Home -->
-      <RouterLink :to="{ name: 'home' }" class="flatnotes-navbar-action-link">
+      <RouterLink :to="{ name: 'home' }" class="lamanotes-navbar-action-link">
         <CustomButton
           :iconPath="mdilHome"
           label="Home"
-          class="flatnotes-navbar-icon-only"
+          class="lamanotes-navbar-icon-only"
         />
       </RouterLink>
       <template v-for="action in leadingNoteActions" :key="action.key">
@@ -21,8 +21,8 @@
           :style="action.style || 'subtle'"
           class="relative"
           :class="{
-            'flatnotes-navbar-icon-only': action.iconOnly,
-            'flatnotes-navbar-action-active': action.active,
+            'lamanotes-navbar-icon-only': action.iconOnly,
+            'lamanotes-navbar-action-active': action.active,
           }"
           @click="action.handler"
         >
@@ -30,7 +30,7 @@
             v-if="action.unsaved"
             class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-theme-brand"
           ></div>
-          <span v-if="action.badge" class="flatnotes-navbar-action-badge">
+          <span v-if="action.badge" class="lamanotes-navbar-action-badge">
             {{ action.badge }}
           </span>
         </CustomButton>
@@ -55,8 +55,8 @@
           :style="action.style || 'subtle'"
           class="relative"
           :class="{
-            'flatnotes-navbar-icon-only': action.iconOnly,
-            'flatnotes-navbar-action-active': action.active,
+            'lamanotes-navbar-icon-only': action.iconOnly,
+            'lamanotes-navbar-action-active': action.active,
           }"
           @click="action.handler"
         >
@@ -64,7 +64,7 @@
             v-if="action.unsaved"
             class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-theme-brand"
           ></div>
-          <span v-if="action.badge" class="flatnotes-navbar-action-badge">
+          <span v-if="action.badge" class="lamanotes-navbar-action-badge">
             {{ action.badge }}
           </span>
         </CustomButton>
@@ -121,8 +121,8 @@ const baseMenuItems = computed(() => {
   if (nativeClientUpdate.available) {
     items.push({
       label: nativeClientUpdate.installing
-        ? "Updating NirvNotes..."
-        : "Update NirvNotes",
+        ? "Updating LamaNotes..."
+        : "Update LamaNotes",
       icon: mdiUpdate,
       disabled: nativeClientUpdate.installing || !nativeClientUpdate.canInstall,
       command: startNativeClientUpdate,
@@ -191,12 +191,12 @@ const menuItems = computed(() => {
 });
 
 async function startNativeClientUpdate() {
-  toast.add(getToastOptions("Downloading the NirvNotes update..."));
+  toast.add(getToastOptions("Downloading the LamaNotes update..."));
   const result = await installNativeClientUpdate();
   if (result?.started) {
     toast.add(
       getToastOptions(
-        "Update verified. NirvNotes will restart now.",
+        "Update verified. LamaNotes will restart now.",
         "Updating",
         "success",
       ),
@@ -205,7 +205,7 @@ async function startNativeClientUpdate() {
   }
   toast.add(
     getToastOptions(
-      result?.error || "Could not start the NirvNotes update.",
+      result?.error || "Could not start the LamaNotes update.",
       "Update Failed",
       "error",
     ),
@@ -221,12 +221,12 @@ function checkForNativeUpdate() {
 
 onMounted(() => {
   checkForNativeUpdate();
-  window.addEventListener("nirvnotes:native-ready", checkForNativeUpdate);
+  window.addEventListener("lamanotes:native-ready", checkForNativeUpdate);
 });
 
 onBeforeUnmount(() => {
   window.clearTimeout(nativeUpdateCheckTimer);
-  window.removeEventListener("nirvnotes:native-ready", checkForNativeUpdate);
+  window.removeEventListener("lamanotes:native-ready", checkForNativeUpdate);
 });
 
 const showNewButton = computed(() => {
@@ -276,7 +276,7 @@ async function openNewWindow() {
     if (!result?.started) {
       toast.add(
         getToastOptions(
-          result?.error || "Could not open a new NirvNotes window.",
+          result?.error || "Could not open a new LamaNotes window.",
           "New Window Failed",
           "error",
         ),
@@ -296,7 +296,7 @@ function showLogOutButton() {
 </script>
 
 <style scoped>
-.flatnotes-navbar {
+.lamanotes-navbar {
   position: sticky;
   top: 0;
   z-index: 35;
@@ -307,14 +307,14 @@ function showLogOutButton() {
   isolation: isolate;
 }
 
-.flatnotes-navbar-action-link {
+.lamanotes-navbar-action-link {
   display: inline-flex;
   align-items: center;
   align-self: center;
   line-height: 1;
 }
 
-.flatnotes-navbar-action-badge {
+.lamanotes-navbar-action-badge {
   position: absolute;
   top: -0.12rem;
   right: -0.08rem;
@@ -332,31 +332,31 @@ function showLogOutButton() {
 }
 
 @media print {
-  .flatnotes-navbar {
+  .lamanotes-navbar {
     position: static;
   }
 }
 
 @media (max-width: 560px) {
-  .flatnotes-navbar-actions {
+  .lamanotes-navbar-actions {
     gap: 0.12rem;
   }
 
-  .flatnotes-navbar-actions :deep(.flatnotes-custom-button) {
+  .lamanotes-navbar-actions :deep(.lamanotes-custom-button) {
     min-width: 1.75rem;
     padding-inline: 0.42rem;
   }
 
-  .flatnotes-navbar-actions :deep(.flatnotes-icon-label-text) {
+  .lamanotes-navbar-actions :deep(.lamanotes-icon-label-text) {
     display: none;
   }
 
-  .flatnotes-navbar-actions :deep(.flatnotes-icon-label-icon) {
+  .lamanotes-navbar-actions :deep(.lamanotes-icon-label-icon) {
     margin-right: 0 !important;
   }
 }
 
-.flatnotes-navbar-actions :deep(.flatnotes-navbar-icon-only) {
+.lamanotes-navbar-actions :deep(.lamanotes-navbar-icon-only) {
   display: inline-flex;
   min-width: 1.78rem;
   align-items: center;
@@ -364,17 +364,17 @@ function showLogOutButton() {
   padding-inline: 0.42rem;
 }
 
-.flatnotes-navbar-actions :deep(.flatnotes-navbar-action-active) {
+.lamanotes-navbar-actions :deep(.lamanotes-navbar-action-active) {
   color: rgb(var(--theme-brand));
 }
 
-.flatnotes-navbar-actions
-  :deep(.flatnotes-navbar-icon-only .flatnotes-icon-label-text) {
+.lamanotes-navbar-actions
+  :deep(.lamanotes-navbar-icon-only .lamanotes-icon-label-text) {
   display: none;
 }
 
-.flatnotes-navbar-actions
-  :deep(.flatnotes-navbar-icon-only .flatnotes-icon-label-icon) {
+.lamanotes-navbar-actions
+  :deep(.lamanotes-navbar-icon-only .lamanotes-icon-label-icon) {
   margin-right: 0 !important;
 }
 </style>

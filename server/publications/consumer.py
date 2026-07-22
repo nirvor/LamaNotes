@@ -20,7 +20,7 @@ class PublicationConsumer:
         self.timeout_seconds = max(2, min(int(timeout_seconds), 60))
         parsed = urllib.parse.urlparse(self.base_url)
         if parsed.scheme != "https" or not parsed.netloc:
-            raise ValueError("NIRVNOTES_PUBLISH_BASE_URL must use HTTPS.")
+            raise ValueError("LAMANOTES_PUBLISH_BASE_URL must use HTTPS.")
         self.origin = f"{parsed.scheme}://{parsed.netloc}"
         self._transport = transport
 
@@ -39,7 +39,9 @@ class PublicationConsumer:
         parsed = urllib.parse.urlparse(url)
         if (
             f"{parsed.scheme}://{parsed.netloc}" != self.origin
-            or not parsed.path.startswith("/api/nirvnotes-publications/")
+            or not parsed.path.startswith(
+                ("/api/lamanotes-publications/", "/api/nirvnotes-publications/")
+            )
         ):
             raise PublicationError(
                 502,

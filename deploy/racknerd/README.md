@@ -23,7 +23,7 @@ copied into the Windows package. Required environment names and the staged
 cutover are documented in
 `C:\Users\thoma\Desktop\work\VPS-Config\GOOGLE-AUTH-CUTOVER.md`.
 Use the exact email only for the controlled bootstrap login, then bind the
-observed Google account identifier through `NIRVNOTES_GOOGLE_ALLOWED_SUB`.
+observed Google account identifier through `LAMANOTES_GOOGLE_ALLOWED_SUB`.
 
 The public ports bind to the RackNerd IPv4 address explicitly because Tailscale
 owns port 443 on the Tailnet address. Caddy stores public certificates in named
@@ -40,7 +40,7 @@ volumes and reads the existing Tailnet certificate from `/data/certs`.
    attributes, API-token access, note count, and the Tailnet fallback.
 6. Verify one complete login/logout/login cycle in the installed Win11 app.
    Confirm that Google opens in the system browser and that the DPAPI-protected
-   NirvNotes session survives an app restart.
+   LamaNotes session survives an app restart.
 
 ## Rollback
 

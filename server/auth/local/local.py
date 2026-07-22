@@ -32,12 +32,22 @@ class LocalAuth(BaseAuth):
 
     def __init__(self, config: GlobalConfig | None = None) -> None:
         self.config = config or GlobalConfig()
-        self.username = get_env("FLATNOTES_USERNAME", mandatory=True).lower()
+        self.username = get_env(
+            "LAMANOTES_USERNAME",
+            mandatory=True,
+            legacy_keys=("FLATNOTES_USERNAME",),
+        ).lower()
         self.password_hash = get_env(
-            "FLATNOTES_PASSWORD_HASH", mandatory=False, default=""
+            "LAMANOTES_PASSWORD_HASH",
+            mandatory=False,
+            default="",
+            legacy_keys=("FLATNOTES_PASSWORD_HASH",),
         )
         self.legacy_password = get_env(
-            "FLATNOTES_PASSWORD", mandatory=False, default=""
+            "LAMANOTES_PASSWORD",
+            mandatory=False,
+            default="",
+            legacy_keys=("FLATNOTES_PASSWORD",),
         )
         self.password_login_enabled = self.config.password_login_enabled
         if (
@@ -46,16 +56,20 @@ class LocalAuth(BaseAuth):
             and not self.legacy_password
         ):
             raise RuntimeError(
-                "FLATNOTES_PASSWORD_HASH or FLATNOTES_PASSWORD must be set."
+                "LAMANOTES_PASSWORD_HASH or LAMANOTES_PASSWORD must be set."
             )
         if self.password_login_enabled and not self.password_hash:
             logger.warning(
-                "FLATNOTES_PASSWORD is a compatibility fallback. Migrate to "
-                "FLATNOTES_PASSWORD_HASH before exposing the service."
+                "LAMANOTES_PASSWORD is a compatibility fallback. Migrate to "
+                "LAMANOTES_PASSWORD_HASH before exposing the service."
             )
 
         self.password_hasher = PasswordHasher()
-        self.secret_key = get_env("FLATNOTES_SECRET_KEY", mandatory=True)
+        self.secret_key = get_env(
+            "LAMANOTES_SECRET_KEY",
+            mandatory=True,
+            legacy_keys=("FLATNOTES_SECRET_KEY",),
+        )
         self.session_expiry_hours = self.config.session_expiry_hours
         self.remember_expiry_days = self.config.remember_expiry_days
         self.accept_legacy_tokens = self.config.accept_legacy_tokens
@@ -65,7 +79,11 @@ class LocalAuth(BaseAuth):
         self.is_totp_enabled = False
         if self.password_login_enabled and self.config.auth_type == AuthType.TOTP:
             self.is_totp_enabled = True
-            self.totp_key = get_env("FLATNOTES_TOTP_KEY", mandatory=True)
+            self.totp_key = get_env(
+                "LAMANOTES_TOTP_KEY",
+                mandatory=True,
+                legacy_keys=("FLATNOTES_TOTP_KEY",),
+            )
             self.totp_key = b32encode(self.totp_key.encode("utf-8"))
             self.totp = TOTP(self.totp_key)
             self.last_used_totp = None
@@ -218,15 +236,20 @@ class LocalAuth(BaseAuth):
         )
 
     def _load_api_tokens(self) -> list[dict]:
-        raw = get_env("NIRVNOTES_API_TOKEN_HASHES", mandatory=False, default="[]")
+        raw = get_env(
+            "LAMANOTES_API_TOKEN_HASHES",
+            mandatory=False,
+            default="[]",
+            legacy_keys=("NIRVNOTES_API_TOKEN_HASHES",),
+        )
         try:
             entries = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise RuntimeError(
-                "NIRVNOTES_API_TOKEN_HASHES must be valid JSON."
+                "LAMANOTES_API_TOKEN_HASHES must be valid JSON."
             ) from exc
         if not isinstance(entries, list):
-            raise RuntimeError("NIRVNOTES_API_TOKEN_HASHES must be a list.")
+            raise RuntimeError("LAMANOTES_API_TOKEN_HASHES must be a list.")
 
         parsed = []
         for entry in entries:
@@ -256,7 +279,7 @@ class LocalAuth(BaseAuth):
 
     def _display_totp_enrolment(self) -> None:
         unpadded_secret = self.totp_key.rstrip(b"=")
-        uri = build_uri(unpadded_secret, self.username, issuer="NirvNotes")
+        uri = build_uri(unpadded_secret, self.username, issuer="LamaNotes")
         qr = QRCode()
         qr.add_data(uri)
         print(

@@ -16,7 +16,7 @@ if (!(Test-Path $Python)) {
 }
 
 $Args = @(
-  (Join-Path $PSScriptRoot "nirvnotes_client.py"),
+  (Join-Path $PSScriptRoot "lamanotes_client.py"),
   "--url",
   $Url
 )

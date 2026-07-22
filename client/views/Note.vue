@@ -58,13 +58,13 @@
   <LoadingIndicator
     ref="loadingIndicator"
     :class="[
-      'flatnotes-note-shell flex h-full min-w-0 max-w-full flex-col',
+      'lamanotes-note-shell flex h-full min-w-0 max-w-full flex-col',
       {
-        'flatnotes-document-find-open': findVisible,
-        'flatnotes-note-shell-wide': isWideDashboardNote,
-        'flatnotes-note-shell-work': noteLayoutKind === 'work',
-        'flatnotes-note-shell-research': noteLayoutKind === 'research',
-        'flatnotes-note-shell-markdown': noteLayoutKind === 'markdown',
+        'lamanotes-document-find-open': findVisible,
+        'lamanotes-note-shell-wide': isWideDashboardNote,
+        'lamanotes-note-shell-work': noteLayoutKind === 'work',
+        'lamanotes-note-shell-research': noteLayoutKind === 'research',
+        'lamanotes-note-shell-markdown': noteLayoutKind === 'markdown',
       },
     ]"
   >
@@ -92,9 +92,9 @@
       <!-- Title -->
       <div
         v-if="editMode || !desktopShell.enabled"
-        class="flatnotes-note-title-row"
+        class="lamanotes-note-title-row"
       >
-        <div class="flatnotes-note-title-text">
+        <div class="lamanotes-note-title-text">
           <span v-show="!editMode" :title="note.title">{{ note.title }}</span>
           <input
             v-show="editMode"
@@ -108,13 +108,13 @@
 
     <hr
       v-if="!editMode && !desktopShell.enabled"
-      class="flatnotes-note-title-rule border-theme-border"
+      class="lamanotes-note-title-rule border-theme-border"
     />
 
     <!-- Content -->
     <div
       ref="noteContent"
-      class="flatnotes-note-content min-w-0 max-w-full flex-1"
+      class="lamanotes-note-content min-w-0 max-w-full flex-1"
       @dblclick="noteContentDblClickHandler"
       @pointerup="noteContentPointerUpHandler"
     >
@@ -502,7 +502,7 @@ function cachedNoteDeletedHandler(event) {
 function markNoteReady() {
   nextTick(() => {
     window.requestAnimationFrame(() => {
-      performance.mark("nirvnotes-note-ready");
+      performance.mark("lamanotes-note-ready");
       const reporter = window.pywebview?.api?.report_client_ready;
       if (!reporter) {
         return;
@@ -566,7 +566,7 @@ function focusEditor() {
   const editorElement =
     contentEditor.value?.focusEditor?.() ||
     document.querySelector(
-      ".flatnotes-note-content textarea, .flatnotes-note-content .toastui-editor-md-container textarea, .flatnotes-note-content [contenteditable='true']",
+      ".lamanotes-note-content textarea, .lamanotes-note-content .toastui-editor-md-container textarea, .lamanotes-note-content [contenteditable='true']",
     );
 
   if (editorElement instanceof HTMLElement) {
@@ -1173,12 +1173,8 @@ function loadDefaultEditorMode() {
 }
 
 function loadNewNoteKind() {
-  const key = "nirvNotesNewNoteKind";
-  const legacyKey = "flatnotesNewNoteKind";
-  const kind = localStorage.getItem(key) || localStorage.getItem(legacyKey);
-  if (kind && !localStorage.getItem(key)) {
-    localStorage.setItem(key, kind);
-  }
+  const key = "lamanotes:new-note-kind";
+  const kind = localStorage.getItem(key);
   return kind || "work";
 }
 
@@ -1212,7 +1208,7 @@ function setNewNoteKind(kind) {
   }
 
   editorKind.value = kind;
-  localStorage.setItem("nirvNotesNewNoteKind", kind);
+  localStorage.setItem("lamanotes:new-note-kind", kind);
   note.value.content =
     kind === "work" ? buildWorkNoteHtml(newTitle.value || "Untitled", "") : "";
   documentSession.clearDraft();
@@ -1242,7 +1238,7 @@ function htmlToPlainText(html) {
     "text/html",
   );
   parsedDocument
-    .querySelectorAll("script, style, template, .flatnotes-note-hidden-title")
+    .querySelectorAll("script, style, template, .lamanotes-note-hidden-title")
     .forEach((element) => element.remove());
 
   const rawText =
@@ -1254,10 +1250,10 @@ function removeAbstractLikeLead(documentRoot) {
   documentRoot
     .querySelectorAll(
       [
-        ".flatnotes-note-lead",
-        ".flatnotes-note-lead-abstract",
-        ".flatnote-summary",
-        "[data-flatnotes-component='summary']",
+        ".lamanotes-note-lead",
+        ".lamanotes-note-lead-abstract",
+        ".lamanote-summary",
+        "[data-lamanotes-component='summary']",
       ].join(","),
     )
     .forEach((element) => element.remove());
@@ -1305,7 +1301,7 @@ function getCleanNoteTextContent() {
     "text/html",
   );
   parsedDocument
-    .querySelectorAll("script, style, template, .flatnotes-note-hidden-title")
+    .querySelectorAll("script, style, template, .lamanotes-note-hidden-title")
     .forEach((element) => element.remove());
   removeAbstractLikeLead(parsedDocument);
 
@@ -1540,7 +1536,7 @@ function applyDocumentAutomation(content) {
 function libraryFilename() {
   const title = editMode.value ? newTitle.value : note.value.title;
   if (!title) {
-    return isNewNote.value ? "New Note.html" : "NirvNotes";
+    return isNewNote.value ? "New Note.html" : "LamaNotes";
   }
   const extension = editorFormat.value || note.value.format || "html";
   return String(title).toLowerCase().endsWith(`.${extension}`)
@@ -1629,18 +1625,18 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.flatnotes-note-shell,
-.flatnotes-note-content {
+.lamanotes-note-shell,
+.lamanotes-note-content {
   overflow-x: clip;
   overflow-y: visible;
 }
 
-.flatnotes-note-shell {
+.lamanotes-note-shell {
   width: min(100%, 68rem);
   margin-inline: auto;
 }
 
-.flatnotes-note-title-row {
+.lamanotes-note-title-row {
   display: flex;
   min-width: 0;
   max-width: 100%;
@@ -1648,7 +1644,7 @@ onUnmounted(() => {
   gap: 0.45rem;
 }
 
-.flatnotes-note-title-text {
+.lamanotes-note-title-text {
   min-width: 0;
   flex-grow: 1;
   overflow: hidden;
@@ -1659,32 +1655,32 @@ onUnmounted(() => {
   line-height: 1.18;
 }
 
-.flatnotes-note-title-rule {
+.lamanotes-note-title-rule {
   margin-top: 0.5rem;
   margin-bottom: 0.62rem;
 }
 
-.flatnotes-note-shell-work {
+.lamanotes-note-shell-work {
   width: min(100%, 54rem);
 }
 
-.flatnotes-note-shell-markdown {
+.lamanotes-note-shell-markdown {
   width: min(100%, 58rem);
 }
 
-.flatnotes-note-shell-research {
+.lamanotes-note-shell-research {
   width: min(100%, 76rem);
 }
 
-.flatnotes-note-shell-wide {
+.lamanotes-note-shell-wide {
   width: min(100%, calc(100vw - 1.5rem));
   max-width: none;
   margin-inline: auto;
 }
 
 @supports not (overflow: clip) {
-  .flatnotes-note-shell,
-  .flatnotes-note-content {
+  .lamanotes-note-shell,
+  .lamanotes-note-content {
     overflow-x: visible;
   }
 }

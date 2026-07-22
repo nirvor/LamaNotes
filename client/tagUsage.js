@@ -1,5 +1,5 @@
-const tagUsageStorageKey = "nirvNotesTagUsage";
-const tagUsageEventName = "nirvnotes:tag-usage";
+const tagUsageStorageKey = "lamanotes:tag-usage";
+const tagUsageEventName = "lamanotes:tag-usage";
 const maxStoredTags = 80;
 
 export function normalizeTagName(tag = "") {

@@ -17,10 +17,10 @@ const ignoredEditTriggerSelector = [
   "[role='button']",
   "pre",
   "code",
-  ".flatnotes-code-block-wrapper",
-  ".flatnotes-bottom-tags",
-  ".flatnotes-media-button",
-  ".flatnotes-media-lightbox",
+  ".lamanotes-code-block-wrapper",
+  ".lamanotes-bottom-tags",
+  ".lamanotes-media-button",
+  ".lamanotes-media-lightbox",
   ".katex",
 ].join(",");
 
@@ -42,7 +42,7 @@ export function useDocumentSession(options = {}) {
 
   function draftKey(overrideKey = null) {
     const key = String(overrideKey ?? getOptionValue("draftKey", "")).trim();
-    return key ? `nirvnotes:draft:${key}` : "";
+    return key ? `lamanotes:draft:${key}` : "";
   }
 
   function legacyDraftKeys() {

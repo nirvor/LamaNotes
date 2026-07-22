@@ -7,7 +7,7 @@ export const useGlobalStore = defineStore("global", () => {
   const noteLayoutKind = ref("default");
   const noteMenuItems = ref([]);
   const showLineNumbers = ref(
-    localStorage.getItem("nirvnotes:show-line-numbers") === "true",
+    localStorage.getItem("lamanotes:show-line-numbers") === "true",
   );
 
   function setNoteActions(actions = []) {
@@ -31,7 +31,7 @@ export const useGlobalStore = defineStore("global", () => {
   function toggleLineNumbers() {
     showLineNumbers.value = !showLineNumbers.value;
     localStorage.setItem(
-      "nirvnotes:show-line-numbers",
+      "lamanotes:show-line-numbers",
       String(showLineNumbers.value),
     );
   }

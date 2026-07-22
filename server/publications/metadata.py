@@ -13,15 +13,15 @@ from bs4 import BeautifulSoup
 
 from helpers import is_valid_filename
 
-SOURCE_ID = "nirvnotes-source-id"
-PUBLICATION_ID = "nirvnotes-publication-id"
-PUBLICATION_SLUG = "nirvnotes-publication-slug"
-PUBLICATION_URL = "nirvnotes-publication-url"
-PUBLISHED_HASH = "nirvnotes-published-content-hash"
-PUBLISHED_AT = "nirvnotes-published-at"
-OPERATION_ID = "nirvnotes-publish-operation-id"
-OPERATION_HASH = "nirvnotes-publish-operation-hash"
-OPERATION_STARTED_AT = "nirvnotes-publish-started-at"
+SOURCE_ID = "lamanotes-source-id"
+PUBLICATION_ID = "lamanotes-publication-id"
+PUBLICATION_SLUG = "lamanotes-publication-slug"
+PUBLICATION_URL = "lamanotes-publication-url"
+PUBLISHED_HASH = "lamanotes-published-content-hash"
+PUBLISHED_AT = "lamanotes-published-at"
+OPERATION_ID = "lamanotes-publish-operation-id"
+OPERATION_HASH = "lamanotes-publish-operation-hash"
+OPERATION_STARTED_AT = "lamanotes-publish-started-at"
 
 PUBLICATION_META_NAMES = (
     SOURCE_ID,
@@ -35,6 +35,13 @@ PUBLICATION_META_NAMES = (
     OPERATION_STARTED_AT,
 )
 PUBLICATION_META_SET = set(PUBLICATION_META_NAMES)
+LEGACY_PUBLICATION_META_MAP = {
+    name.replace("lamanotes-", "nirvnotes-", 1): name
+    for name in PUBLICATION_META_NAMES
+}
+ALL_PUBLICATION_META_NAMES = PUBLICATION_META_SET | set(
+    LEGACY_PUBLICATION_META_MAP
+)
 PUBLICATION_FILE_LOCK = threading.RLock()
 META_TAG_RE = re.compile(r"<meta\b[^>]*>", re.IGNORECASE)
 ATTRIBUTE_RE_TEMPLATE = (
@@ -87,8 +94,9 @@ def parse_publication_metadata(content: str) -> PublicationMetadata:
     values: dict[str, str] = {}
     for meta in soup.find_all("meta"):
         name = str(meta.get("name") or "").strip().lower()
-        if name in PUBLICATION_META_SET:
-            values[name] = str(meta.get("content") or "").strip()
+        canonical_name = LEGACY_PUBLICATION_META_MAP.get(name, name)
+        if canonical_name in PUBLICATION_META_SET:
+            values[canonical_name] = str(meta.get("content") or "").strip()
     return PublicationMetadata(
         source_id=values.get(SOURCE_ID),
         publication_id=values.get(PUBLICATION_ID),
@@ -118,7 +126,7 @@ def _attribute_value(markup: str, attribute: str) -> str:
 def strip_publication_metadata(content: str) -> str:
     def replace(markup: re.Match) -> str:
         name = _attribute_value(markup.group(0), "name").strip().lower()
-        return "" if name in PUBLICATION_META_SET else markup.group(0)
+        return "" if name in ALL_PUBLICATION_META_NAMES else markup.group(0)
 
     return META_TAG_RE.sub(replace, content or "")
 

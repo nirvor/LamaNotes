@@ -1,6 +1,6 @@
 <template>
-  <div class="flatnotes-work-editor">
-    <div class="flatnotes-work-editor-toolbar" aria-label="Work note tools">
+  <div class="lamanotes-work-editor">
+    <div class="lamanotes-work-editor-toolbar" aria-label="Work note tools">
       <NoteKindSwitch
         v-if="showKindSwitch"
         :current-kind="currentKind"
@@ -8,7 +8,7 @@
       />
       <button
         type="button"
-        class="flatnotes-work-icon-button"
+        class="lamanotes-work-icon-button"
         title="Insert code block"
         aria-label="Insert code block"
         @click="insertCodeBlock"
@@ -17,7 +17,7 @@
       </button>
       <button
         type="button"
-        class="flatnotes-work-icon-button"
+        class="lamanotes-work-icon-button"
         title="Insert checklist item"
         aria-label="Insert checklist item"
         @click="insertChecklist"
@@ -26,8 +26,8 @@
       </button>
       <button
         type="button"
-        class="flatnotes-work-icon-button"
-        :class="{ 'flatnotes-work-icon-button-active': previewVisible }"
+        class="lamanotes-work-icon-button"
+        :class="{ 'lamanotes-work-icon-button-active': previewVisible }"
         :title="previewVisible ? 'Hide preview' : 'Show preview'"
         :aria-label="previewVisible ? 'Hide preview' : 'Show preview'"
         :aria-pressed="previewVisible"
@@ -41,8 +41,8 @@
       </button>
       <button
         type="button"
-        class="flatnotes-work-icon-button flatnotes-work-copy-button"
-        :class="{ 'flatnotes-work-icon-button-active': copied }"
+        class="lamanotes-work-icon-button lamanotes-work-copy-button"
+        :class="{ 'lamanotes-work-icon-button-active': copied }"
         :title="copied ? 'Copied' : 'Copy markdown'"
         :aria-label="copied ? 'Copied' : 'Copy markdown'"
         @click="copyMarkdown"
@@ -59,7 +59,7 @@
       v-show="!previewVisible"
       ref="sourceEditor"
       v-model="markdown"
-      class="flatnotes-work-editor-source"
+      class="lamanotes-work-editor-source"
       language="markdown"
       :normalize-tags="true"
       :show-line-numbers="showLineNumbers"
@@ -72,7 +72,7 @@
       @ready="editorReadyHandler"
     />
 
-    <div v-if="previewVisible" class="flatnotes-work-editor-preview">
+    <div v-if="previewVisible" class="lamanotes-work-editor-preview">
       <ToastViewer
         :key="previewKey"
         :initialValue="markdown"
@@ -259,7 +259,7 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
-.flatnotes-work-editor {
+.lamanotes-work-editor {
   display: flex;
   min-height: 65vh;
   flex-direction: column;
@@ -269,7 +269,7 @@ defineExpose({
   background-color: rgb(var(--theme-background));
 }
 
-.flatnotes-work-editor-toolbar {
+.lamanotes-work-editor-toolbar {
   display: flex;
   min-height: 1.42rem;
   align-items: center;
@@ -281,7 +281,7 @@ defineExpose({
   background-color: rgb(var(--theme-background-elevated));
 }
 
-.flatnotes-work-icon-button {
+.lamanotes-work-icon-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -295,31 +295,31 @@ defineExpose({
   touch-action: manipulation;
 }
 
-.flatnotes-work-copy-button {
+.lamanotes-work-copy-button {
   margin-left: auto;
 }
 
-.flatnotes-work-icon-button:hover,
-.flatnotes-work-icon-button:focus-visible,
-.flatnotes-work-icon-button-active {
+.lamanotes-work-icon-button:hover,
+.lamanotes-work-icon-button:focus-visible,
+.lamanotes-work-icon-button-active {
   border-color: rgb(var(--theme-brand));
   color: rgb(var(--theme-brand));
   background-color: rgb(var(--theme-background-elevated));
 }
 
-.flatnotes-work-editor-source {
+.lamanotes-work-editor-source {
   min-height: 65vh;
   flex: 0 0 auto;
   border: 0;
 }
 
-.flatnotes-work-editor-source :deep(.cm-editor),
-.flatnotes-work-editor-source :deep(.cm-scroller),
-.flatnotes-work-editor-source :deep(.cm-content) {
+.lamanotes-work-editor-source :deep(.cm-editor),
+.lamanotes-work-editor-source :deep(.cm-scroller),
+.lamanotes-work-editor-source :deep(.cm-content) {
   min-height: 65vh;
 }
 
-.flatnotes-work-editor-preview {
+.lamanotes-work-editor-preview {
   min-height: 65vh;
   padding: 1.05rem 1.2rem;
   background-color: rgb(var(--theme-background));
@@ -327,13 +327,13 @@ defineExpose({
 
 @media (max-width: 640px) and (pointer: coarse),
   (max-width: 640px) and (hover: none) {
-  .flatnotes-work-editor-toolbar {
+  .lamanotes-work-editor-toolbar {
     gap: 0.22rem;
     min-height: 2.35rem;
     padding: 0.26rem;
   }
 
-  .flatnotes-work-icon-button {
+  .lamanotes-work-icon-button {
     width: 2rem;
     height: 2rem;
   }

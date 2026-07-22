@@ -35,9 +35,9 @@ class GoogleIdentity:
 
 class GoogleOAuthService:
     JWT_ALGORITHM = "HS256"
-    JWT_ISSUER = "nirvnotes-google-auth"
-    STATE_AUDIENCE = "nirvnotes-google-state"
-    HANDOFF_AUDIENCE = "nirvnotes-native-handoff"
+    JWT_ISSUER = "lamanotes-google-auth"
+    STATE_AUDIENCE = "lamanotes-google-state"
+    HANDOFF_AUDIENCE = "lamanotes-native-handoff"
 
     def __init__(self, config, auth) -> None:
         self.config = config

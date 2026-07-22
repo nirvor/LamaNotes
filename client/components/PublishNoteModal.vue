@@ -1,5 +1,5 @@
 <template>
-  <Modal v-model="isVisible" class="flatnotes-publish-modal px-5 py-4">
+  <Modal v-model="isVisible" class="lamanotes-publish-modal px-5 py-4">
     <div class="mb-3 text-lg font-semibold">Publish online</div>
     <label
       class="mb-1 block text-xs uppercase text-theme-text-muted"
@@ -7,7 +7,7 @@
     >
       Public URL
     </label>
-    <div class="flatnotes-publish-url-row">
+    <div class="lamanotes-publish-url-row">
       <span class="text-theme-text-muted">https://pages.thuber.org/</span>
       <input
         id="publication-slug"
@@ -84,11 +84,11 @@ function submit() {
 </script>
 
 <style scoped>
-.flatnotes-publish-modal {
+.lamanotes-publish-modal {
   max-width: 29rem;
 }
 
-.flatnotes-publish-url-row {
+.lamanotes-publish-url-row {
   display: flex;
   min-width: 0;
   align-items: baseline;
@@ -98,7 +98,7 @@ function submit() {
   font-size: 0.95rem;
 }
 
-.flatnotes-publish-url-row input {
+.lamanotes-publish-url-row input {
   min-width: 4rem;
   flex: 1;
   background: transparent;
@@ -107,7 +107,7 @@ function submit() {
 }
 
 @media (max-width: 420px) {
-  .flatnotes-publish-url-row {
+  .lamanotes-publish-url-row {
     font-size: 0.82rem;
   }
 }

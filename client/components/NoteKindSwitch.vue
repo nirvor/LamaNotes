@@ -1,10 +1,10 @@
 <template>
-  <div class="flatnotes-note-kind-switch" aria-label="New note kind">
+  <div class="lamanotes-note-kind-switch" aria-label="New note kind">
     <button
       type="button"
       title="Work note"
       aria-label="Work note"
-      :class="{ 'flatnotes-note-kind-switch-active': currentKind === 'work' }"
+      :class="{ 'lamanotes-note-kind-switch-active': currentKind === 'work' }"
       @click="setKind('work')"
     >
       <SvgIcon type="mdi" :path="mdiBriefcaseOutline" size="0.92rem" />
@@ -13,7 +13,9 @@
       type="button"
       title="Research note"
       aria-label="Research note"
-      :class="{ 'flatnotes-note-kind-switch-active': currentKind === 'research' }"
+      :class="{
+        'lamanotes-note-kind-switch-active': currentKind === 'research',
+      }"
       @click="setKind('research')"
     >
       <SvgIcon type="mdi" :path="mdiTextBoxSearchOutline" size="0.92rem" />
@@ -40,7 +42,7 @@ function setKind(kind) {
 </script>
 
 <style lang="scss" scoped>
-.flatnotes-note-kind-switch {
+.lamanotes-note-kind-switch {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -52,7 +54,7 @@ function setKind(kind) {
   background-color: rgb(var(--theme-background));
 }
 
-.flatnotes-note-kind-switch button {
+.lamanotes-note-kind-switch button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -64,21 +66,22 @@ function setKind(kind) {
   touch-action: manipulation;
 }
 
-.flatnotes-note-kind-switch button:hover,
-.flatnotes-note-kind-switch button:focus-visible,
-.flatnotes-note-kind-switch-active {
+.lamanotes-note-kind-switch button:hover,
+.lamanotes-note-kind-switch button:focus-visible,
+.lamanotes-note-kind-switch-active {
   color: rgb(var(--theme-text)) !important;
   background-color: rgb(var(--theme-background-elevated));
 }
 
-@media (max-width: 640px) and (pointer: coarse), (max-width: 640px) and (hover: none) {
-  .flatnotes-note-kind-switch {
+@media (max-width: 640px) and (pointer: coarse),
+  (max-width: 640px) and (hover: none) {
+  .lamanotes-note-kind-switch {
     gap: 0.12rem;
     margin-right: 0.25rem;
     padding: 0.1rem;
   }
 
-  .flatnotes-note-kind-switch button {
+  .lamanotes-note-kind-switch button {
     width: 1.86rem;
     height: 1.86rem;
   }

@@ -45,7 +45,7 @@
     <!-- Live Note Suggestions -->
     <div
       v-if="suggestionMenuVisible"
-      class="flatnotes-search-suggestions"
+      class="lamanotes-search-suggestions"
       role="listbox"
       aria-label="Matching notes"
     >
@@ -54,7 +54,7 @@
         :key="suggestion.title"
         ref="suggestionMenuItems"
         type="button"
-        class="flatnotes-search-suggestion"
+        class="lamanotes-search-suggestion"
         :class="{ 'is-selected': index === suggestionMenuIndex }"
         role="option"
         :aria-selected="index === suggestionMenuIndex"
@@ -63,12 +63,12 @@
         @pointerdown.prevent
         @click="openSuggestion(suggestion)"
       >
-        <span class="flatnotes-search-suggestion-title">{{
+        <span class="lamanotes-search-suggestion-title">{{
           suggestion.title
         }}</span>
         <span
           v-if="formatSuggestionTags(suggestion)"
-          class="flatnotes-search-suggestion-tags"
+          class="lamanotes-search-suggestion-tags"
         >
           {{ formatSuggestionTags(suggestion) }}
         </span>
@@ -76,13 +76,13 @@
     </div>
 
     <!-- Empty Search Tag Cloud -->
-    <div v-if="tagCloudVisible" class="flatnotes-tag-cloud">
-      <div class="flatnotes-tag-cloud-list">
+    <div v-if="tagCloudVisible" class="lamanotes-tag-cloud">
+      <div class="lamanotes-tag-cloud-list">
         <button
           v-for="tag in topTags"
           :key="tag.name"
           type="button"
-          class="flatnotes-tag-cloud-item"
+          class="lamanotes-tag-cloud-item"
           :title="`${tag.count} ${tag.count === 1 ? 'note' : 'notes'}`"
           @click="tagCloudChosen(tag.name)"
           @mousedown.prevent
@@ -606,19 +606,19 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.flatnotes-tag-cloud {
+.lamanotes-tag-cloud {
   width: 100%;
   padding: 0.42rem 0.15rem 0;
 }
 
-.flatnotes-tag-cloud-list {
+.lamanotes-tag-cloud-list {
   display: flex;
   flex-wrap: wrap;
   column-gap: 0.9rem;
   row-gap: 0.18rem;
 }
 
-.flatnotes-tag-cloud-item {
+.lamanotes-tag-cloud-item {
   display: inline-flex;
   align-items: center;
   gap: 0.28rem;
@@ -632,22 +632,22 @@ onBeforeUnmount(() => {
   transition: color 120ms ease;
 }
 
-.flatnotes-tag-cloud-item :deep(svg) {
+.lamanotes-tag-cloud-item :deep(svg) {
   color: rgb(var(--theme-text-very-muted));
 }
 
-.flatnotes-tag-cloud-item:hover,
-.flatnotes-tag-cloud-item:focus-visible {
+.lamanotes-tag-cloud-item:hover,
+.lamanotes-tag-cloud-item:focus-visible {
   color: rgb(var(--theme-brand));
   outline: none;
 }
 
-.flatnotes-tag-cloud-item:focus-visible {
+.lamanotes-tag-cloud-item:focus-visible {
   text-decoration: underline;
   text-underline-offset: 0.2rem;
 }
 
-.flatnotes-search-suggestions {
+.lamanotes-search-suggestions {
   position: absolute;
   z-index: 20;
   width: 100%;
@@ -660,7 +660,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 0.55rem 1.4rem rgb(0 0 0 / 0.18);
 }
 
-.flatnotes-search-suggestion {
+.lamanotes-search-suggestion {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -676,22 +676,22 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-.flatnotes-search-suggestion:last-child {
+.lamanotes-search-suggestion:last-child {
   border-bottom: 0;
 }
 
-.flatnotes-search-suggestion:hover,
-.flatnotes-search-suggestion:focus-visible,
-.flatnotes-search-suggestion.is-selected {
+.lamanotes-search-suggestion:hover,
+.lamanotes-search-suggestion:focus-visible,
+.lamanotes-search-suggestion.is-selected {
   background: rgb(var(--theme-background));
   outline: none;
 }
 
-.flatnotes-search-suggestion.is-selected .flatnotes-search-suggestion-title {
+.lamanotes-search-suggestion.is-selected .lamanotes-search-suggestion-title {
   color: rgb(var(--theme-brand));
 }
 
-.flatnotes-search-suggestion-title {
+.lamanotes-search-suggestion-title {
   overflow: hidden;
   font-size: 0.88rem;
   line-height: 1.25;
@@ -699,7 +699,7 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.flatnotes-search-suggestion-tags {
+.lamanotes-search-suggestion-tags {
   max-width: 12rem;
   overflow: hidden;
   color: rgb(var(--theme-text-muted));
@@ -710,7 +710,7 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 520px) {
-  .flatnotes-search-suggestion-tags {
+  .lamanotes-search-suggestion-tags {
     max-width: 7rem;
   }
 }

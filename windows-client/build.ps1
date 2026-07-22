@@ -1,5 +1,5 @@
 param(
-  [string]$Name = "NirvNotes",
+  [string]$Name = "LamaNotes",
   [string]$Version = "",
   [string]$Commit = ""
 )
@@ -8,13 +8,14 @@ $ErrorActionPreference = "Stop"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $Venv = Join-Path $PSScriptRoot ".venv"
 $Python = Join-Path $Venv "Scripts\python.exe"
-$Icon = Join-Path $Root "client\assets\favicon.ico"
-$Entry = Join-Path $PSScriptRoot "nirvnotes_client.py"
+$Icon = Join-Path $PSScriptRoot "lamanotes.ico"
+$Entry = Join-Path $PSScriptRoot "lamanotes_client.py"
 $Dist = Join-Path $PSScriptRoot "dist"
 $Build = Join-Path $PSScriptRoot "build"
 $UpdaterScript = Join-Path $PSScriptRoot "apply-update.ps1"
+$LegacyMigrationScript = Join-Path $PSScriptRoot "migrate-legacy-install.ps1"
 $ClientDist = Join-Path $Root "client\dist"
-$MetadataDir = Join-Path $env:TEMP "NirvNotes-build-metadata-$PID"
+$MetadataDir = Join-Path $env:TEMP "LamaNotes-build-metadata-$PID"
 $VersionMetadata = Join-Path $MetadataDir "client-version.json"
 
 if (-not $Commit) {
@@ -42,7 +43,7 @@ Get-CimInstance Win32_Process |
     } else {
       ""
     }
-    ($_.Name -eq "NirvNotes.exe" -and $ExecutablePath.StartsWith(
+    ($_.Name -in @("LamaNotes.exe", "NirvNotes.exe") -and $ExecutablePath.StartsWith(
       $ResolvedDist,
       [System.StringComparison]::OrdinalIgnoreCase
     )) -or
@@ -88,10 +89,11 @@ try {
     --distpath $Dist `
     --workpath $Build `
     --specpath $Build `
-    --add-data "$Icon;client\assets" `
+    --add-data "$Icon;." `
     --add-data "$ClientDist;client\dist" `
     --add-data "$VersionMetadata;." `
     --add-data "$UpdaterScript;." `
+    --add-data "$LegacyMigrationScript;." `
     $Entry
 } finally {
   Pop-Location

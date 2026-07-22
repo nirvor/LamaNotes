@@ -1,1 +1,1 @@
-"""NirvNotes server-side public publishing support."""
+"""LamaNotes server-side public publishing support."""

@@ -1,5 +1,5 @@
 <template>
-  <section class="flatnotes-work-viewer">
+  <section class="lamanotes-work-viewer">
     <ToastViewer
       :initialValue="markdown"
       :enhance-note-lead="false"
@@ -28,7 +28,7 @@ const markdown = computed(() => extractWorkMarkdown(props.initialValue || ""));
 </script>
 
 <style lang="scss" scoped>
-.flatnotes-work-viewer {
+.lamanotes-work-viewer {
   position: relative;
   min-width: 0;
   max-width: 100%;

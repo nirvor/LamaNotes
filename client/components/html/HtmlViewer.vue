@@ -1,7 +1,7 @@
 <template>
-  <div ref="viewerElement" class="flatnotes-html-viewer">
+  <div ref="viewerElement" class="lamanotes-html-viewer">
     <div
-      class="toastui-editor-contents flatnotes-html-contents"
+      class="toastui-editor-contents lamanotes-html-contents"
       v-html="html"
     ></div>
   </div>

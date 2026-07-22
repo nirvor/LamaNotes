@@ -1,16 +1,16 @@
 param(
-  [string]$SourceApp = (Join-Path $PSScriptRoot "dist\NirvNotes")
+  [string]$SourceApp = (Join-Path $PSScriptRoot "dist\LamaNotes")
 )
 
 $ErrorActionPreference = "Stop"
 $TestId = [Guid]::NewGuid().ToString("N")
-$InstallDir = Join-Path $env:LOCALAPPDATA "NirvNotesUpdaterTest-$TestId"
-$PayloadRoot = Join-Path $env:TEMP "NirvNotesUpdaterPayload-$TestId"
-$PackagePath = Join-Path $env:LOCALAPPDATA "NirvNotes\updates\updater-test-$TestId.zip"
+$InstallDir = Join-Path $env:LOCALAPPDATA "LamaNotesUpdaterTest-$TestId"
+$PayloadRoot = Join-Path $env:TEMP "LamaNotesUpdaterPayload-$TestId"
+$PackagePath = Join-Path $env:LOCALAPPDATA "LamaNotes\updates\updater-test-$TestId.zip"
 $TestProcesses = @()
 
 try {
-  if (-not (Test-Path -LiteralPath (Join-Path $SourceApp "NirvNotes.exe"))) {
+  if (-not (Test-Path -LiteralPath (Join-Path $SourceApp "LamaNotes.exe"))) {
     throw "Build the Windows app before running this updater integration test."
   }
 
@@ -19,10 +19,10 @@ try {
   New-Item -ItemType Directory -Path (Split-Path -Parent $PackagePath) -Force | Out-Null
   Copy-Item -Path (Join-Path $SourceApp "*") -Destination $InstallDir -Recurse -Force
   Copy-Item -Path (Join-Path $SourceApp "*") -Destination (Join-Path $PayloadRoot "app") -Recurse -Force
-  Copy-Item -LiteralPath (Join-Path $env:WINDIR "System32\ping.exe") -Destination (Join-Path $InstallDir "NirvNotes.exe") -Force
+  Copy-Item -LiteralPath (Join-Path $env:WINDIR "System32\ping.exe") -Destination (Join-Path $InstallDir "LamaNotes.exe") -Force
   $TestProcesses = @(
-    Start-Process -FilePath (Join-Path $InstallDir "NirvNotes.exe") -ArgumentList "-t", "127.0.0.1" -WindowStyle Hidden -PassThru
-    Start-Process -FilePath (Join-Path $InstallDir "NirvNotes.exe") -ArgumentList "-t", "127.0.0.1" -WindowStyle Hidden -PassThru
+    Start-Process -FilePath (Join-Path $InstallDir "LamaNotes.exe") -ArgumentList "-t", "127.0.0.1" -WindowStyle Hidden -PassThru
+    Start-Process -FilePath (Join-Path $InstallDir "LamaNotes.exe") -ArgumentList "-t", "127.0.0.1" -WindowStyle Hidden -PassThru
   )
   Set-Content -LiteralPath (Join-Path $PayloadRoot "app\_internal\client-version.json") -Value '{"version":"updater-integration-test"}' -Encoding UTF8
   Compress-Archive -Path (Join-Path $PayloadRoot "*") -DestinationPath $PackagePath -Force

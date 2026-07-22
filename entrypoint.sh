@@ -1,40 +1,39 @@
 #!/bin/sh
 
 [ "$EXEC_TOOL" ] || EXEC_TOOL=gosu
-[ "$FLATNOTES_HOST" ] || FLATNOTES_HOST=0.0.0.0
-[ "$FLATNOTES_PORT" ] || FLATNOTES_PORT=8080
+LAMANOTES_HOST=${LAMANOTES_HOST:-${FLATNOTES_HOST:-0.0.0.0}}
+LAMANOTES_PORT=${LAMANOTES_PORT:-${FLATNOTES_PORT:-8080}}
+LAMANOTES_PATH=${LAMANOTES_PATH:-${FLATNOTES_PATH:-/data}}
 
 set -e
 
 echo "\
 ======================================
-======== Welcome to NirvNotes ========
+========= Welcome to LamaNotes =======
 ======================================
 
-HTML-first, flat-folder notes for a
-clean personal knowledge workflow.
-
-──────────────────────────────────────
+Fast local editing with an explicit,
+private HTML note library.
 "
 
-nirvnotes_command="python -m \
+lamanotes_command="python -m \
                   uvicorn \
                   main:app \
                   --app-dir server \
-                  --host ${FLATNOTES_HOST} \
-                  --port ${FLATNOTES_PORT} \
+                  --host ${LAMANOTES_HOST} \
+                  --port ${LAMANOTES_PORT} \
                   --proxy-headers \
                   --forwarded-allow-ips '*'"
 
 if [ `id -u` -eq 0 ] && [ `id -g` -eq 0 ]; then
     echo Setting file permissions...
-    chown -R ${PUID}:${PGID} ${FLATNOTES_PATH}
+    chown -R ${PUID}:${PGID} ${LAMANOTES_PATH}
 
-    echo Starting NirvNotes as user ${PUID}...
-    exec ${EXEC_TOOL} ${PUID}:${PGID} ${nirvnotes_command}
+    echo Starting LamaNotes as user ${PUID}...
+    exec ${EXEC_TOOL} ${PUID}:${PGID} ${lamanotes_command}
 
 else
     echo "A user was set by docker, skipping file permission changes."
-    echo Starting NirvNotes as user $(id -u)...
-    exec ${nirvnotes_command}
+    echo Starting LamaNotes as user $(id -u)...
+    exec ${lamanotes_command}
 fi

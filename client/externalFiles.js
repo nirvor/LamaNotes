@@ -93,7 +93,7 @@ function nativeWritableHandle(payload) {
       Boolean(force),
     );
     if (savedPayload?.conflict) {
-      const error = new Error("The file changed outside NirvNotes.");
+      const error = new Error("The file changed outside LamaNotes.");
       error.code = "external-conflict";
       error.external = savedPayload.external;
       throw error;

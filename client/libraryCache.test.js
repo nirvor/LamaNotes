@@ -41,7 +41,7 @@ test("deleted titles leave both warm note and semantic index", () => {
   setWarmIndex(
     [
       { title: "Keep", tags: ["private"] },
-      { title: "Delete", tags: ["flatnotes"] },
+      { title: "Delete", tags: ["lamanotes"] },
     ],
     storage,
   );

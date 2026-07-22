@@ -46,10 +46,10 @@ function splitTags(value = "") {
   ];
 }
 
-function findFlatnotesTagsMeta(content = "") {
+function findLamaNotesTagsMeta(content = "") {
   return [...String(content).matchAll(metaTagPattern)].find(
     (match) =>
-      getAttributeValue(match[0], "name").toLowerCase() === "flatnotes-tags",
+      getAttributeValue(match[0], "name").toLowerCase() === "lamanotes-tags",
   )?.[0];
 }
 
@@ -63,9 +63,9 @@ function replaceContentAttribute(metaMarkup, value) {
   return `${metaMarkup.slice(0, -closing.length).trimEnd()} content="${value}"${closing}`;
 }
 
-function setFlatnotesMetaTags(content = "", tags = []) {
+function setLamaNotesMetaTags(content = "", tags = []) {
   const value = [...new Set(tags.map(normalizeTag).filter(Boolean))].join(",");
-  const existingMeta = findFlatnotesTagsMeta(content);
+  const existingMeta = findLamaNotesTagsMeta(content);
   if (existingMeta) {
     return String(content).replace(
       existingMeta,
@@ -73,7 +73,7 @@ function setFlatnotesMetaTags(content = "", tags = []) {
     );
   }
 
-  const metaMarkup = `<meta name="flatnotes-tags" content="${value}">`;
+  const metaMarkup = `<meta name="lamanotes-tags" content="${value}">`;
   if (/<\/head>/i.test(content)) {
     return String(content).replace(/<\/head>/i, `    ${metaMarkup}\n  </head>`);
   }
@@ -115,8 +115,8 @@ function stripLegacyTagFromHtml(content = "", tag = "") {
   );
 }
 
-export function getFlatnotesMetaTags(content = "") {
-  const metaMarkup = findFlatnotesTagsMeta(content);
+export function getLamaNotesMetaTags(content = "") {
+  const metaMarkup = findLamaNotesTagsMeta(content);
   return metaMarkup ? splitTags(getAttributeValue(metaMarkup, "content")) : [];
 }
 
@@ -135,8 +135,8 @@ export function synchronizeDocumentTags({
     return content;
   }
 
-  const metadataOnlyTags = getFlatnotesMetaTags(content).filter(isSystemTag);
-  return setFlatnotesMetaTags(content, [...visibleTags, ...metadataOnlyTags]);
+  const metadataOnlyTags = getLamaNotesMetaTags(content).filter(isSystemTag);
+  return setLamaNotesMetaTags(content, [...visibleTags, ...metadataOnlyTags]);
 }
 
 export { isSystemTag };
@@ -152,7 +152,7 @@ export function documentHasSystemTag(
   }
 
   return (
-    getFlatnotesMetaTags(content).includes(normalizedTag) ||
+    getLamaNotesMetaTags(content).includes(normalizedTag) ||
     getLegacyTagOnlyTags(content).includes(normalizedTag)
   );
 }
@@ -173,7 +173,7 @@ export function setDocumentSystemTag({
     return setWorkMarkdownTag(content, normalizedTag, enabled);
   }
 
-  const existingMetaTags = getFlatnotesMetaTags(content);
+  const existingMetaTags = getLamaNotesMetaTags(content);
   if (isWorkNoteHtml(content)) {
     const markdown = setWorkMarkdownTag(
       extractWorkMarkdown(content),
@@ -197,5 +197,5 @@ export function setDocumentSystemTag({
   if (enabled) {
     nextTags.push(normalizedTag);
   }
-  return setFlatnotesMetaTags(strippedContent, nextTags);
+  return setLamaNotesMetaTags(strippedContent, nextTags);
 }

@@ -3,13 +3,13 @@ import test from "node:test";
 
 import {
   documentHasSystemTag,
-  getFlatnotesMetaTags,
+  getLamaNotesMetaTags,
   setDocumentSystemTag,
   synchronizeDocumentTags,
 } from "./noteSystemTags.js";
 
 const researchNote = `<!doctype html>
-<html><head><meta name="flatnotes-tags" content="private,research"></head>
+<html><head><meta name="lamanotes-tags" content="private,research"></head>
 <body><article><h1>Test</h1><p>#private #research #pinned</p></article></body></html>`;
 
 test("pin state migrates from visible tag to metadata", () => {
@@ -20,7 +20,7 @@ test("pin state migrates from visible tag to metadata", () => {
     format: "html",
     enabled: true,
   });
-  assert.deepEqual(getFlatnotesMetaTags(pinned), [
+  assert.deepEqual(getLamaNotesMetaTags(pinned), [
     "private",
     "research",
     "pinned",
@@ -35,7 +35,7 @@ test("pin state migrates from visible tag to metadata", () => {
     enabled: false,
   });
   assert.equal(documentHasSystemTag(unpinned, "pinned", "html"), false);
-  assert.deepEqual(getFlatnotesMetaTags(unpinned), ["private", "research"]);
+  assert.deepEqual(getLamaNotesMetaTags(unpinned), ["private", "research"]);
 });
 
 test("legacy markdown can still be pinned", () => {
@@ -55,8 +55,8 @@ test("legacy markdown can still be pinned", () => {
 
 test("visible HTML tags replace stale non-system metadata on save", () => {
   const stale = `<!doctype html>
-<html><head><meta name="flatnotes-tags" content="private,pinned,robotics"></head>
-<body><article><footer class="tags" data-flatnotes-component="tags">
+<html><head><meta name="lamanotes-tags" content="private,pinned,robotics"></head>
+<body><article><footer class="tags" data-lamanotes-component="tags">
   <span>#private</span><span>#nirv-bot</span>
 </footer></article></body></html>`;
 
@@ -65,7 +65,7 @@ test("visible HTML tags replace stale non-system metadata on save", () => {
     previousContent: stale,
   });
 
-  assert.deepEqual(getFlatnotesMetaTags(synchronized), [
+  assert.deepEqual(getLamaNotesMetaTags(synchronized), [
     "private",
     "nirv-bot",
     "pinned",
@@ -75,7 +75,7 @@ test("visible HTML tags replace stale non-system metadata on save", () => {
 
 test("removing the final visible HTML tag clears non-system metadata", () => {
   const previous = `<!doctype html>
-<html><head><meta name="flatnotes-tags" content="private,pinned"></head>
+<html><head><meta name="lamanotes-tags" content="private,pinned"></head>
 <body><article><p>#private</p></article></body></html>`;
   const content = previous.replace("<p>#private</p>", "");
 
@@ -84,5 +84,5 @@ test("removing the final visible HTML tag clears non-system metadata", () => {
     previousContent: previous,
   });
 
-  assert.deepEqual(getFlatnotesMetaTags(synchronized), ["pinned"]);
+  assert.deepEqual(getLamaNotesMetaTags(synchronized), ["pinned"]);
 });

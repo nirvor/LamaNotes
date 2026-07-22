@@ -1,16 +1,16 @@
 <template>
-  <div class="flatnotes-html-editor">
-    <div class="flatnotes-html-editor-toolbar">
+  <div class="lamanotes-html-editor">
+    <div class="lamanotes-html-editor-toolbar">
       <NoteKindSwitch
         v-if="showKindSwitch"
         :current-kind="currentKind"
         @set-kind="setKind"
       />
-      <div class="flatnotes-html-editor-toolbar-group">
-        <span class="flatnotes-html-editor-label">HTML</span>
+      <div class="lamanotes-html-editor-toolbar-group">
+        <span class="lamanotes-html-editor-label">HTML</span>
         <select
           v-model="selectedSnippet"
-          class="flatnotes-html-editor-select"
+          class="lamanotes-html-editor-select"
           aria-label="HTML component"
         >
           <option
@@ -23,7 +23,7 @@
         </select>
         <button type="button" @click="insertSelectedSnippet">Insert</button>
       </div>
-      <div class="flatnotes-html-editor-toolbar-group">
+      <div class="lamanotes-html-editor-toolbar-group">
         <button type="button" @click="chooseImage">Media</button>
       </div>
       <input
@@ -37,7 +37,7 @@
     <textarea
       ref="textarea"
       v-model="content"
-      class="flatnotes-html-editor-source"
+      class="lamanotes-html-editor-source"
       rows="1"
       spellcheck="false"
       @input="contentInputHandler"
@@ -470,7 +470,7 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
-.flatnotes-html-editor {
+.lamanotes-html-editor {
   display: flex;
   min-height: 65vh;
   flex-direction: column;
@@ -480,7 +480,7 @@ defineExpose({
   background-color: rgb(var(--theme-background));
 }
 
-.flatnotes-html-editor-toolbar {
+.lamanotes-html-editor-toolbar {
   display: flex;
   min-height: 1.82rem;
   align-items: center;
@@ -495,19 +495,19 @@ defineExpose({
   font-weight: 600;
 }
 
-.flatnotes-html-editor-toolbar-group {
+.lamanotes-html-editor-toolbar-group {
   display: flex;
   align-items: center;
   gap: 0.32rem;
   min-width: 0;
 }
 
-.flatnotes-html-editor-label {
+.lamanotes-html-editor-label {
   flex: 0 0 auto;
 }
 
-.flatnotes-html-editor-select,
-.flatnotes-html-editor-toolbar button {
+.lamanotes-html-editor-select,
+.lamanotes-html-editor-toolbar button {
   min-height: 1.42rem;
   border: 1px solid rgb(var(--theme-border));
   border-radius: 5px;
@@ -518,19 +518,19 @@ defineExpose({
   touch-action: manipulation;
 }
 
-.flatnotes-html-editor-select {
+.lamanotes-html-editor-select {
   min-width: min(11rem, 48vw);
   max-width: 100%;
   outline: none;
 }
 
-.flatnotes-html-editor-select:focus-visible,
-.flatnotes-html-editor-toolbar button:hover,
-.flatnotes-html-editor-toolbar button:focus-visible {
+.lamanotes-html-editor-select:focus-visible,
+.lamanotes-html-editor-toolbar button:hover,
+.lamanotes-html-editor-toolbar button:focus-visible {
   border-color: rgb(var(--theme-brand));
 }
 
-.flatnotes-html-editor-source {
+.lamanotes-html-editor-source {
   min-height: 65vh;
   flex: 0 0 auto;
   resize: none;
@@ -548,18 +548,18 @@ defineExpose({
 
 @media (max-width: 640px) and (pointer: coarse),
   (max-width: 640px) and (hover: none) {
-  .flatnotes-html-editor-toolbar {
+  .lamanotes-html-editor-toolbar {
     min-height: 2.35rem;
     gap: 0.4rem;
     padding: 0.26rem;
   }
 
-  .flatnotes-html-editor-toolbar-group {
+  .lamanotes-html-editor-toolbar-group {
     gap: 0.45rem;
   }
 
-  .flatnotes-html-editor-select,
-  .flatnotes-html-editor-toolbar button {
+  .lamanotes-html-editor-select,
+  .lamanotes-html-editor-toolbar button {
     min-height: 2rem;
     padding: 0 0.65rem;
   }

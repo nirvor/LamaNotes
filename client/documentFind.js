@@ -7,8 +7,8 @@ import {
   watch,
 } from "vue";
 
-const allMatchesHighlightName = "nirvnotes-find-matches";
-const activeMatchHighlightName = "nirvnotes-find-active";
+const allMatchesHighlightName = "lamanotes-find-matches";
+const activeMatchHighlightName = "lamanotes-find-active";
 const skippedElementSelector =
   "script, style, template, textarea, input, button";
 

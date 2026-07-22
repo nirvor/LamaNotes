@@ -6,6 +6,7 @@ import { authCheck, clearApiCaches } from "./api.js";
 import { desktopShell, setDesktopWindowTitle } from "./desktopShell.js";
 import { clearStoredToken, getStoredToken } from "./tokenStorage.js";
 import { scheduleIdleWork } from "./performanceScheduling.js";
+import { PRODUCT_NAME } from "./brand.js";
 
 const loadHomeView = () => import("./views/Home.vue");
 const loadNoteView = () => import("./views/Note.vue");
@@ -127,7 +128,7 @@ router.beforeEach(async (to) => {
 });
 
 router.afterEach((to) => {
-  let title = "NirvNotes";
+  let title = PRODUCT_NAME;
   if (to.name === "note") {
     if (to.params.title) {
       title = String(to.params.title);

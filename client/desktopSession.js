@@ -1,6 +1,6 @@
-const DESKTOP_FILE_SESSION_KEY = "nirvnotes:desktop-files:v1";
-const DESKTOP_ROUTE_SESSION_KEY = "nirvnotes:desktop-route:v1";
-const DESKTOP_SCROLL_PREFIX = "nirvnotes:route-scroll:";
+const DESKTOP_FILE_SESSION_KEY = "lamanotes:desktop-files:v1";
+const DESKTOP_ROUTE_SESSION_KEY = "lamanotes:desktop-route:v1";
+const DESKTOP_SCROLL_PREFIX = "lamanotes:route-scroll:";
 
 export function loadDesktopFileSession() {
   try {

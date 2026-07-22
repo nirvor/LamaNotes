@@ -14,7 +14,7 @@ from .normalizer import PublicProjection
 class PublicationStagingStore:
     def __init__(self, storage_path: str) -> None:
         self.root = (
-            Path(storage_path).resolve() / ".nirvnotes-publish"
+            Path(storage_path).resolve() / ".lamanotes-publish"
         ).resolve()
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
 

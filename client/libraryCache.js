@@ -1,4 +1,4 @@
-const cacheKey = "nirvnotes:library-cache:v1";
+const cacheKey = "lamanotes:library-cache:v1";
 const cacheVersion = 1;
 const maxCachedNotes = 4;
 const maxCachedNoteCharacters = 600_000;

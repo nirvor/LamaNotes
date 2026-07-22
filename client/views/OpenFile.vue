@@ -1,8 +1,8 @@
 <template>
   <section
     :class="[
-      'flatnotes-open-file min-w-0 max-w-full',
-      { 'flatnotes-document-find-open': findVisible },
+      'lamanotes-open-file min-w-0 max-w-full',
+      { 'lamanotes-document-find-open': findVisible },
     ]"
     @dblclick="openFileDblClickHandler"
     @pointerup="openFilePointerUpHandler"
@@ -27,27 +27,27 @@
     />
 
     <div
-      class="flatnotes-open-file-heading"
+      class="lamanotes-open-file-heading"
       :class="{
-        'flatnotes-open-file-heading-desktop': desktopShell.enabled,
+        'lamanotes-open-file-heading-desktop': desktopShell.enabled,
       }"
     >
       <div class="min-w-0">
-        <div class="flatnotes-open-file-kicker-line">
-          <span class="flatnotes-open-file-kicker">
+        <div class="lamanotes-open-file-kicker-line">
+          <span class="lamanotes-open-file-kicker">
             <SvgIcon type="mdi" :path="mdiHarddisk" size="0.68rem" />
             Local
           </span>
           <span
             v-for="item in metadataItems"
             :key="item.label"
-            class="flatnotes-open-file-meta"
+            class="lamanotes-open-file-meta"
           >
             <span>{{ item.label }}</span>
             <strong>{{ item.value }}</strong>
           </span>
         </div>
-        <h1 v-if="!desktopShell.enabled" class="flatnotes-open-file-title">
+        <h1 v-if="!desktopShell.enabled" class="lamanotes-open-file-title">
           {{ activeFile ? activeFile.name : "Open a local file" }}
         </h1>
       </div>
@@ -62,10 +62,10 @@
       @change="fileInputChanged"
     />
 
-    <div v-if="visibleStatusMessage" class="flatnotes-open-file-strip">
+    <div v-if="visibleStatusMessage" class="lamanotes-open-file-strip">
       <span
-        class="flatnotes-open-file-status"
-        :class="{ 'flatnotes-open-file-status-error': statusTone === 'error' }"
+        class="lamanotes-open-file-status"
+        :class="{ 'lamanotes-open-file-status-error': statusTone === 'error' }"
       >
         <SvgIcon type="mdi" :path="statusIcon" size="0.76rem" />
         {{ visibleStatusMessage }}
@@ -74,7 +74,7 @@
 
     <div
       v-if="activeFile?.externalState"
-      class="flatnotes-open-file-conflict print:hidden"
+      class="lamanotes-open-file-conflict print:hidden"
       role="status"
     >
       <SvgIcon
@@ -136,7 +136,7 @@
       </button>
     </div>
 
-    <div ref="openFileContent" class="flatnotes-open-file-content">
+    <div ref="openFileContent" class="lamanotes-open-file-content">
       <SourceEditor
         v-if="activeFile && editMode"
         ref="editorTextarea"
@@ -159,12 +159,12 @@
 
       <pre
         v-else-if="activeFile && activeFile.previewMode === 'plain'"
-        class="flatnotes-open-file-plain-preview"
+        class="lamanotes-open-file-plain-preview"
         >{{ activeFile.previewContent }}</pre
       >
       <p
         v-if="activeFile?.largeFile && activeFile.previewTruncated && !editMode"
-        class="flatnotes-large-file-note"
+        class="lamanotes-large-file-note"
       >
         Fast preview shortened. Edit opens the complete file.
       </p>
@@ -196,18 +196,18 @@
 
     <div
       v-if="compareOpen && activeFile?.externalChange"
-      class="flatnotes-file-compare-backdrop print:hidden"
+      class="lamanotes-file-compare-backdrop print:hidden"
       role="presentation"
       @click.self="compareOpen = false"
     >
       <section
-        class="flatnotes-file-compare"
+        class="lamanotes-file-compare"
         role="dialog"
         aria-modal="true"
         aria-label="Compare local file versions"
       >
         <header>
-          <strong>File changed outside NirvNotes</strong>
+          <strong>File changed outside LamaNotes</strong>
           <button
             type="button"
             title="Close comparison"
@@ -217,7 +217,7 @@
             <SvgIcon type="mdi" :path="mdiClose" size="0.95rem" />
           </button>
         </header>
-        <div class="flatnotes-file-compare-grid">
+        <div class="lamanotes-file-compare-grid">
           <div>
             <span>My version</span>
             <pre>{{ activeFile.draftContent }}</pre>
@@ -420,7 +420,7 @@ const metadataItems = computed(() => {
 });
 const externalStateMessage = computed(() => {
   if (activeFile.value?.externalState === "deleted") {
-    return "The original file was deleted outside NirvNotes.";
+    return "The original file was deleted outside LamaNotes.";
   }
   return "The file changed on disk while this version has unsaved edits.";
 });
@@ -446,19 +446,19 @@ const draftPersistence = createDebouncedWork(persistDraftState, 240);
 onMounted(() => {
   if (!supportsFileHandlingLaunchQueue() && !supportsNativeFileBridge()) {
     showStatus(
-      "This browser can preview files here, but Windows file opening needs the installed NirvNotes app.",
+      "This browser can preview files here, but Windows file opening needs the installed LamaNotes app.",
     );
   }
   startNativeWatcher();
   window.addEventListener("scroll", scheduleActiveScrollSave, {
     passive: true,
   });
-  window.addEventListener("nirvnotes:text-drop", insertExternalDroppedText);
+  window.addEventListener("lamanotes:text-drop", insertExternalDroppedText);
   window.addEventListener(
-    "nirvnotes:text-drag-position",
+    "lamanotes:text-drag-position",
     previewExternalTextDrop,
   );
-  window.addEventListener("nirvnotes:text-drag-end", endExternalTextDrop);
+  window.addEventListener("lamanotes:text-drag-end", endExternalTextDrop);
   window.addEventListener("visibilitychange", nativeWatcherVisibilityChanged);
   window.addEventListener("pagehide", flushDraftPersistence);
 });
@@ -490,7 +490,7 @@ watchEffect(() => {
 });
 watchEffect(() => {
   document.body.classList.toggle(
-    "nirvnotes-text-drop-enabled",
+    "lamanotes-text-drop-enabled",
     Boolean(activeFile.value),
   );
 });
@@ -503,22 +503,22 @@ onUnmounted(() => {
   window.clearTimeout(scrollSaveTimer);
   saveActiveScroll();
   window.removeEventListener("scroll", scheduleActiveScrollSave);
-  window.removeEventListener("nirvnotes:text-drop", insertExternalDroppedText);
+  window.removeEventListener("lamanotes:text-drop", insertExternalDroppedText);
   window.removeEventListener(
-    "nirvnotes:text-drag-position",
+    "lamanotes:text-drag-position",
     previewExternalTextDrop,
   );
-  window.removeEventListener("nirvnotes:text-drag-end", endExternalTextDrop);
+  window.removeEventListener("lamanotes:text-drag-end", endExternalTextDrop);
   window.removeEventListener(
     "visibilitychange",
     nativeWatcherVisibilityChanged,
   );
   window.removeEventListener("pagehide", flushDraftPersistence);
   document.body.classList.remove(
-    "nirvnotes-text-drop-enabled",
-    "nirvnotes-native-text-drag-active",
+    "lamanotes-text-drop-enabled",
+    "lamanotes-native-text-drag-active",
   );
-  delete document.body.dataset.nirvnotesTextDropLabel;
+  delete document.body.dataset.lamanotesTextDropLabel;
   globalStore.clearNoteActions();
 });
 
@@ -559,14 +559,14 @@ async function previewExternalTextDrop(event) {
     fallback: textDropActivatedEditMode ? "end" : "selection",
   });
   if (target?.lineNumber) {
-    document.body.dataset.nirvnotesTextDropLabel = `Insert - line ${target.lineNumber}`;
+    document.body.dataset.lamanotesTextDropLabel = `Insert - line ${target.lineNumber}`;
   }
 }
 
 function clearExternalTextDropPreview() {
   editorTextarea.value?.clearDroppedTextPosition?.();
   latestTextDropPosition = null;
-  delete document.body.dataset.nirvnotesTextDropLabel;
+  delete document.body.dataset.lamanotesTextDropLabel;
 }
 
 function endExternalTextDrop(event) {
@@ -699,7 +699,7 @@ async function keepActiveFileAsNote() {
     );
     toast.add(
       getToastOptions(
-        "Local snapshot added to the NirvNotes library.",
+        "Local snapshot added to the LamaNotes library.",
         "Note Kept",
         "success",
       ),
@@ -734,7 +734,7 @@ async function chooseFile() {
   }
 
   if (supportsNativeFileBridge()) {
-    window.dispatchEvent(new CustomEvent("nirvnotes:open-native-file-dialog"));
+    window.dispatchEvent(new CustomEvent("lamanotes:open-native-file-dialog"));
     return;
   }
 
@@ -901,7 +901,7 @@ function createLocalDraft(draftId) {
 }
 
 function localDraftNameKey(draftId) {
-  return `nirvnotes:local-draft-name:${draftId}`;
+  return `lamanotes:local-draft-name:${draftId}`;
 }
 
 function suggestedDraftName(content = "") {
@@ -1128,7 +1128,7 @@ function compactLeadingMarkdownMetadata(markdown = "") {
   }
 
   const metaLine = metaValues.map(escapeHtml).join(" | ");
-  return `<p class="flatnotes-external-meta-line"><strong>Meta</strong> ${metaLine}</p>\n\n${rest}`;
+  return `<p class="lamanotes-external-meta-line"><strong>Meta</strong> ${metaLine}</p>\n\n${rest}`;
 }
 
 function fencedCode(content = "", language = "") {
@@ -1376,7 +1376,7 @@ function restoreLaunchSession(session) {
 
 function activeScrollStorageKey() {
   const identity = activeFile.value?.path || activeFile.value?.draftStorageKey;
-  return identity ? `nirvnotes:document-scroll:${identity}` : "";
+  return identity ? `lamanotes:document-scroll:${identity}` : "";
 }
 
 function scheduleActiveScrollSave() {
@@ -1546,7 +1546,7 @@ function reportEditorReady() {
     return;
   }
   lastEditorReadyGeneration = localLoadGeneration;
-  performance.mark("nirvnotes-editor-ready");
+  performance.mark("lamanotes-editor-ready");
   reportLocalReady("editor");
 }
 
@@ -1566,7 +1566,7 @@ function reportFileReady() {
         return;
       }
       lastFileReadyGeneration = generation;
-      performance.mark("nirvnotes-file-ready");
+      performance.mark("lamanotes-file-ready");
       reportLocalReady("file");
     });
   });
@@ -1602,26 +1602,26 @@ function showStatus(message, tone = "info") {
 </script>
 
 <style scoped>
-.flatnotes-open-file {
+.lamanotes-open-file {
   width: min(100%, 68rem);
   margin-inline: auto;
 }
 
-.flatnotes-open-file-heading {
+.lamanotes-open-file-heading {
   min-width: 0;
   max-width: 100%;
   margin-bottom: 0.68rem;
 }
 
-.flatnotes-open-file-heading-desktop {
+.lamanotes-open-file-heading-desktop {
   margin-bottom: 0.38rem;
 }
 
-.flatnotes-open-file-heading-desktop .flatnotes-open-file-kicker-line {
+.lamanotes-open-file-heading-desktop .lamanotes-open-file-kicker-line {
   margin-bottom: 0;
 }
 
-.flatnotes-open-file-kicker-line {
+.lamanotes-open-file-kicker-line {
   display: flex;
   min-width: 0;
   flex-wrap: wrap;
@@ -1630,7 +1630,7 @@ function showStatus(message, tone = "info") {
   margin-bottom: 0.22rem;
 }
 
-.flatnotes-open-file-kicker {
+.lamanotes-open-file-kicker {
   display: inline-flex;
   align-items: center;
   gap: 0.18rem;
@@ -1642,7 +1642,7 @@ function showStatus(message, tone = "info") {
   text-transform: uppercase;
 }
 
-.flatnotes-open-file-title {
+.lamanotes-open-file-title {
   display: block;
   width: 100%;
   min-width: 0;
@@ -1655,7 +1655,7 @@ function showStatus(message, tone = "info") {
   line-height: 1.15;
 }
 
-.flatnotes-large-file-note {
+.lamanotes-large-file-note {
   margin: 0;
   border-top: 1px solid rgb(var(--theme-border) / 0.72);
   padding: 0.42rem 0.1rem;
@@ -1664,7 +1664,7 @@ function showStatus(message, tone = "info") {
   line-height: 1.3;
 }
 
-.flatnotes-open-file-strip {
+.lamanotes-open-file-strip {
   display: flex;
   min-height: 1.42rem;
   flex-wrap: wrap;
@@ -1676,8 +1676,8 @@ function showStatus(message, tone = "info") {
   line-height: 1.1;
 }
 
-.flatnotes-open-file-status,
-.flatnotes-open-file-meta {
+.lamanotes-open-file-status,
+.lamanotes-open-file-meta {
   display: inline-flex;
   min-height: 1.18rem;
   align-items: center;
@@ -1687,15 +1687,15 @@ function showStatus(message, tone = "info") {
   line-height: 1;
 }
 
-.flatnotes-open-file-status {
+.lamanotes-open-file-status {
   color: rgb(var(--theme-text));
 }
 
-.flatnotes-open-file-status-error {
+.lamanotes-open-file-status-error {
   color: rgb(var(--theme-danger));
 }
 
-.flatnotes-open-file-conflict {
+.lamanotes-open-file-conflict {
   display: flex;
   min-height: 1.82rem;
   align-items: center;
@@ -1708,8 +1708,8 @@ function showStatus(message, tone = "info") {
   line-height: 1.25;
 }
 
-.flatnotes-open-file-conflict button,
-.flatnotes-file-compare button {
+.lamanotes-open-file-conflict button,
+.lamanotes-file-compare button {
   display: inline-grid;
   width: 1.65rem;
   height: 1.65rem;
@@ -1721,31 +1721,31 @@ function showStatus(message, tone = "info") {
   background: transparent;
 }
 
-.flatnotes-open-file-conflict button:hover,
-.flatnotes-file-compare button:hover {
+.lamanotes-open-file-conflict button:hover,
+.lamanotes-file-compare button:hover {
   border-color: rgb(var(--theme-text-muted));
   color: rgb(var(--theme-text));
 }
 
-.flatnotes-open-file-meta {
+.lamanotes-open-file-meta {
   border: 1px solid rgb(var(--theme-border));
   background-color: rgb(var(--theme-background-elevated) / 0.45);
   font-size: 0.72rem;
 }
 
-.flatnotes-open-file-meta span {
+.lamanotes-open-file-meta span {
   color: rgb(var(--theme-text-very-muted));
   font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;
 }
 
-.flatnotes-open-file-meta strong {
+.lamanotes-open-file-meta strong {
   color: rgb(var(--theme-text));
   font-weight: 600;
 }
 
-.flatnotes-open-file-plain-preview {
+.lamanotes-open-file-plain-preview {
   margin: 0;
   min-height: min(58vh, 38rem);
   overflow-x: auto;
@@ -1761,7 +1761,7 @@ function showStatus(message, tone = "info") {
   line-height: 1.5;
 }
 
-:deep(.flatnotes-external-meta-line) {
+:deep(.lamanotes-external-meta-line) {
   max-width: 100%;
   margin: 0 0 0.7rem 0 !important;
   color: rgb(var(--theme-text-muted));
@@ -1772,7 +1772,7 @@ function showStatus(message, tone = "info") {
   white-space: nowrap;
 }
 
-:deep(.flatnotes-external-meta-line strong) {
+:deep(.lamanotes-external-meta-line strong) {
   color: rgb(var(--theme-text-very-muted));
   font-size: 0.68rem;
   font-weight: 700;
@@ -1780,22 +1780,22 @@ function showStatus(message, tone = "info") {
   text-transform: uppercase;
 }
 
-.flatnotes-open-file
-  :deep(.toastui-editor-contents:not(.flatnotes-html-contents) h1) {
+.lamanotes-open-file
+  :deep(.toastui-editor-contents:not(.lamanotes-html-contents) h1) {
   font-size: 1.42rem;
 }
 
-.flatnotes-open-file
-  :deep(.toastui-editor-contents:not(.flatnotes-html-contents) h2) {
+.lamanotes-open-file
+  :deep(.toastui-editor-contents:not(.lamanotes-html-contents) h2) {
   font-size: 1.22rem;
 }
 
-.flatnotes-open-file
-  :deep(.toastui-editor-contents:not(.flatnotes-html-contents) h3) {
+.lamanotes-open-file
+  :deep(.toastui-editor-contents:not(.lamanotes-html-contents) h3) {
   font-size: 1.08rem;
 }
 
-.flatnotes-file-compare-backdrop {
+.lamanotes-file-compare-backdrop {
   position: fixed;
   z-index: 80;
   inset: 0;
@@ -1805,7 +1805,7 @@ function showStatus(message, tone = "info") {
   background: rgb(0 0 0 / 0.62);
 }
 
-.flatnotes-file-compare {
+.lamanotes-file-compare {
   display: grid;
   width: min(64rem, 100%);
   max-height: min(84vh, 50rem);
@@ -1817,7 +1817,7 @@ function showStatus(message, tone = "info") {
   box-shadow: 0 1rem 3rem rgb(0 0 0 / 0.32);
 }
 
-.flatnotes-file-compare header {
+.lamanotes-file-compare header {
   display: flex;
   min-height: 2.4rem;
   align-items: center;
@@ -1828,24 +1828,24 @@ function showStatus(message, tone = "info") {
   font-size: 0.82rem;
 }
 
-.flatnotes-file-compare-grid {
+.lamanotes-file-compare-grid {
   display: grid;
   min-height: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.flatnotes-file-compare-grid > div {
+.lamanotes-file-compare-grid > div {
   display: grid;
   min-width: 0;
   min-height: 0;
   grid-template-rows: auto 1fr;
 }
 
-.flatnotes-file-compare-grid > div + div {
+.lamanotes-file-compare-grid > div + div {
   border-left: 1px solid rgb(var(--theme-border));
 }
 
-.flatnotes-file-compare-grid span {
+.lamanotes-file-compare-grid span {
   padding: 0.35rem 0.65rem;
   color: rgb(var(--theme-text-muted));
   background: rgb(var(--theme-background-elevated) / 0.52);
@@ -1854,7 +1854,7 @@ function showStatus(message, tone = "info") {
   text-transform: uppercase;
 }
 
-.flatnotes-file-compare-grid pre {
+.lamanotes-file-compare-grid pre {
   min-width: 0;
   overflow: auto;
   margin: 0;
@@ -1870,17 +1870,17 @@ function showStatus(message, tone = "info") {
 }
 
 @media (max-width: 720px) {
-  .flatnotes-file-compare-grid {
+  .lamanotes-file-compare-grid {
     grid-template-columns: 1fr;
     overflow-y: auto;
   }
 
-  .flatnotes-file-compare-grid > div + div {
+  .lamanotes-file-compare-grid > div + div {
     border-top: 1px solid rgb(var(--theme-border));
     border-left: 0;
   }
 
-  .flatnotes-file-compare-grid pre {
+  .lamanotes-file-compare-grid pre {
     max-height: 34vh;
   }
 }

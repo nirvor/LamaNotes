@@ -39,7 +39,7 @@ export async function checkNativeClientUpdate(force = false) {
     })
     .catch((error) => {
       nativeClientUpdate.checked = true;
-      nativeClientUpdate.error = "Could not check for NirvNotes updates.";
+      nativeClientUpdate.error = "Could not check for LamaNotes updates.";
       console.error(error);
       return nativeClientUpdate;
     })

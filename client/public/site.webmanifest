@@ -1,7 +1,8 @@
 {
-  "name": "NirvNotes",
-  "short_name": "NirvNotes",
-  "description": "HTML-first, flat-folder NirvNotes app for clean, media-rich notes.",
+  "id": "/",
+  "name": "LamaNotes",
+  "short_name": "LamaNotes",
+  "description": "Fast local-first editing with an explicit, media-rich private note library.",
   "scope": "/",
   "start_url": "/",
   "launch_handler": {
@@ -16,27 +17,29 @@
         "application/json": [".json"],
         "application/yaml": [".yaml", ".yml"],
         "application/toml": [".toml"],
-        "application/xml": [".xml"]
+        "application/xml": [".xml"],
+        "text/csv": [".csv"],
+        "application/x-tex": [".tex"]
       },
       "launch_type": "single-client"
     }
   ],
   "icons": [
     {
-      "src": "nirvnotes-icon-192.png",
+      "src": "lamanotes-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "nirvnotes-icon-512.png",
+      "src": "lamanotes-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
   ],
-  "theme_color": "#20252B",
-  "background_color": "#20252B",
+  "theme_color": "#082A4C",
+  "background_color": "#22262C",
   "display_override": ["window-controls-overlay", "standalone"],
   "display": "standalone",
   "categories": ["productivity", "utilities"]

@@ -57,7 +57,7 @@ class PublicationService:
                 base_url, token, timeout_seconds=timeout_seconds
             )
         self._executor = ThreadPoolExecutor(
-            max_workers=2, thread_name_prefix="nirvnotes-publish"
+            max_workers=2, thread_name_prefix="lamanotes-publish"
         )
         self._active: set[tuple[str, str]] = set()
         self._active_lock = threading.Lock()
@@ -174,7 +174,7 @@ class PublicationService:
             raise PublicationError(
                 503,
                 "consumer_unavailable",
-                "Publishing is not configured on this NirvNotes server.",
+                "Publishing is not configured on this LamaNotes server.",
                 retryable=True,
             )
         try:

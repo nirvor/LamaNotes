@@ -1,5 +1,5 @@
 param(
-  [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "Programs\NirvNotes"),
+  [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "Programs\LamaNotes"),
   [string]$ServerUrl = "https://notes.thuber.org",
   [switch]$NoStartMenuShortcut,
   [switch]$NoDesktopShortcut,
@@ -10,8 +10,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$AppName = "NirvNotes"
-$ProgId = "NirvNotes.TextFile"
+$AppName = "LamaNotes"
+$ProgId = "LamaNotes.TextFile"
 $Extensions = @(".md", ".txt", ".cfg", ".ini", ".json", ".yaml", ".yml", ".toml", ".xml", ".log", ".csv", ".tex")
 $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PackageVersion = "Win11 client"
@@ -65,24 +65,24 @@ function Assert-SafeInstallDir([string]$Path) {
 
 function Get-AppSourceDir {
   $PackageSource = Join-Path $ScriptRoot "app"
-  if (Test-Path (Join-Path $PackageSource "NirvNotes.exe")) {
+  if (Test-Path (Join-Path $PackageSource "LamaNotes.exe")) {
     return (Resolve-Path $PackageSource).Path
   }
 
-  $RepoSource = Join-Path (Split-Path $ScriptRoot -Parent) "dist\NirvNotes"
-  if (Test-Path (Join-Path $RepoSource "NirvNotes.exe")) {
+  $RepoSource = Join-Path (Split-Path $ScriptRoot -Parent) "dist\LamaNotes"
+  if (Test-Path (Join-Path $RepoSource "LamaNotes.exe")) {
     return (Resolve-Path $RepoSource).Path
   }
 
-  throw "Could not find packaged NirvNotes app. Expected app\NirvNotes.exe next to this installer."
+  throw "Could not find packaged LamaNotes app. Expected app\LamaNotes.exe next to this installer."
 }
 
 function Stop-RunningApp {
-  $Processes = Get-Process -Name "NirvNotes" -ErrorAction SilentlyContinue
+  $Processes = Get-Process -Name "LamaNotes", "NirvNotes" -ErrorAction SilentlyContinue
   if ($Processes) {
     $Processes | Stop-Process -Force
     Start-Sleep -Seconds 2
-    Write-Ok "Stopped running NirvNotes instance."
+    Write-Ok "Stopped running LamaNotes instance."
   }
 }
 
@@ -99,7 +99,9 @@ function Copy-AppFiles(
 
   New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
   Copy-Item -Path (Join-Path $SourceDir "*") -Destination $TargetDir -Recurse -Force
-  Copy-Item -Path (Join-Path $ScriptRoot "Uninstall-NirvNotes.ps1") -Destination $TargetDir -Force
+  Remove-Item -LiteralPath (Join-Path $TargetDir "NirvNotes.exe") -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath (Join-Path $TargetDir "Uninstall-NirvNotes.ps1") -Force -ErrorAction SilentlyContinue
+  Copy-Item -Path (Join-Path $ScriptRoot "Uninstall-LamaNotes.ps1") -Destination $TargetDir -Force
 
   $InstallInfo = [ordered]@{
     app = $AppName
@@ -122,7 +124,7 @@ function New-Shortcut([string]$ShortcutPath, [string]$TargetPath) {
   $Shortcut.TargetPath = $TargetPath
   $Shortcut.WorkingDirectory = Split-Path -Parent $TargetPath
   $Shortcut.IconLocation = "$TargetPath,0"
-  $Shortcut.Description = "NirvNotes"
+  $Shortcut.Description = "LamaNotes"
   $Shortcut.Save()
 }
 
@@ -130,11 +132,11 @@ function Register-FileAssociations([string]$ExePath) {
   $AppKey = "HKCU:\Software\Classes\$ProgId"
   $CommandKey = "$AppKey\shell\open\command"
   $IconKey = "$AppKey\DefaultIcon"
-  $ApplicationsKey = "HKCU:\Software\Classes\Applications\NirvNotes.exe"
+  $ApplicationsKey = "HKCU:\Software\Classes\Applications\LamaNotes.exe"
 
   New-Item -Path $AppKey -Force | Out-Null
-  Set-Item -Path $AppKey -Value "Open with NirvNotes"
-  New-ItemProperty -Path $AppKey -Name "FriendlyTypeName" -Value "NirvNotes text file" -PropertyType String -Force | Out-Null
+  Set-Item -Path $AppKey -Value "Open with LamaNotes"
+  New-ItemProperty -Path $AppKey -Name "FriendlyTypeName" -Value "LamaNotes text file" -PropertyType String -Force | Out-Null
 
   New-Item -Path $CommandKey -Force | Out-Null
   Set-Item -Path $CommandKey -Value "`"$ExePath`" `"%1`""
@@ -144,14 +146,14 @@ function Register-FileAssociations([string]$ExePath) {
   New-Item -Path "$ApplicationsKey\shell\open\command" -Force | Out-Null
   Set-Item -Path "$ApplicationsKey\shell\open\command" -Value "`"$ExePath`" `"%1`""
   New-Item -Path "$ApplicationsKey\SupportedTypes" -Force | Out-Null
-  New-ItemProperty -Path $ApplicationsKey -Name "ApplicationName" -Value "NirvNotes" -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $ApplicationsKey -Name "ApplicationName" -Value "LamaNotes" -PropertyType String -Force | Out-Null
 
   foreach ($Extension in $Extensions) {
     $ExtensionKey = "HKCU:\Software\Classes\$Extension\OpenWithProgids"
     New-Item -Path $ExtensionKey -Force | Out-Null
     New-ItemProperty -Path $ExtensionKey -Name $ProgId -Value ([byte[]]@()) -PropertyType Binary -Force | Out-Null
 
-    $OpenWithListKey = "HKCU:\Software\Classes\$Extension\OpenWithList\NirvNotes.exe"
+    $OpenWithListKey = "HKCU:\Software\Classes\$Extension\OpenWithList\LamaNotes.exe"
     New-Item -Path $OpenWithListKey -Force | Out-Null
 
     New-ItemProperty -Path "$ApplicationsKey\SupportedTypes" -Name $Extension -Value "" -PropertyType String -Force | Out-Null
@@ -159,17 +161,17 @@ function Register-FileAssociations([string]$ExePath) {
 }
 
 function Register-Uninstaller([string]$ExePath, [string]$TargetDir) {
-  $UninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NirvNotes"
-  $UninstallScript = Join-Path $TargetDir "Uninstall-NirvNotes.ps1"
+  $UninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\LamaNotes"
+  $UninstallScript = Join-Path $TargetDir "Uninstall-LamaNotes.ps1"
   $UninstallCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$UninstallScript`""
   $EstimatedSize = [int](([System.IO.Directory]::EnumerateFiles($TargetDir, "*", "AllDirectories") |
     ForEach-Object { (Get-Item $_).Length } |
     Measure-Object -Sum).Sum / 1KB)
 
   New-Item -Path $UninstallKey -Force | Out-Null
-  New-ItemProperty -Path $UninstallKey -Name "DisplayName" -Value "NirvNotes" -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $UninstallKey -Name "DisplayName" -Value "LamaNotes" -PropertyType String -Force | Out-Null
   New-ItemProperty -Path $UninstallKey -Name "DisplayVersion" -Value $PackageVersion -PropertyType String -Force | Out-Null
-  New-ItemProperty -Path $UninstallKey -Name "Publisher" -Value "NirvNotes" -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $UninstallKey -Name "Publisher" -Value "LamaNotes" -PropertyType String -Force | Out-Null
   New-ItemProperty -Path $UninstallKey -Name "InstallLocation" -Value $TargetDir -PropertyType String -Force | Out-Null
   New-ItemProperty -Path $UninstallKey -Name "DisplayIcon" -Value "$ExePath,0" -PropertyType String -Force | Out-Null
   New-ItemProperty -Path $UninstallKey -Name "UninstallString" -Value $UninstallCommand -PropertyType String -Force | Out-Null
@@ -179,7 +181,7 @@ function Register-Uninstaller([string]$ExePath, [string]$TargetDir) {
 }
 
 function Register-AppPath([string]$ExePath, [string]$TargetDir) {
-  $AppPathKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\NirvNotes.exe"
+  $AppPathKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\LamaNotes.exe"
   New-Item -Path $AppPathKey -Force | Out-Null
   Set-Item -Path $AppPathKey -Value $ExePath
   New-ItemProperty -Path $AppPathKey -Name "Path" -Value $TargetDir -PropertyType String -Force | Out-Null
@@ -196,7 +198,7 @@ function Test-Connectivity {
   try {
     $Health = & curl.exe -s -S --max-time 8 $HealthUrl 2>$null
     if ($LASTEXITCODE -eq 0 -and $Health -match "OK") {
-      Write-Ok "NirvNotes cloud endpoint reachable over HTTPS."
+      Write-Ok "LamaNotes cloud endpoint reachable over HTTPS."
     } else {
       Write-Warn "Cloud endpoint did not return OK from $HealthUrl."
     }
@@ -205,11 +207,31 @@ function Test-Connectivity {
   }
 }
 
+function Remove-LegacyInstallation {
+  $LegacyProgId = "NirvNotes.TextFile"
+  Remove-Item -LiteralPath "HKCU:\Software\Classes\$LegacyProgId" -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath "HKCU:\Software\Classes\Applications\NirvNotes.exe" -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NirvNotes" -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath "HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\NirvNotes.exe" -Recurse -Force -ErrorAction SilentlyContinue
+  foreach ($Extension in $Extensions) {
+    $OpenWithProgids = "HKCU:\Software\Classes\$Extension\OpenWithProgids"
+    Remove-ItemProperty -Path $OpenWithProgids -Name $LegacyProgId -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath "HKCU:\Software\Classes\$Extension\OpenWithList\NirvNotes.exe" -Recurse -Force -ErrorAction SilentlyContinue
+  }
+
+  Remove-Item -LiteralPath (Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\NirvNotes.lnk") -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath("Desktop")) "NirvNotes.lnk") -Force -ErrorAction SilentlyContinue
+  $LegacyInstallDir = Join-Path $env:LOCALAPPDATA "Programs\NirvNotes"
+  if ((Test-Path -LiteralPath $LegacyInstallDir) -and $LegacyInstallDir -ine $InstallDir) {
+    Remove-Item -LiteralPath $LegacyInstallDir -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+
 $InstallDir = Assert-SafeInstallDir $InstallDir
 $AppSource = Get-AppSourceDir
-$ExePath = Join-Path $InstallDir "NirvNotes.exe"
+$ExePath = Join-Path $InstallDir "LamaNotes.exe"
 
-Write-Step "Installing NirvNotes"
+Write-Step "Installing LamaNotes"
 Write-Host "Source: $AppSource"
 Write-Host "Target: $InstallDir"
 
@@ -222,14 +244,14 @@ Copy-AppFiles `
   -InstallFileAssociations (-not $NoFileAssociations)
 Write-Ok "Copied app files."
 
-$StartMenuShortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\NirvNotes.lnk"
+$StartMenuShortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\LamaNotes.lnk"
 if (-not $NoStartMenuShortcut) {
   New-Shortcut -ShortcutPath $StartMenuShortcut -TargetPath $ExePath
   Write-Ok "Created Start Menu shortcut."
 }
 
 if (-not $NoDesktopShortcut) {
-  $DesktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "NirvNotes.lnk"
+  $DesktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "LamaNotes.lnk"
   New-Shortcut -ShortcutPath $DesktopShortcut -TargetPath $ExePath
   Write-Ok "Created Desktop shortcut."
 }
@@ -241,15 +263,16 @@ if (-not $NoFileAssociations) {
 
 Register-Uninstaller -ExePath $ExePath -TargetDir $InstallDir
 Register-AppPath -ExePath $ExePath -TargetDir $InstallDir
+Remove-LegacyInstallation
 Write-Ok "Registered Windows app metadata and uninstaller."
 
 Test-Connectivity
 
 if (-not $NoLaunch) {
   Start-Process -FilePath $ExePath
-  Write-Ok "Started NirvNotes."
+  Write-Ok "Started LamaNotes."
 }
 
 Write-Step "Done"
-Write-Host "NirvNotes is installed for this Windows user."
-Write-Host "If Windows asks for the default app once, choose NirvNotes for the wanted text/config format."
+Write-Host "LamaNotes is installed for this Windows user."
+Write-Host "If Windows asks for the default app once, choose LamaNotes for the wanted text/config format."

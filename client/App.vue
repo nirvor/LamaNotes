@@ -1,15 +1,15 @@
 <template>
   <LoadingIndicator
     ref="loadingIndicator"
-    class="flatnotes-app-shell container mx-auto flex min-h-screen w-full min-w-0 max-w-full flex-col px-1.5 py-3 print:max-w-full"
+    class="lamanotes-app-shell container mx-auto flex min-h-screen w-full min-w-0 max-w-full flex-col px-1.5 py-3 print:max-w-full"
     :class="{
-      'flatnotes-app-shell-note': route.name === 'note' || route.name === 'new',
-      'flatnotes-app-shell-dashboard': isDashboardRoute,
-      'flatnotes-app-shell-note-work':
+      'lamanotes-app-shell-note': route.name === 'note' || route.name === 'new',
+      'lamanotes-app-shell-dashboard': isDashboardRoute,
+      'lamanotes-app-shell-note-work':
         isNoteRoute && globalStore.noteLayoutKind === 'work',
-      'flatnotes-app-shell-note-research':
+      'lamanotes-app-shell-note-research':
         isNoteRoute && globalStore.noteLayoutKind === 'research',
-      'flatnotes-app-shell-note-markdown':
+      'lamanotes-app-shell-note-markdown':
         isNoteRoute && globalStore.noteLayoutKind === 'markdown',
     }"
   >
@@ -25,7 +25,7 @@
     />
     <div
       v-if="desktopShell.enabled && desktopShell.cloudOnline === false"
-      class="flatnotes-cloud-offline-strip print:hidden"
+      class="lamanotes-cloud-offline-strip print:hidden"
       role="status"
     >
       Cloud unavailable. Local files remain editable.
@@ -203,7 +203,7 @@ function markAppLoaded() {
   }
   appMarkedLoaded = true;
   loadingIndicator.value?.setLoaded();
-  performance.mark("nirvnotes-app-ready");
+  performance.mark("lamanotes-app-ready");
   if (appReadyReported) {
     return;
   }
@@ -303,33 +303,33 @@ loadTheme();
 </script>
 
 <style scoped>
-.flatnotes-app-shell {
+.lamanotes-app-shell {
   overflow: visible;
 }
 
-.flatnotes-app-shell-note {
+.lamanotes-app-shell-note {
   max-width: min(100%, 68rem);
 }
 
-.flatnotes-app-shell-note-work {
+.lamanotes-app-shell-note-work {
   max-width: min(100%, 54rem);
 }
 
-.flatnotes-app-shell-note-markdown {
+.lamanotes-app-shell-note-markdown {
   max-width: min(100%, 58rem);
 }
 
-.flatnotes-app-shell-note-research {
+.lamanotes-app-shell-note-research {
   max-width: min(100%, 76rem);
 }
 
-.flatnotes-app-shell-dashboard,
-.flatnotes-app-shell-note.flatnotes-app-shell-dashboard {
+.lamanotes-app-shell-dashboard,
+.lamanotes-app-shell-note.lamanotes-app-shell-dashboard {
   width: min(100%, calc(100vw - 1.5rem));
   max-width: none;
 }
 
-.flatnotes-cloud-offline-strip {
+.lamanotes-cloud-offline-strip {
   align-self: flex-end;
   margin: -0.3rem 0 0.45rem;
   color: rgb(var(--theme-text-very-muted));

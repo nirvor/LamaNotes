@@ -5,10 +5,10 @@
       type="mdi"
       :path="iconPath"
       :size="iconSize"
-      class="flatnotes-icon-label-icon"
+      class="lamanotes-icon-label-icon"
       :class="{ 'mr-1': label }"
     ></SvgIcon>
-    <span v-if="label" class="flatnotes-icon-label-text">{{ label }}</span>
+    <span v-if="label" class="lamanotes-icon-label-text">{{ label }}</span>
   </div>
 </template>
 

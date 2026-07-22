@@ -1,5 +1,5 @@
-const workNoteSelector = "[data-flatnotes-note-kind='work']";
-const markdownTemplateSelector = "template[data-flatnotes-work-markdown]";
+const workNoteSelector = "[data-lamanotes-note-kind='work']";
+const markdownTemplateSelector = "template[data-lamanotes-work-markdown]";
 
 function escapeHtml(value = "") {
   return String(value)
@@ -258,7 +258,7 @@ function renderInlineMarkdown(value = "") {
   let text = String(value).replace(/`([^`]+)`/g, (_, code) => {
     const index = codeSpans.length;
     codeSpans.push(`<code>${escapeHtml(code)}</code>`);
-    return `@@FLATNOTES_CODE_${index}@@`;
+    return `@@LAMANOTES_CODE_${index}@@`;
   });
 
   text = escapeHtml(text)
@@ -276,7 +276,7 @@ function renderInlineMarkdown(value = "") {
     .replace(/\*([^*]+)\*/g, "<em>$1</em>");
 
   codeSpans.forEach((replacement, index) => {
-    text = text.replace(`@@FLATNOTES_CODE_${index}@@`, replacement);
+    text = text.replace(`@@LAMANOTES_CODE_${index}@@`, replacement);
   });
 
   return text;
@@ -469,8 +469,8 @@ function isWorkNoteHtml(value = "") {
   }
 
   if (
-    /data-flatnotes-note-kind=["']work["']/i.test(value) ||
-    /<meta[^>]+name=["']flatnotes-note-kind["'][^>]+content=["']work["']/i.test(
+    /data-lamanotes-note-kind=["']work["']/i.test(value) ||
+    /<meta[^>]+name=["']lamanotes-note-kind["'][^>]+content=["']work["']/i.test(
       value,
     )
   ) {
@@ -482,7 +482,7 @@ function isWorkNoteHtml(value = "") {
     return Boolean(
       documentValue.querySelector(workNoteSelector) ||
         documentValue.querySelector(
-          "meta[name='flatnotes-note-kind'][content='work']",
+          "meta[name='lamanotes-note-kind'][content='work']",
         ),
     );
   } catch {
@@ -507,7 +507,7 @@ function extractWorkMarkdown(value = "") {
     );
   }
 
-  const fallback = documentValue.querySelector("[data-flatnotes-work-source]");
+  const fallback = documentValue.querySelector("[data-lamanotes-work-source]");
   if (fallback) {
     return normalizeMarkdown(fallback.textContent || "");
   }
@@ -532,17 +532,17 @@ function buildWorkNoteHtml(title = "Untitled", markdown = "", options = {}) {
 <html lang="de">
   <head>
     <meta charset="utf-8">
-    <meta name="flatnotes-note-kind" content="work">
-    <meta name="flatnotes-tags" content="${escapeAttribute(metaTags)}">
+    <meta name="lamanotes-note-kind" content="work">
+    <meta name="lamanotes-tags" content="${escapeAttribute(metaTags)}">
     <title>${escapedTitle}</title>
   </head>
   <body>
-    <article class="flatnote flatnote-work-note" data-flatnotes-note-kind="work">
+    <article class="lamanote lamanote-work-note" data-lamanotes-note-kind="work">
       <h1>${escapedTitle}</h1>
-      <section class="flatnote-work-rendered" data-flatnotes-component="work-body">
+      <section class="lamanote-work-rendered" data-lamanotes-component="work-body">
 ${rendered}
       </section>
-      <template data-flatnotes-work-markdown>${escapeHtml(normalizedMarkdown)}</template>
+      <template data-lamanotes-work-markdown>${escapeHtml(normalizedMarkdown)}</template>
     </article>
   </body>
 </html>`;

@@ -40,9 +40,9 @@ const semanticIndexCacheTtlMs = 2 * 60 * 1000;
 const semanticIndexRevalidateCooldownMs = 5000;
 const tagCacheTtlMs = 2 * 60 * 1000;
 
-export const libraryIndexUpdatedEvent = "nirvnotes:library-index-updated";
-export const libraryNoteUpdatedEvent = "nirvnotes:library-note-updated";
-export const libraryNoteDeletedEvent = "nirvnotes:library-note-deleted";
+export const libraryIndexUpdatedEvent = "lamanotes:library-index-updated";
+export const libraryNoteUpdatedEvent = "lamanotes:library-note-updated";
+export const libraryNoteDeletedEvent = "lamanotes:library-note-deleted";
 
 api.interceptors.request.use(
   // If the request is not for the token endpoint, add the token to the headers.

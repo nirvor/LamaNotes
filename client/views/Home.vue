@@ -1,22 +1,22 @@
 <template>
-  <div class="flatnotes-home">
-    <div class="flatnotes-home-inner">
+  <div class="lamanotes-home">
+    <div class="lamanotes-home-inner">
       <SearchInput class="mb-4 shadow-[0_0_20px] shadow-theme-shadow" />
       <LoadingIndicator
         ref="loadingIndicator"
-        class="flatnotes-home-pinned min-h-56"
+        class="lamanotes-home-pinned min-h-56"
         hideLoader
       >
-        <div v-if="notes.length > 0" class="flatnotes-home-pinned-title">
+        <div v-if="notes.length > 0" class="lamanotes-home-pinned-title">
           <SvgIcon type="mdi" :path="mdiStar" size="0.72rem" />
           <span>{{ globalStore.config.quickAccessTitle }}</span>
         </div>
-        <div v-if="notes.length > 0" class="flatnotes-home-pinned-list">
+        <div v-if="notes.length > 0" class="lamanotes-home-pinned-list">
           <RouterLink
             v-for="note in notes.slice(0, globalStore.config.quickAccessLimit)"
             :key="note.title"
             :to="{ name: 'note', params: { title: note.title } }"
-            class="flatnotes-home-pinned-link"
+            class="lamanotes-home-pinned-link"
             :title="note.title"
             @focus="warmNote(note.title)"
             @pointerenter="warmNote(note.title)"
@@ -32,7 +32,7 @@
                 sortBy: searchSortOptions[globalStore.config.quickAccessSort],
               },
             }"
-            class="flatnotes-home-pinned-link flatnotes-home-pinned-more"
+            class="lamanotes-home-pinned-link lamanotes-home-pinned-more"
             title="Show more"
             aria-label="Show more pinned notes"
           >
@@ -142,20 +142,20 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.flatnotes-home {
+.lamanotes-home {
   display: flex;
   min-height: 100%;
   justify-content: center;
 }
 
-.flatnotes-home-inner {
+.lamanotes-home-inner {
   display: flex;
   width: min(100%, 34rem);
   flex-direction: column;
   padding-top: clamp(11rem, 25vh, 18rem);
 }
 
-.flatnotes-home-pinned {
+.lamanotes-home-pinned {
   display: flex;
   width: 100%;
   min-width: 0;
@@ -163,7 +163,7 @@ onBeforeUnmount(() => {
   align-items: stretch;
 }
 
-.flatnotes-home-pinned-title {
+.lamanotes-home-pinned-title {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -175,7 +175,7 @@ onBeforeUnmount(() => {
   text-transform: uppercase;
 }
 
-.flatnotes-home-pinned-list {
+.lamanotes-home-pinned-list {
   display: grid;
   width: 100%;
   min-width: 0;
@@ -184,7 +184,7 @@ onBeforeUnmount(() => {
   row-gap: 0;
 }
 
-.flatnotes-home-pinned-link {
+.lamanotes-home-pinned-link {
   display: flex;
   min-width: 0;
   min-height: 2rem;
@@ -203,14 +203,14 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.flatnotes-home-pinned-link:hover,
-.flatnotes-home-pinned-link:focus-visible {
+.lamanotes-home-pinned-link:hover,
+.lamanotes-home-pinned-link:focus-visible {
   color: rgb(var(--theme-text));
   border-bottom-color: rgb(var(--theme-brand) / 0.62);
   outline: none;
 }
 
-.flatnotes-home-pinned-more {
+.lamanotes-home-pinned-more {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -218,11 +218,11 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 560px) {
-  .flatnotes-home-inner {
+  .lamanotes-home-inner {
     padding-top: clamp(10rem, 30vh, 17rem);
   }
 
-  .flatnotes-home-pinned-list {
+  .lamanotes-home-pinned-list {
     grid-template-columns: 1fr;
   }
 }

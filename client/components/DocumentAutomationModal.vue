@@ -1,35 +1,35 @@
 <template>
   <div
     v-if="visible"
-    class="flatnotes-automation-backdrop print:hidden"
+    class="lamanotes-automation-backdrop print:hidden"
     role="presentation"
     @click.self="close"
   >
     <section
       ref="dialog"
-      class="flatnotes-automation-dialog"
+      class="lamanotes-automation-dialog"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="flatnotes-automation-title"
+      aria-labelledby="lamanotes-automation-title"
       tabindex="-1"
       @keydown.esc.stop.prevent="close"
     >
-      <header class="flatnotes-automation-header">
-        <div class="flatnotes-automation-heading">
-          <span class="flatnotes-automation-mark" aria-hidden="true">A</span>
-          <strong id="flatnotes-automation-title">Note tools</strong>
+      <header class="lamanotes-automation-header">
+        <div class="lamanotes-automation-heading">
+          <span class="lamanotes-automation-mark" aria-hidden="true">A</span>
+          <strong id="lamanotes-automation-title">Note tools</strong>
         </div>
         <button type="button" title="Close" aria-label="Close" @click="close">
           <SvgIcon type="mdi" :path="mdiClose" size="0.92rem" />
         </button>
       </header>
 
-      <div v-if="!selectedAction" class="flatnotes-automation-list">
+      <div v-if="!selectedAction" class="lamanotes-automation-list">
         <button
           v-for="action in availableActions"
           :key="action.id"
           type="button"
-          class="flatnotes-automation-option"
+          class="lamanotes-automation-option"
           @click="previewAction(action)"
         >
           <span>
@@ -38,13 +38,13 @@
           </span>
           <SvgIcon type="mdi" :path="mdiChevronRight" size="0.9rem" />
         </button>
-        <p v-if="!availableActions.length" class="flatnotes-automation-empty">
+        <p v-if="!availableActions.length" class="lamanotes-automation-empty">
           No safe automatic tool is available for this file type.
         </p>
       </div>
 
-      <div v-else class="flatnotes-automation-preview">
-        <div class="flatnotes-automation-result-line">
+      <div v-else class="lamanotes-automation-preview">
+        <div class="lamanotes-automation-result-line">
           <strong>{{ selectedAction.label }}</strong>
           <span v-if="result?.changed">
             {{ result.changedLines }} changed
@@ -52,20 +52,20 @@
           </span>
           <span v-else>No changes needed</span>
         </div>
-        <p v-if="problem" class="flatnotes-automation-problem">{{ problem }}</p>
-        <pre v-else class="flatnotes-automation-diff"><code
+        <p v-if="problem" class="lamanotes-automation-problem">{{ problem }}</p>
+        <pre v-else class="lamanotes-automation-diff"><code
           v-for="(line, index) in result?.preview || []"
           :key="`${index}:${line}`"
           :class="{
-            'flatnotes-automation-added': line.startsWith('+ '),
-            'flatnotes-automation-removed': line.startsWith('- '),
+            'lamanotes-automation-added': line.startsWith('+ '),
+            'lamanotes-automation-removed': line.startsWith('- '),
           }"
         >{{ line }}
 </code></pre>
-        <footer class="flatnotes-automation-actions">
+        <footer class="lamanotes-automation-actions">
           <button
             type="button"
-            class="flatnotes-automation-back"
+            class="lamanotes-automation-back"
             @click="reset"
           >
             <SvgIcon type="mdi" :path="mdiArrowLeft" size="0.86rem" />
@@ -73,7 +73,7 @@
           </button>
           <button
             type="button"
-            class="flatnotes-automation-apply"
+            class="lamanotes-automation-apply"
             :disabled="!result?.changed || Boolean(problem)"
             @click="apply"
           >
@@ -155,7 +155,7 @@ function apply() {
 </script>
 
 <style scoped>
-.flatnotes-automation-backdrop {
+.lamanotes-automation-backdrop {
   position: fixed;
   inset: 0;
   z-index: 55;
@@ -166,7 +166,7 @@ function apply() {
   backdrop-filter: blur(3px);
 }
 
-.flatnotes-automation-dialog {
+.lamanotes-automation-dialog {
   width: min(100%, 42rem);
   max-height: min(76vh, 42rem);
   overflow: auto;
@@ -178,16 +178,16 @@ function apply() {
   outline: none;
 }
 
-.flatnotes-automation-header,
-.flatnotes-automation-result-line,
-.flatnotes-automation-actions {
+.lamanotes-automation-header,
+.lamanotes-automation-result-line,
+.lamanotes-automation-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem;
 }
 
-.flatnotes-automation-header {
+.lamanotes-automation-header {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -196,9 +196,9 @@ function apply() {
   background: rgb(var(--theme-background));
 }
 
-.flatnotes-automation-header button,
-.flatnotes-automation-back,
-.flatnotes-automation-apply {
+.lamanotes-automation-header button,
+.lamanotes-automation-back,
+.lamanotes-automation-apply {
   display: inline-flex;
   min-width: 1.8rem;
   min-height: 1.8rem;
@@ -210,19 +210,19 @@ function apply() {
   color: rgb(var(--theme-text-muted));
 }
 
-.flatnotes-automation-header button:hover,
-.flatnotes-automation-back:hover {
+.lamanotes-automation-header button:hover,
+.lamanotes-automation-back:hover {
   border-color: rgb(var(--theme-border));
   color: rgb(var(--theme-text));
 }
 
-.flatnotes-automation-heading {
+.lamanotes-automation-heading {
   display: flex;
   align-items: center;
   gap: 0.48rem;
 }
 
-.flatnotes-automation-mark {
+.lamanotes-automation-mark {
   display: grid;
   width: 1.45rem;
   height: 1.45rem;
@@ -234,11 +234,11 @@ function apply() {
   font-weight: 700;
 }
 
-.flatnotes-automation-list {
+.lamanotes-automation-list {
   padding: 0.4rem 0.5rem 0.55rem;
 }
 
-.flatnotes-automation-option {
+.lamanotes-automation-option {
   display: flex;
   width: 100%;
   min-height: 2.65rem;
@@ -250,34 +250,34 @@ function apply() {
   text-align: left;
 }
 
-.flatnotes-automation-option:hover,
-.flatnotes-automation-option:focus-visible {
+.lamanotes-automation-option:hover,
+.lamanotes-automation-option:focus-visible {
   color: rgb(var(--theme-heading));
   background: rgb(var(--theme-background-elevated) / 0.52);
   outline: none;
 }
 
-.flatnotes-automation-option span {
+.lamanotes-automation-option span {
   display: grid;
   gap: 0.08rem;
 }
 
-.flatnotes-automation-option small,
-.flatnotes-automation-result-line span,
-.flatnotes-automation-empty {
+.lamanotes-automation-option small,
+.lamanotes-automation-result-line span,
+.lamanotes-automation-empty {
   color: rgb(var(--theme-text-muted));
   font-size: 0.74rem;
 }
 
-.flatnotes-automation-preview {
+.lamanotes-automation-preview {
   padding: 0.68rem;
 }
 
-.flatnotes-automation-result-line {
+.lamanotes-automation-result-line {
   margin-bottom: 0.55rem;
 }
 
-.flatnotes-automation-diff {
+.lamanotes-automation-diff {
   max-height: min(52vh, 30rem);
   overflow: auto;
   padding: 0.58rem 0.65rem;
@@ -292,43 +292,43 @@ function apply() {
   word-break: break-word;
 }
 
-.flatnotes-automation-diff code {
+.lamanotes-automation-diff code {
   display: block;
 }
 
-.flatnotes-automation-added {
+.lamanotes-automation-added {
   color: rgb(var(--theme-heading));
   background: rgb(var(--theme-link) / 0.09);
 }
 
-.flatnotes-automation-removed {
+.lamanotes-automation-removed {
   color: rgb(var(--theme-text-muted));
   text-decoration: line-through;
   text-decoration-color: rgb(var(--theme-danger) / 0.58);
 }
 
-.flatnotes-automation-problem {
+.lamanotes-automation-problem {
   margin: 0.45rem 0 0.7rem;
   color: rgb(var(--theme-danger));
   font-size: 0.82rem;
 }
 
-.flatnotes-automation-actions {
+.lamanotes-automation-actions {
   margin-top: 0.62rem;
 }
 
-.flatnotes-automation-back,
-.flatnotes-automation-apply {
+.lamanotes-automation-back,
+.lamanotes-automation-apply {
   padding-inline: 0.52rem;
   font-size: 0.78rem;
 }
 
-.flatnotes-automation-apply {
+.lamanotes-automation-apply {
   border-color: rgb(var(--theme-heading) / 0.72);
   color: rgb(var(--theme-heading));
 }
 
-.flatnotes-automation-apply:disabled {
+.lamanotes-automation-apply:disabled {
   cursor: default;
   opacity: 0.42;
 }

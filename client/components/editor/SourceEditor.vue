@@ -1,22 +1,22 @@
 <template>
-  <div class="flatnotes-source-editor-shell">
+  <div class="lamanotes-source-editor-shell">
     <div
       ref="editorHost"
-      class="flatnotes-source-editor"
+      class="lamanotes-source-editor"
       :class="{
-        'flatnotes-source-editor-wrap': wrap,
-        'flatnotes-source-editor-no-gutter': !showLineNumbers,
+        'lamanotes-source-editor-wrap': wrap,
+        'lamanotes-source-editor-no-gutter': !showLineNumbers,
       }"
     ></div>
     <div
       v-if="pendingStructuredPaste"
-      class="flatnotes-structured-paste"
+      class="lamanotes-structured-paste"
       role="toolbar"
       aria-label="Paste as"
     >
       <button
         type="button"
-        class="flatnotes-structured-paste-active"
+        class="lamanotes-structured-paste-active"
         title="Keep raw text"
         aria-label="Keep raw text"
         @click="clearStructuredPaste"
@@ -41,7 +41,7 @@
       </button>
       <button
         type="button"
-        class="flatnotes-structured-paste-close"
+        class="lamanotes-structured-paste-close"
         title="Dismiss paste options"
         aria-label="Dismiss paste options"
         @click="clearStructuredPaste"
@@ -835,7 +835,7 @@ function setSearchMatches(matches = [], currentIndex = -1) {
 
 function sessionStorageKey() {
   const key = String(props.sessionKey || "").trim();
-  return key ? `nirvnotes:editor-session:${key}` : "";
+  return key ? `lamanotes:editor-session:${key}` : "";
 }
 
 function scheduleSessionSave() {
@@ -1005,20 +1005,20 @@ defineExpose({
 </script>
 
 <style scoped>
-.flatnotes-source-editor-shell {
+.lamanotes-source-editor-shell {
   position: relative;
   width: 100%;
   min-width: 0;
 }
 
-.flatnotes-source-editor {
+.lamanotes-source-editor {
   width: 100%;
   min-width: 0;
   border-top: 1px solid rgb(var(--theme-border));
   border-bottom: 1px solid rgb(var(--theme-border));
 }
 
-.flatnotes-structured-paste {
+.lamanotes-structured-paste {
   position: sticky;
   z-index: 12;
   bottom: 0.42rem;
@@ -1039,7 +1039,7 @@ defineExpose({
   backdrop-filter: blur(6px);
 }
 
-.flatnotes-structured-paste button {
+.lamanotes-structured-paste button {
   display: inline-flex;
   min-width: 1.55rem;
   min-height: 1.42rem;
@@ -1053,39 +1053,39 @@ defineExpose({
   font-size: 0.68rem;
 }
 
-.flatnotes-structured-paste button:hover,
-.flatnotes-structured-paste button:focus-visible,
-.flatnotes-structured-paste-active {
+.lamanotes-structured-paste button:hover,
+.lamanotes-structured-paste button:focus-visible,
+.lamanotes-structured-paste-active {
   border-color: rgb(var(--theme-border));
   color: rgb(var(--theme-heading));
   background: rgb(var(--theme-background));
   outline: none;
 }
 
-.flatnotes-structured-paste .flatnotes-structured-paste-close {
+.lamanotes-structured-paste .lamanotes-structured-paste-close {
   padding-inline: 0.2rem;
 }
 
-.flatnotes-source-editor :deep(.cm-editor) {
+.lamanotes-source-editor :deep(.cm-editor) {
   width: 100%;
   min-width: 0;
 }
 
-.flatnotes-source-editor :deep(.cm-scroller) {
+.lamanotes-source-editor :deep(.cm-scroller) {
   scrollbar-width: thin;
   scrollbar-color: rgb(var(--theme-border)) transparent;
 }
 
-.flatnotes-source-editor-no-gutter :deep(.cm-gutters) {
+.lamanotes-source-editor-no-gutter :deep(.cm-gutters) {
   display: none;
 }
 
 @media (max-width: 440px) {
-  .flatnotes-source-editor :deep(.cm-lineNumbers) {
+  .lamanotes-source-editor :deep(.cm-lineNumbers) {
     display: none;
   }
 
-  .flatnotes-source-editor :deep(.cm-line) {
+  .lamanotes-source-editor :deep(.cm-line) {
     padding-inline: 0.22rem;
   }
 }

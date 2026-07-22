@@ -33,11 +33,12 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 DEFAULT_URL = "https://notes.thuber.org"
-APP_NAME = "NirvNotes"
+APP_NAME = "LamaNotes"
+LEGACY_APP_NAME = "NirvNotes"
 WEBVIEW_PROFILE = "WebView2"
 DEFAULT_PROXY_PORT = 31992
 WINDOW_STATE_FILE = "window-state.json"
-LOG_FILE = "nirvnotes-client.log"
+LOG_FILE = "lamanotes-client.log"
 INSTANCE_DIR = "instances"
 HANDOFF_TIMEOUT_SECONDS = 0.35
 INSTANCE_RECORD_MAX_AGE_SECONDS = 30
@@ -47,8 +48,10 @@ UPDATE_STATUS_TTL_SECONDS = 10 * 60
 UPDATE_MANIFEST_PATH = "/api/windows-client-update"
 CLIENT_METADATA_FILE = "client-version.json"
 UPDATE_SCRIPT_FILE = "apply-update.ps1"
+LEGACY_MIGRATION_SCRIPT_FILE = "migrate-legacy-install.ps1"
 CREDENTIAL_FILE = "auth-token.bin"
-CREDENTIAL_ENTROPY = b"NirvNotes desktop credential v1"
+CREDENTIAL_ENTROPY = b"LamaNotes desktop credential v1"
+LEGACY_CREDENTIAL_ENTROPY = b"NirvNotes desktop credential v1"
 SHARD_PATHW = 0x00000003
 ALLOWED_EXTENSIONS = {
     ".md",
@@ -80,6 +83,7 @@ TEXT_TYPES = {
 }
 
 WINDOWS_UPDATE_REQUIRED_FILES = (
+    "app/LamaNotes.exe",
     "app/NirvNotes.exe",
     "app/_internal/client-version.json",
     "app/_internal/webview/lib/runtimes/win-arm64/native/WebView2Loader.dll",
@@ -176,7 +180,7 @@ UPSTREAM_PATH_PREFIXES = (
 UPSTREAM_EXACT_PATHS = {"/health", "/openapi.json"}
 DESKTOP_SHELL_MARKER = """
 <script>
-  window.__NIRVNOTES_DESKTOP_SHELL__ = true;
+  window.__LAMANOTES_DESKTOP_SHELL__ = true;
 </script>
 """.strip()
 
@@ -197,11 +201,14 @@ def data_blob(payload: bytes) -> tuple[DataBlob, Any]:
     return blob, buffer
 
 
-def dpapi_protect(payload: bytes) -> bytes:
+def dpapi_protect(
+    payload: bytes,
+    entropy_value: bytes = CREDENTIAL_ENTROPY,
+) -> bytes:
     if sys.platform != "win32":
         raise OSError("Windows DPAPI is unavailable.")
     source, source_buffer = data_blob(payload)
-    entropy, entropy_buffer = data_blob(CREDENTIAL_ENTROPY)
+    entropy, entropy_buffer = data_blob(entropy_value)
     protected = DataBlob()
     result = ctypes.windll.crypt32.CryptProtectData(
         ctypes.byref(source),
@@ -221,11 +228,14 @@ def dpapi_protect(payload: bytes) -> bytes:
         ctypes.windll.kernel32.LocalFree(protected.data)
 
 
-def dpapi_unprotect(payload: bytes) -> bytes:
+def dpapi_unprotect(
+    payload: bytes,
+    entropy_value: bytes = CREDENTIAL_ENTROPY,
+) -> bytes:
     if sys.platform != "win32":
         raise OSError("Windows DPAPI is unavailable.")
     source, source_buffer = data_blob(payload)
-    entropy, entropy_buffer = data_blob(CREDENTIAL_ENTROPY)
+    entropy, entropy_buffer = data_blob(entropy_value)
     clear = DataBlob()
     result = ctypes.windll.crypt32.CryptUnprotectData(
         ctypes.byref(source),
@@ -254,16 +264,39 @@ class CredentialStore:
     def get_token(self) -> str:
         if sys.platform != "win32":
             return ""
+
+        protected = b""
         with self._lock:
             try:
-                payload = json.loads(
-                    dpapi_unprotect(self.path.read_bytes()).decode("utf-8")
-                )
-            except (OSError, ValueError, json.JSONDecodeError, UnicodeError):
+                protected = self.path.read_bytes()
+            except OSError:
                 return ""
+
+        payload: Any = None
+        used_legacy_entropy = False
+        for entropy_value in (CREDENTIAL_ENTROPY, LEGACY_CREDENTIAL_ENTROPY):
+            try:
+                payload = json.loads(
+                    dpapi_unprotect(protected, entropy_value).decode("utf-8")
+                )
+                used_legacy_entropy = entropy_value == LEGACY_CREDENTIAL_ENTROPY
+                break
+            except (OSError, ValueError, json.JSONDecodeError, UnicodeError):
+                continue
+
         if not isinstance(payload, dict) or payload.get("sourceUrl") != self.source_url:
             return ""
-        return str(payload.get("token", ""))
+        token = str(payload.get("token", ""))
+        if token and used_legacy_entropy:
+            try:
+                self.set_token(token)
+                logging.info("migrated desktop credential protection")
+            except OSError:
+                logging.warning(
+                    "could not migrate desktop credential protection",
+                    exc_info=True,
+                )
+        return token
 
     def set_token(self, token: str) -> bool:
         if sys.platform != "win32" or not token:
@@ -335,7 +368,7 @@ class NativeFileStore:
             path = self._paths.get(file_id)
             metadata = dict(self._metadata.get(file_id, {}))
         if not path or path.suffix.lower() not in ALLOWED_EXTENSIONS:
-            raise ValueError("File is not writable from this NirvNotes client.")
+            raise ValueError("File is not writable from this LamaNotes client.")
 
         current_payload = self._payload_for_path(path)
         if not current_payload:
@@ -501,7 +534,7 @@ class NativeFileEventHandler(FileSystemEventHandler):
             self._callback(destination)
 
 
-class NirvNotesApi:
+class LamaNotesApi:
     def __init__(
         self,
         file_store: NativeFileStore,
@@ -621,7 +654,7 @@ class NirvNotesApi:
             if not token or not self._credential_store:
                 raise ValueError("The server did not return a usable session.")
             if not self._credential_store.set_token(token):
-                raise OSError("Windows could not protect the NirvNotes session.")
+                raise OSError("Windows could not protect the LamaNotes session.")
         except (OSError, ValueError, UnicodeError) as exc:
             logging.warning("native Google login exchange failed: %s", exc)
             return {"ok": False, "error": "The secure login exchange failed."}
@@ -732,10 +765,10 @@ class NirvNotesApi:
                 close_fds=True,
                 creationflags=creation_flags,
             )
-            logging.info("opened new NirvNotes window route=%s", normalized_route)
+            logging.info("opened new LamaNotes window route=%s", normalized_route)
             return {"started": True, "route": normalized_route}
         except OSError as exc:
-            logging.exception("could not open a new NirvNotes window")
+            logging.exception("could not open a new LamaNotes window")
             return {"started": False, "error": str(exc)}
 
     def open_external_url(self, url: str) -> dict[str, Any]:
@@ -823,10 +856,10 @@ class NirvNotesApi:
             )
         except error.HTTPError as exc:
             if exc.code != 404:
-                status["error"] = "Could not check for NirvNotes updates."
+                status["error"] = "Could not check for LamaNotes updates."
                 logging.info("update check failed http=%s", exc.code)
         except (OSError, ValueError, json.JSONDecodeError, KeyError) as exc:
-            status["error"] = "Could not check for NirvNotes updates."
+            status["error"] = "Could not check for LamaNotes updates."
             logging.info("update check failed: %s", exc)
 
         self._update_status = status
@@ -862,7 +895,7 @@ class NirvNotesApi:
 
             updater_source = Path(resource_path(UPDATE_SCRIPT_FILE))
             if not updater_source.is_file():
-                raise FileNotFoundError("The NirvNotes updater script is missing.")
+                raise FileNotFoundError("The LamaNotes updater script is missing.")
             updater_path = update_root / UPDATE_SCRIPT_FILE
             shutil.copy2(updater_source, updater_path)
 
@@ -1070,9 +1103,52 @@ def launch_updater_process(command: list[str]) -> int:
     return_code = process.poll()
     if return_code is not None:
         raise OSError(
-            f"The NirvNotes updater exited before handoff (code {return_code})."
+            f"The LamaNotes updater exited before handoff (code {return_code})."
         )
     return int(process.pid)
+
+
+def handoff_legacy_install() -> bool:
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        return False
+
+    executable = Path(sys.executable).resolve()
+    expected_legacy_dir = (
+        local_appdata_root() / "Programs" / LEGACY_APP_NAME
+    ).resolve()
+    if (
+        executable.name.casefold() != f"{LEGACY_APP_NAME}.exe".casefold()
+        or executable.parent != expected_legacy_dir
+    ):
+        return False
+
+    migration_source = Path(resource_path(LEGACY_MIGRATION_SCRIPT_FILE))
+    if not migration_source.is_file():
+        return False
+
+    update_root = local_app_root() / "updates"
+    update_root.mkdir(parents=True, exist_ok=True)
+    migration_script = update_root / LEGACY_MIGRATION_SCRIPT_FILE
+    shutil.copy2(migration_source, migration_script)
+    target_dir = local_appdata_root() / "Programs" / APP_NAME
+    command = [
+        "powershell.exe",
+        "-NoProfile",
+        "-WindowStyle",
+        "Hidden",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(migration_script),
+        "-ParentProcessId",
+        str(os.getpid()),
+        "-LegacyInstallDir",
+        str(executable.parent),
+        "-InstallDir",
+        str(target_dir),
+    ]
+    launch_updater_process(command)
+    return True
 
 
 def parse_iso_datetime(value: Any) -> datetime | None:
@@ -1104,9 +1180,52 @@ def download_update_package(url: str, destination: Path) -> None:
         raise
 
 
+def local_appdata_root() -> Path:
+    return Path(os.getenv("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+
+
+def _move_missing_tree(source: Path, destination: Path) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    for source_item in source.iterdir():
+        destination_item = destination / source_item.name
+        if source_item.is_dir() and destination_item.is_dir():
+            _move_missing_tree(source_item, destination_item)
+            with contextlib.suppress(OSError):
+                source_item.rmdir()
+            continue
+        if destination_item.exists():
+            if source_item.is_dir():
+                shutil.rmtree(source_item, ignore_errors=True)
+            else:
+                source_item.unlink(missing_ok=True)
+            continue
+        shutil.move(str(source_item), str(destination_item))
+
+
+def migrate_legacy_local_state(base_root: Path | None = None) -> bool:
+    root = base_root or local_appdata_root()
+    legacy_path = root / LEGACY_APP_NAME
+    target_path = root / APP_NAME
+    if not legacy_path.is_dir():
+        return False
+
+    try:
+        if not target_path.exists():
+            legacy_path.replace(target_path)
+        else:
+            _move_missing_tree(legacy_path, target_path)
+            with contextlib.suppress(OSError):
+                legacy_path.rmdir()
+        return True
+    except OSError:
+        logging.warning("could not migrate legacy desktop state", exc_info=True)
+        return False
+
+
 def local_app_root() -> Path:
-    root = Path(os.getenv("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-    path = root / "NirvNotes"
+    root = local_appdata_root()
+    migrate_legacy_local_state(root)
+    path = root / "LamaNotes"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -1302,7 +1421,7 @@ def activate_current_process_window() -> None:
             user32.ShowWindow(target_hwnd.value, 9)  # SW_RESTORE
         user32.SetForegroundWindow(target_hwnd.value)
     except Exception:
-        logging.debug("could not focus NirvNotes window", exc_info=True)
+        logging.debug("could not focus LamaNotes window", exc_info=True)
 
 
 def get_window_coordinate_scale(user32: Any, hwnd: int) -> float:
@@ -1502,7 +1621,7 @@ class LocalProxyHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Cache-Control", cache_control)
-        self.send_header("X-NirvNotes-Shell", "desktop")
+        self.send_header("X-LamaNotes-Shell", "desktop")
         self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(payload)
@@ -1554,13 +1673,13 @@ class LocalProxyHandler(BaseHTTPRequestHandler):
                 response.release_conn()
 
     def _send_upstream_offline(self, reason: str) -> None:
-        payload = f"NirvNotes local proxy could not reach upstream: {reason}".encode(
+        payload = f"LamaNotes local proxy could not reach upstream: {reason}".encode(
             "utf-8",
             errors="replace",
         )
         self.send_response(502)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
-        self.send_header("X-NirvNotes-Upstream", "offline")
+        self.send_header("X-LamaNotes-Upstream", "offline")
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Connection", "close")
         self.end_headers()
@@ -1673,7 +1792,7 @@ class HandoffServer(ThreadingHTTPServer):
     def __init__(
         self,
         server_address: tuple[str, int],
-        api: NirvNotesApi,
+        api: LamaNotesApi,
         browser_base_url: str,
     ) -> None:
         super().__init__(server_address, HandoffHandler)
@@ -1699,12 +1818,12 @@ class HandoffHandler(BaseHTTPRequestHandler):
         if result.get("ok"):
             self._send_html(
                 200,
-                "NirvNotes ist angemeldet. Dieses Fenster kann geschlossen werden.",
+                "LamaNotes ist angemeldet. Dieses Fenster kann geschlossen werden.",
             )
         else:
             self._send_html(
                 400,
-                "Die NirvNotes-Anmeldung ist abgelaufen oder fehlgeschlagen.",
+                "Die LamaNotes-Anmeldung ist abgelaufen oder fehlgeschlagen.",
             )
 
     def do_POST(self) -> None:
@@ -1758,7 +1877,7 @@ class HandoffHandler(BaseHTTPRequestHandler):
         encoded = (
             '<!doctype html><html lang="de"><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width">'
-            '<title>NirvNotes</title><body style="font:16px system-ui;'
+            '<title>LamaNotes</title><body style="font:16px system-ui;'
             'max-width:34rem;margin:12vh auto;padding:1rem">'
             f"<p>{message}</p></body></html>"
         ).encode("utf-8")
@@ -1773,7 +1892,7 @@ class HandoffHandler(BaseHTTPRequestHandler):
 
 
 def start_handoff_server(
-    api: NirvNotesApi,
+    api: LamaNotesApi,
     browser_base_url: str,
 ) -> tuple[HandoffServer, int]:
     port = find_free_port()
@@ -1806,7 +1925,7 @@ def start_instance_registration(command_port: int) -> threading.Event:
         write_record(started_at, last_active)
     except OSError:
         logging.debug(
-            "could not write initial NirvNotes instance record", exc_info=True
+            "could not write initial LamaNotes instance record", exc_info=True
         )
 
     def registration_loop() -> None:
@@ -1819,7 +1938,7 @@ def start_instance_registration(command_port: int) -> threading.Event:
                 write_record(now, last_active)
             except OSError:
                 logging.debug(
-                    "could not write NirvNotes instance record", exc_info=True
+                    "could not write LamaNotes instance record", exc_info=True
                 )
             stop_event.wait(INSTANCE_HEARTBEAT_SECONDS)
 
@@ -1954,9 +2073,9 @@ def remove_instance_record(record: dict[str, Any]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="NirvNotes Windows client")
+    parser = argparse.ArgumentParser(description="LamaNotes Windows client")
     parser.add_argument("files", nargs="*", help="Optional local files to open")
-    parser.add_argument("--url", default=DEFAULT_URL, help="NirvNotes server URL")
+    parser.add_argument("--url", default=DEFAULT_URL, help="LamaNotes server URL")
     parser.add_argument("--width", type=int, default=430)
     parser.add_argument("--height", type=int, default=960)
     parser.add_argument("--min-width", type=int, default=360)
@@ -1964,7 +2083,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--route",
         default="",
-        help="Initial NirvNotes route for a newly opened window.",
+        help="Initial LamaNotes route for a newly opened window.",
     )
     parser.add_argument(
         "--proxy-port",
@@ -2016,10 +2135,10 @@ def startup_html() -> str:
       }
 
       .loader {
-        width: 42px;
-        height: 42px;
-        border: 3px solid rgba(154, 170, 196, 0.22);
-        border-top-color: #8fc7ff;
+        width: 34px;
+        height: 34px;
+        border: 2px solid rgba(39, 179, 205, 0.18);
+        border-top-color: #27b3cd;
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
       }
@@ -2032,7 +2151,7 @@ def startup_html() -> str:
     </style>
   </head>
   <body>
-    <div class="loader" aria-label="Loading NirvNotes"></div>
+    <div class="loader" aria-label="Loading LamaNotes"></div>
   </body>
 </html>
 """.strip()
@@ -2043,14 +2162,14 @@ def dispatch_native_file_drag_state(window: webview.Window, active: bool) -> Non
     run_js(
         window,
         "window.dispatchEvent(new CustomEvent("
-        "'nirvnotes:native-file-drag-state', "
+        "'lamanotes:native-file-drag-state', "
         f"{{ detail: {{ active: {active_json} }} }}));",
     )
 
 
 def register_native_file_drop(
     window: webview.Window,
-    api: NirvNotesApi,
+    api: LamaNotesApi,
     browser_base_url: str,
 ) -> None:
     def handle_drop(event: Any) -> None:
@@ -2074,19 +2193,19 @@ def register_native_file_drop(
                 stop_propagation=False,
             )
             document.events.drop += handler
-            setattr(window, "_nirvnotes_drop_binding", (document, handler))
+            setattr(window, "_lamanotes_drop_binding", (document, handler))
             logging.info("native file drop ready")
         except Exception:
             logging.warning("could not attach native file drop", exc_info=True)
 
     window.events.loaded += attach_to_page
-    setattr(window, "_nirvnotes_drop_page_handler", attach_to_page)
+    setattr(window, "_lamanotes_drop_page_handler", attach_to_page)
 
 
 def load_start_url_after_gui(
     window: webview.Window,
     start_url: str,
-    api: NirvNotesApi,
+    api: LamaNotesApi,
     browser_base_url: str,
 ) -> None:
     logging.info("webview gui started")
@@ -2113,8 +2232,8 @@ def dispatch_native_launch_consumption(
     script = f"""
 (() => {{
   const fallbackUrl = {encoded_fallback_url};
-  if (typeof window.__nirvnotesConsumeNativeLaunchFiles === "function") {{
-    window.__nirvnotesConsumeNativeLaunchFiles();
+  if (typeof window.__lamanotesConsumeNativeLaunchFiles === "function") {{
+    window.__lamanotesConsumeNativeLaunchFiles();
     return;
   }}
 
@@ -2145,7 +2264,7 @@ def build_menu(window_ref: dict[str, webview.Window], base_url: str) -> list[Men
         if window():
             run_js(
                 window(),
-                "window.dispatchEvent(new CustomEvent('nirvnotes:open-native-file-dialog'))",
+                "window.dispatchEvent(new CustomEvent('lamanotes:open-native-file-dialog'))",
             )
 
     def reload() -> None:
@@ -2195,6 +2314,8 @@ def build_menu(window_ref: dict[str, webview.Window], base_url: str) -> list[Men
 
 def main() -> None:
     process_started_at = time.monotonic()
+    if handoff_legacy_install():
+        return
     setup_logging()
     logging.info("process start pid=%s argv=%s", os.getpid(), sys.argv[1:])
     args = parse_args()
@@ -2218,7 +2339,7 @@ def main() -> None:
             credential_store=credential_store,
         )
 
-    api = NirvNotesApi(
+    api = LamaNotesApi(
         file_store,
         args.files,
         browser_base_url,
@@ -2230,7 +2351,7 @@ def main() -> None:
     logging.info("start url prepared %s", start_url)
     window_ref: dict[str, webview.Window] = {}
     menu = build_menu(window_ref, browser_base_url) if args.native_menu else []
-    icon_path = resource_path("client/assets/favicon.ico")
+    icon_path = resource_path("lamanotes.ico")
     saved_window_state = load_window_state(args.min_width, args.min_height)
 
     window = webview.create_window(
@@ -2243,13 +2364,13 @@ def main() -> None:
         y=saved_window_state.get("y"),
         min_size=(args.min_width, args.min_height),
         maximized=saved_window_state.get("maximized", False),
-        background_color="#20252B",
+        background_color="#20252b",
         text_select=True,
         zoomable=True,
         menu=menu if menu else None,
     )
     if not window:
-        raise RuntimeError("Could not create NirvNotes window.")
+        raise RuntimeError("Could not create LamaNotes window.")
 
     logging.info("window created")
     api._window = window

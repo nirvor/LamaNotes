@@ -65,7 +65,7 @@ export function publicationProblemMessage(problem) {
     note_changed: "The note changed. Review it before publishing again.",
     publication_busy: "An update for this page is already running.",
     publication_too_large: "This note is too large to publish.",
-    publisher_forbidden: "This NirvNotes server is not allowed to publish.",
+    publisher_forbidden: "This LamaNotes server is not allowed to publish.",
     publisher_unauthorized: "Publishing authentication needs attention.",
     public_asset_verification_failed:
       "A public media file could not be verified.",

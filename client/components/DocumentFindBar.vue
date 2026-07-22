@@ -1,6 +1,6 @@
 <template>
   <form
-    class="flatnotes-document-find print:hidden"
+    class="lamanotes-document-find print:hidden"
     role="search"
     aria-label="Find in document"
     @submit.prevent="$emit('next')"
@@ -11,7 +11,7 @@
       type="mdi"
       :path="mdiMagnify"
       size="0.9rem"
-      class="flatnotes-document-find-icon"
+      class="lamanotes-document-find-icon"
     />
     <input
       ref="input"
@@ -25,7 +25,7 @@
       @keydown.enter.prevent="enterHandler"
       @keydown.esc.prevent.stop="$emit('close')"
     />
-    <span class="flatnotes-document-find-count" aria-live="polite">
+    <span class="lamanotes-document-find-count" aria-live="polite">
       {{ current }}/{{ total }}
     </span>
     <button
@@ -84,7 +84,7 @@ defineExpose({ focusSelect });
 </script>
 
 <style scoped>
-.flatnotes-document-find {
+.lamanotes-document-find {
   position: fixed;
   z-index: 70;
   top: 3.15rem;
@@ -102,13 +102,13 @@ defineExpose({ focusSelect });
   box-shadow: 0 0.45rem 1.25rem rgb(var(--theme-shadow) / 0.34);
 }
 
-.flatnotes-document-find-icon {
+.lamanotes-document-find-icon {
   align-self: center;
   margin-left: 0.58rem;
   color: rgb(var(--theme-text-muted));
 }
 
-.flatnotes-document-find input {
+.lamanotes-document-find input {
   min-width: 0;
   border: 0;
   padding: 0.35rem 0.5rem;
@@ -118,11 +118,11 @@ defineExpose({ focusSelect });
   font-size: 0.82rem;
 }
 
-.flatnotes-document-find input::-webkit-search-cancel-button {
+.lamanotes-document-find input::-webkit-search-cancel-button {
   display: none;
 }
 
-.flatnotes-document-find-count {
+.lamanotes-document-find-count {
   min-width: 2.7rem;
   align-self: center;
   color: rgb(var(--theme-text-very-muted));
@@ -131,7 +131,7 @@ defineExpose({ focusSelect });
   text-align: center;
 }
 
-.flatnotes-document-find button {
+.lamanotes-document-find button {
   display: inline-grid;
   min-width: 0;
   place-items: center;
@@ -141,19 +141,19 @@ defineExpose({ focusSelect });
   background: transparent;
 }
 
-.flatnotes-document-find button:hover,
-.flatnotes-document-find button:focus-visible {
+.lamanotes-document-find button:hover,
+.lamanotes-document-find button:focus-visible {
   color: rgb(var(--theme-text));
   background: rgb(var(--theme-background-elevated) / 0.74);
   outline: 0;
 }
 
-.flatnotes-document-find button:disabled {
+.lamanotes-document-find button:disabled {
   opacity: 0.34;
 }
 
 @media (max-width: 520px) {
-  .flatnotes-document-find {
+  .lamanotes-document-find {
     top: 3rem;
     min-height: 2.35rem;
     grid-template-columns: auto minmax(4rem, 1fr) auto repeat(3, 2rem);
@@ -162,18 +162,18 @@ defineExpose({ focusSelect });
 </style>
 
 <style>
-::highlight(nirvnotes-find-matches) {
+::highlight(lamanotes-find-matches) {
   color: inherit;
   background-color: rgb(var(--theme-brand) / 0.3);
 }
 
-::highlight(nirvnotes-find-active) {
+::highlight(lamanotes-find-active) {
   color: rgb(var(--theme-background));
   background-color: rgb(var(--theme-brand));
 }
 
 @media (max-width: 520px) {
-  .flatnotes-document-find-open {
+  .lamanotes-document-find-open {
     padding-top: 2.6rem;
   }
 }

@@ -29,14 +29,14 @@ ARG BUILD_DIR
 ENV PUID=1000
 ENV PGID=1000
 ENV EXEC_TOOL=gosu
-ENV FLATNOTES_HOST=0.0.0.0
-ENV FLATNOTES_PORT=8080
+ENV LAMANOTES_HOST=0.0.0.0
+ENV LAMANOTES_PORT=8080
 
 ENV APP_PATH=/app
-ENV FLATNOTES_PATH=/data
+ENV LAMANOTES_PATH=/data
 
 RUN mkdir -p ${APP_PATH}
-RUN mkdir -p ${FLATNOTES_PATH}
+RUN mkdir -p ${LAMANOTES_PATH}
 
 RUN apt update && apt install -y \
     curl \
@@ -59,7 +59,7 @@ RUN sed -i 's/\r$//' /entrypoint.sh /healthcheck.sh
 RUN chmod +x /entrypoint.sh /healthcheck.sh
 
 VOLUME /data
-EXPOSE ${FLATNOTES_PORT}/tcp
+EXPOSE ${LAMANOTES_PORT}/tcp
 HEALTHCHECK --interval=60s --timeout=10s CMD /healthcheck.sh
 
 ENTRYPOINT [ "/entrypoint.sh" ]

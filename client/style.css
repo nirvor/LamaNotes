@@ -3,216 +3,216 @@
 @tailwind utilities;
 
 @layer base {
-    @font-face {
-        font-family: "Poppins";
-        font-style: normal;
-        font-weight: 400;
-        font-display: swap;
-        src: url("assets/fonts/Poppins/Poppins-Regular.woff2") format("woff2");
-    }
+  @font-face {
+    font-family: "Poppins";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("assets/fonts/Poppins/Poppins-Regular.woff2") format("woff2");
+  }
 
-    @font-face {
-        font-family: "Poppins";
-        font-style: italic;
-        font-weight: 400;
-        font-display: swap;
-        src: url("assets/fonts/Poppins/Poppins-Italic.woff2") format("woff2");
-    }
+  @font-face {
+    font-family: "Poppins";
+    font-style: italic;
+    font-weight: 400;
+    font-display: swap;
+    src: url("assets/fonts/Poppins/Poppins-Italic.woff2") format("woff2");
+  }
 
-    @font-face {
-        font-family: "Poppins";
-        font-style: normal;
-        font-weight: 600;
-        font-display: swap;
-        src: url("assets/fonts/Poppins/Poppins-SemiBold.woff2") format("woff2");
-    }
+  @font-face {
+    font-family: "Poppins";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("assets/fonts/Poppins/Poppins-SemiBold.woff2") format("woff2");
+  }
 
-    @font-face {
-        font-family: "Poppins";
-        font-style: italic;
-        font-weight: 600;
-        font-display: swap;
-        src: url("assets/fonts/Poppins/Poppins-SemiBoldItalic.woff2")
-            format("woff2");
-    }
+  @font-face {
+    font-family: "Poppins";
+    font-style: italic;
+    font-weight: 600;
+    font-display: swap;
+    src: url("assets/fonts/Poppins/Poppins-SemiBoldItalic.woff2")
+      format("woff2");
+  }
 
-    body {
-        --theme-brand: 248 166 107;
-        --theme-background: 255 255 255;
-        --theme-background-elevated: 243 244 245;
-        --theme-heading: 30 92 145;
-        --theme-link: 72 102 145;
-        --theme-text: 44 49 57;
-        --theme-text-muted: 136 145 161;
-        --theme-text-very-muted: 193 199 208;
-        --theme-shadow: 236 238 240;
-        --theme-border: 236 238 240;
-    }
+  body {
+    --theme-brand: 39 179 205;
+    --theme-background: 255 255 255;
+    --theme-background-elevated: 243 244 245;
+    --theme-heading: 30 92 145;
+    --theme-link: 72 102 145;
+    --theme-text: 44 49 57;
+    --theme-text-muted: 136 145 161;
+    --theme-text-very-muted: 193 199 208;
+    --theme-shadow: 236 238 240;
+    --theme-border: 236 238 240;
+  }
 
-    html,
-    body,
-    #app {
-        width: 100%;
-        max-width: 100%;
-        min-width: 0;
-    }
+  html,
+  body,
+  #app {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
 
+  html {
+    overflow-x: hidden;
+    font-size: 15px;
+  }
+
+  body {
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
+  #app {
+    overflow: visible;
+  }
+
+  @media (max-width: 640px) and (pointer: coarse),
+    (max-width: 640px) and (hover: none) {
     html {
-        overflow-x: hidden;
-        font-size: 15px;
+      font-size: 16px;
     }
+  }
 
-    body {
-        overflow-x: clip;
-        overflow-y: visible;
-    }
+  body.dark {
+    --theme-brand: 39 179 205;
+    --theme-background: 34 38 44;
+    --theme-background-elevated: 44 49 57;
+    --theme-heading: 142 203 255;
+    --theme-link: 164 187 224;
+    --theme-text: 255 255 255;
+    --theme-text-muted: 136 145 161;
+    --theme-text-very-muted: 94 107 128;
+    --theme-shadow: none;
+    --theme-border: 94 107 128;
+  }
 
-    #app {
-        overflow: visible;
-    }
+  body.lamanotes-window-controls-overlay {
+    padding-top: env(titlebar-area-height, 0px);
+  }
 
-    @media (max-width: 640px) and (pointer: coarse),
-        (max-width: 640px) and (hover: none) {
-        html {
-            font-size: 16px;
-        }
-    }
-
-    body.dark {
-        /* --theme-brand: 248 166 107; */
-        --theme-background: 34 38 44;
-        --theme-background-elevated: 44 49 57;
-        --theme-heading: 142 203 255;
-        --theme-link: 164 187 224;
-        --theme-text: 255 255 255;
-        --theme-text-muted: 136 145 161;
-        --theme-text-very-muted: 94 107 128;
-        --theme-shadow: none;
-        --theme-border: 94 107 128;
-    }
-
-    body.flatnotes-window-controls-overlay {
-        padding-top: env(titlebar-area-height, 0px);
-    }
-
-    body.flatnotes-window-controls-overlay::before {
-        content: "";
-        position: fixed;
-        top: env(titlebar-area-y, 0px);
-        left: env(titlebar-area-x, 0px);
-        z-index: 10000;
-        width: env(titlebar-area-width, 100vw);
-        height: env(titlebar-area-height, 0px);
-        background: rgb(var(--theme-background));
-        -webkit-app-region: drag;
-        app-region: drag;
-    }
-
-    body.flatnotes-window-controls-overlay button,
-    body.flatnotes-window-controls-overlay a,
-    body.flatnotes-window-controls-overlay input,
-    body.flatnotes-window-controls-overlay select,
-    body.flatnotes-window-controls-overlay textarea,
-    body.flatnotes-window-controls-overlay [role="button"] {
-        -webkit-app-region: no-drag;
-        app-region: no-drag;
-    }
-
-    body.nirvnotes-native-host {
-        background-color: rgb(var(--theme-background));
-    }
-
-    body.nirvnotes-native-host .flatnotes-app-shell {
-        width: 100vw;
-        max-width: 100vw;
-        box-sizing: border-box;
-        overflow: visible;
-        padding-top: 0.55rem;
-        padding-inline: 0.45rem;
-    }
-
-    body.nirvnotes-native-host .flatnotes-open-file,
-    body.nirvnotes-native-host .flatnotes-note-shell {
-        width: 100%;
-        max-width: 100%;
-        box-sizing: border-box;
-    }
-
-    body.nirvnotes-native-host .flatnotes-navbar-actions {
-        min-width: 0;
-        max-width: 100%;
-        gap: 0.1rem;
-    }
-
-    body.nirvnotes-native-host
-        .flatnotes-navbar-actions
-        .flatnotes-custom-button {
-        min-width: 1.38rem;
-        padding-inline: 0.24rem;
-    }
-
-    body.nirvnotes-native-host
-        .flatnotes-navbar-actions
-        .flatnotes-icon-label-text {
-        display: none;
-    }
-
-    body.nirvnotes-native-host
-        .flatnotes-navbar-actions
-        .flatnotes-icon-label-icon {
-        margin-right: 0 !important;
-    }
-}
-
-body.nirvnotes-native-file-drag-active::before {
-    position: fixed;
-    z-index: 10000;
-    inset: 0.45rem;
-    border: 1px dashed rgb(var(--theme-heading) / 0.78);
-    border-radius: 0.38rem;
-    background: rgb(var(--theme-background) / 0.9);
+  body.lamanotes-window-controls-overlay::before {
     content: "";
-    pointer-events: none;
-}
-
-body.nirvnotes-native-file-drag-active::after {
     position: fixed;
-    z-index: 10001;
-    top: 50%;
-    left: 50%;
-    min-width: 9rem;
-    transform: translate(-50%, -50%);
-    color: rgb(var(--theme-heading));
-    font-size: 0.82rem;
-    font-weight: 600;
-    text-align: center;
-    pointer-events: none;
+    top: env(titlebar-area-y, 0px);
+    left: env(titlebar-area-x, 0px);
+    z-index: 10000;
+    width: env(titlebar-area-width, 100vw);
+    height: env(titlebar-area-height, 0px);
+    background: rgb(var(--theme-background));
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+
+  body.lamanotes-window-controls-overlay button,
+  body.lamanotes-window-controls-overlay a,
+  body.lamanotes-window-controls-overlay input,
+  body.lamanotes-window-controls-overlay select,
+  body.lamanotes-window-controls-overlay textarea,
+  body.lamanotes-window-controls-overlay [role="button"] {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+
+  body.lamanotes-native-host {
+    background-color: rgb(var(--theme-background));
+  }
+
+  body.lamanotes-native-host .lamanotes-app-shell {
+    width: 100vw;
+    max-width: 100vw;
+    box-sizing: border-box;
+    overflow: visible;
+    padding-top: 0.55rem;
+    padding-inline: 0.45rem;
+  }
+
+  body.lamanotes-native-host .lamanotes-open-file,
+  body.lamanotes-native-host .lamanotes-note-shell {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  body.lamanotes-native-host .lamanotes-navbar-actions {
+    min-width: 0;
+    max-width: 100%;
+    gap: 0.1rem;
+  }
+
+  body.lamanotes-native-host
+    .lamanotes-navbar-actions
+    .lamanotes-custom-button {
+    min-width: 1.38rem;
+    padding-inline: 0.24rem;
+  }
+
+  body.lamanotes-native-host
+    .lamanotes-navbar-actions
+    .lamanotes-icon-label-text {
+    display: none;
+  }
+
+  body.lamanotes-native-host
+    .lamanotes-navbar-actions
+    .lamanotes-icon-label-icon {
+    margin-right: 0 !important;
+  }
 }
 
-body.nirvnotes-native-file-drag-active::after {
-    content: "Drop file to open";
+body.lamanotes-native-file-drag-active::before {
+  position: fixed;
+  z-index: 10000;
+  inset: 0.45rem;
+  border: 1px dashed rgb(var(--theme-heading) / 0.78);
+  border-radius: 0.38rem;
+  background: rgb(var(--theme-background) / 0.9);
+  content: "";
+  pointer-events: none;
 }
 
-body.nirvnotes-native-text-drag-active::after {
-    position: fixed;
-    z-index: 10001;
-    top: 0.62rem;
-    left: 50%;
-    max-width: min(12rem, calc(100vw - 2rem));
-    transform: translateX(-50%);
-    overflow: hidden;
-    border: 1px solid rgb(var(--theme-heading) / 0.52);
-    border-radius: 0.25rem;
-    padding: 0.24rem 0.48rem;
-    color: rgb(var(--theme-heading));
-    background: rgb(var(--theme-background-elevated) / 0.96);
-    box-shadow: 0 0.22rem 0.7rem rgb(0 0 0 / 0.16);
-    content: attr(data-nirvnotes-text-drop-label);
-    font-size: 0.68rem;
-    font-weight: 600;
-    line-height: 1.15;
-    text-align: center;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    pointer-events: none;
+body.lamanotes-native-file-drag-active::after {
+  position: fixed;
+  z-index: 10001;
+  top: 50%;
+  left: 50%;
+  min-width: 9rem;
+  transform: translate(-50%, -50%);
+  color: rgb(var(--theme-heading));
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none;
+}
+
+body.lamanotes-native-file-drag-active::after {
+  content: "Drop file to open";
+}
+
+body.lamanotes-native-text-drag-active::after {
+  position: fixed;
+  z-index: 10001;
+  top: 0.62rem;
+  left: 50%;
+  max-width: min(12rem, calc(100vw - 2rem));
+  transform: translateX(-50%);
+  overflow: hidden;
+  border: 1px solid rgb(var(--theme-heading) / 0.52);
+  border-radius: 0.25rem;
+  padding: 0.24rem 0.48rem;
+  color: rgb(var(--theme-heading));
+  background: rgb(var(--theme-background-elevated) / 0.96);
+  box-shadow: 0 0.22rem 0.7rem rgb(0 0 0 / 0.16);
+  content: attr(data-lamanotes-text-drop-label);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
 }

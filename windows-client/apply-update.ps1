@@ -8,14 +8,14 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$UpdateRoot = Join-Path $env:LOCALAPPDATA "NirvNotes\updates"
+$UpdateRoot = Join-Path $env:LOCALAPPDATA "LamaNotes\updates"
 $LogPath = Join-Path $UpdateRoot "apply-update.log"
 $SafeVersion = $Version -replace "[^A-Za-z0-9._-]", "_"
 $SessionKey = "$SafeVersion-$ParentProcessId-$PID"
 $StageDir = Join-Path $UpdateRoot "stage-$SessionKey"
 $BackupDir = Join-Path $UpdateRoot "previous-app-$SessionKey"
 $NextAppDir = Join-Path $UpdateRoot "next-app-$SessionKey"
-$InstalledExe = Join-Path $InstallDir "NirvNotes.exe"
+$InstalledExe = Join-Path $InstallDir "LamaNotes.exe"
 $InstalledInternal = Join-Path $InstallDir "_internal"
 
 New-Item -ItemType Directory -Path $UpdateRoot -Force | Out-Null
@@ -38,14 +38,14 @@ function Assert-SafePaths {
     throw "Refusing to update the LOCALAPPDATA root."
   }
   if (-not $ResolvedPackage.StartsWith($ResolvedUpdateRoot + "\", [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "Update package must stay inside the NirvNotes update directory."
+    throw "Update package must stay inside the LamaNotes update directory."
   }
 }
 
 function Get-InstalledAppProcesses {
   $ResolvedExe = [System.IO.Path]::GetFullPath($InstalledExe)
   return @(
-    Get-CimInstance Win32_Process -Filter "Name = 'NirvNotes.exe'" -ErrorAction SilentlyContinue |
+    Get-CimInstance Win32_Process -Filter "Name = 'LamaNotes.exe'" -ErrorAction SilentlyContinue |
       Where-Object {
         $_.ExecutablePath -and
         [System.IO.Path]::GetFullPath($_.ExecutablePath) -ieq $ResolvedExe
@@ -61,7 +61,7 @@ function Stop-InstalledAppProcesses {
       return
     }
 
-    Write-UpdateLog "Closing $($Processes.Count) remaining NirvNotes process(es)."
+    Write-UpdateLog "Closing $($Processes.Count) remaining LamaNotes process(es)."
     foreach ($Process in $Processes) {
       Stop-Process -Id $Process.ProcessId -Force -ErrorAction SilentlyContinue
     }
@@ -70,13 +70,13 @@ function Stop-InstalledAppProcesses {
 
   $Remaining = @(Get-InstalledAppProcesses)
   if ($Remaining.Count -gt 0) {
-    throw "NirvNotes did not close completely before the update."
+    throw "LamaNotes did not close completely before the update."
   }
 }
 
 function Get-RequiredAppFiles([string]$Root) {
   return @(
-    (Join-Path $Root "NirvNotes.exe"),
+    (Join-Path $Root "LamaNotes.exe"),
     (Join-Path $Root "_internal\client-version.json"),
     (Join-Path $Root "_internal\webview\lib\runtimes\win-arm64\native\WebView2Loader.dll"),
     (Join-Path $Root "_internal\webview\lib\runtimes\win-x64\native\WebView2Loader.dll"),
@@ -102,13 +102,13 @@ function Restore-PreviousApp {
   Remove-Item -LiteralPath $InstalledInternal -Recurse -Force -ErrorAction SilentlyContinue
   if (Test-Path -LiteralPath $BackupDir) {
     Copy-AppContents $BackupDir $InstallDir
-    Assert-AppPayload $InstallDir "Restored NirvNotes app"
+    Assert-AppPayload $InstallDir "Restored LamaNotes app"
   }
 }
 
 try {
   Assert-SafePaths
-  Write-UpdateLog "Waiting for NirvNotes process $ParentProcessId."
+  Write-UpdateLog "Waiting for LamaNotes process $ParentProcessId."
   Wait-Process -Id $ParentProcessId -Timeout 15 -ErrorAction SilentlyContinue
   Stop-InstalledAppProcesses
 
@@ -125,9 +125,9 @@ try {
   Expand-Archive -LiteralPath $PackagePath -DestinationPath $StageDir -Force
 
   $NewApp = Join-Path $StageDir "app"
-  Assert-AppPayload $NewApp "Downloaded NirvNotes app"
+  Assert-AppPayload $NewApp "Downloaded LamaNotes app"
   Copy-AppContents $NewApp $NextAppDir
-  Assert-AppPayload $NextAppDir "Staged NirvNotes app"
+  Assert-AppPayload $NextAppDir "Staged LamaNotes app"
 
   if (Test-Path -LiteralPath $InstalledExe) {
     Copy-Item -LiteralPath $InstalledExe -Destination $BackupDir -Force
@@ -136,13 +136,15 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $BackupDir "_internal") -Force | Out-Null
     Copy-Item -Path (Join-Path $InstalledInternal "*") -Destination (Join-Path $BackupDir "_internal") -Recurse -Force
   }
-  Assert-AppPayload $BackupDir "NirvNotes rollback backup"
+  Assert-AppPayload $BackupDir "LamaNotes rollback backup"
 
   try {
     Remove-Item -LiteralPath $InstalledExe -Force
     Remove-Item -LiteralPath $InstalledInternal -Recurse -Force
     Copy-AppContents $NextAppDir $InstallDir
-    Assert-AppPayload $InstallDir "Installed NirvNotes app"
+    Remove-Item -LiteralPath (Join-Path $InstallDir "NirvNotes.exe") -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $InstallDir "Uninstall-NirvNotes.ps1") -Force -ErrorAction SilentlyContinue
+    Assert-AppPayload $InstallDir "Installed LamaNotes app"
   } catch {
     Write-UpdateLog "Install failed. Restoring previous app."
     Restore-PreviousApp
@@ -161,7 +163,7 @@ try {
     }
   }
 
-  $UninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NirvNotes"
+  $UninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\LamaNotes"
   if (Test-Path -LiteralPath $UninstallKey) {
     New-ItemProperty -Path $UninstallKey -Name DisplayVersion -Value $Version -PropertyType String -Force | Out-Null
   }
@@ -169,7 +171,7 @@ try {
   Remove-Item -LiteralPath $BackupDir -Recurse -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $StageDir -Recurse -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $NextAppDir -Recurse -Force -ErrorAction SilentlyContinue
-  Write-UpdateLog "Updated NirvNotes to $Version."
+  Write-UpdateLog "Updated LamaNotes to $Version."
   if (-not $SkipLaunch) {
     Start-Process -FilePath $InstalledExe
   }
@@ -177,10 +179,10 @@ try {
   Write-UpdateLog "Update failed: $($_.Exception.Message)"
   if (-not $SkipLaunch) {
     try {
-      Assert-AppPayload $InstallDir "Recoverable NirvNotes app"
+      Assert-AppPayload $InstallDir "Recoverable LamaNotes app"
       Start-Process -FilePath $InstalledExe
     } catch {
-      Write-UpdateLog "NirvNotes was not restarted because its payload is incomplete."
+      Write-UpdateLog "LamaNotes was not restarted because its payload is incomplete."
     }
   }
   exit 1

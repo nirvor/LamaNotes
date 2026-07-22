@@ -6,9 +6,7 @@ export function createLocalDraftId() {
 }
 
 export function newNoteLocation(options = {}) {
-  const desktopEnabled =
-    options.desktopEnabled ??
-    Boolean(globalThis.window?.__NIRVNOTES_DESKTOP_SHELL__);
+  const desktopEnabled = options.desktopEnabled ?? isDesktopHost();
   if (!desktopEnabled) {
     return { name: "new" };
   }
@@ -25,3 +23,4 @@ export function newNoteLocation(options = {}) {
 export function openNewNote(router, options = {}) {
   return router.push(newNoteLocation(options));
 }
+import { isDesktopHost } from "./brand.js";

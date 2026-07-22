@@ -150,7 +150,9 @@ def load_windows_update_manifest():
         raise HTTPException(404, "Windows client updates are not configured.")
 
     update_root = Path(global_config.windows_update_dir).resolve()
-    manifest_path = update_root / "NirvNotes-update.json"
+    manifest_path = update_root / "LamaNotes-update.json"
+    if not manifest_path.is_file():
+        manifest_path = update_root / "NirvNotes-update.json"
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError):
@@ -289,7 +291,7 @@ if global_config.auth_type not in [AuthType.NONE, AuthType.READ_ONLY]:
                 content=(
                     '<!doctype html><html lang="en"><meta charset="utf-8">'
                     f'<meta http-equiv="refresh" content="0;url={escaped_next}">'
-                    "<title>NirvNotes</title><p>Login completed. "
+                    "<title>LamaNotes</title><p>Login completed. "
                     f'<a href="{escaped_next}">Continue</a></p></html>'
                 ),
                 headers={"Cache-Control": "no-store"},
@@ -554,7 +556,7 @@ def get_config():
     dependencies=read_auth_deps,
 )
 # Include a secondary route used to create relative URLs that can be used
-# outside the context of flatnotes (e.g. "/attachments/image.jpg").
+# outside the API context (e.g. "/attachments/image.jpg").
 @router.get(
     "/attachments/{filename}",
     dependencies=read_auth_deps,
