@@ -70,6 +70,8 @@ import {
 import NavBar from "./partials/NavBar.vue";
 import LoadingIndicator from "./components/LoadingIndicator.vue";
 import { openNewNote } from "./newNoteNavigation.js";
+import { reportNativeReady } from "./nativeTelemetry.js";
+import { scheduleIdleWork } from "./performanceScheduling.js";
 import router from "./router.js";
 
 const SearchModal = defineAsyncComponent(
@@ -108,6 +110,8 @@ Mousetrap.bindGlobal("ctrl+alt+h", () => {
 });
 
 let routeScrollTimer = null;
+let cancelDeferredConfig = null;
+let cancelIndexWarmup = null;
 
 onMounted(() => {
   loadInitialConfig();
@@ -120,6 +124,8 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  cancelDeferredConfig?.();
+  cancelIndexWarmup?.();
   window.clearTimeout(routeScrollTimer);
   saveCurrentRouteScroll();
   window.removeEventListener("scroll", scheduleRouteScrollSave);
@@ -139,37 +145,53 @@ watch(
 );
 
 function loadInitialConfig() {
+  // The first router navigation can still be resolving when App mounts.
+  const localFirst =
+    desktopShell.enabled &&
+    (route.name === "openFile" || window.location.pathname === "/open-file");
   const warmConfig = desktopShell.enabled ? getCachedConfig() : null;
-  if (warmConfig) {
-    globalStore.config = warmConfig;
+  if (warmConfig || localFirst) {
+    globalStore.config = warmConfig || desktopFallbackConfig;
     markAppLoaded();
-    warmCommonNoteViews();
-    void getSemanticIndex().catch(() => {});
+    if (!localFirst) {
+      warmCommonNoteViews();
+      scheduleIndexWarmup();
+    }
   }
 
-  getConfig({ force: Boolean(warmConfig) })
-    .then((data) => {
-      globalStore.config = data;
-      if (!warmConfig) {
-        markAppLoaded();
-        warmCommonNoteViews();
-      }
-      void getSemanticIndex().catch(() => {});
-    })
-    .catch((error) => {
-      if (
-        isCloudNetworkError(error) ||
-        (desktopShell.enabled &&
-          route.name === "openFile" &&
-          error.response?.status === 401)
-      ) {
-        globalStore.config = desktopFallbackConfig;
-        markAppLoaded();
-        return;
-      }
-      apiErrorHandler(error, toast);
-      loadingIndicator.value?.setFailed();
+  const refreshConfig = () =>
+    getConfig({ force: Boolean(warmConfig) })
+      .then((data) => {
+        globalStore.config = data;
+        if (!warmConfig && !localFirst) {
+          markAppLoaded();
+          warmCommonNoteViews();
+          scheduleIndexWarmup();
+        }
+      })
+      .catch((error) => {
+        if (
+          isCloudNetworkError(error) ||
+          (desktopShell.enabled &&
+            route.name === "openFile" &&
+            error.response?.status === 401)
+        ) {
+          globalStore.config = desktopFallbackConfig;
+          markAppLoaded();
+          return;
+        }
+        apiErrorHandler(error, toast);
+        loadingIndicator.value?.setFailed();
+      });
+
+  if (localFirst) {
+    cancelDeferredConfig = scheduleIdleWork(refreshConfig, {
+      delay: 900,
+      timeout: 2200,
     });
+  } else {
+    void refreshConfig();
+  }
 }
 
 let appReadyReported = false;
@@ -182,19 +204,17 @@ function markAppLoaded() {
   appMarkedLoaded = true;
   loadingIndicator.value?.setLoaded();
   performance.mark("nirvnotes-app-ready");
-  if (appReadyReported || !window.pywebview?.api?.report_client_ready) {
+  if (appReadyReported) {
     return;
   }
   appReadyReported = true;
   nextTick(() => {
     window.requestAnimationFrame(() => {
-      window.pywebview.api
-        .report_client_ready({
-          phase: "shell",
-          route: route.fullPath,
-          browserMs: Math.round(performance.now()),
-        })
-        .catch(() => {});
+      reportNativeReady({
+        phase: "shell",
+        route: route.fullPath,
+        browserMs: Math.round(performance.now()),
+      });
     });
   });
 }
@@ -269,6 +289,14 @@ function warmCommonNoteViews() {
     window.setTimeout(warmLightViews, 500);
     window.setTimeout(warmMarkdownView, desktopShell.enabled ? 2600 : 1200);
   }
+}
+
+function scheduleIndexWarmup() {
+  cancelIndexWarmup?.();
+  cancelIndexWarmup = scheduleIdleWork(
+    () => void getSemanticIndex().catch(() => {}),
+    { delay: desktopShell.enabled ? 700 : 250, timeout: 2200 },
+  );
 }
 
 loadTheme();

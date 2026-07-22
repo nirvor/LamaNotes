@@ -68,12 +68,6 @@ import {
   StreamLanguage,
   syntaxHighlighting,
 } from "@codemirror/language";
-import { json } from "@codemirror/legacy-modes/mode/javascript";
-import { properties } from "@codemirror/legacy-modes/mode/properties";
-import { stex } from "@codemirror/legacy-modes/mode/stex";
-import { toml } from "@codemirror/legacy-modes/mode/toml";
-import { xml } from "@codemirror/legacy-modes/mode/xml";
-import { yaml } from "@codemirror/legacy-modes/mode/yaml";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
 import {
   Annotation,
@@ -129,6 +123,7 @@ const languageCompartment = new Compartment();
 const wrappingCompartment = new Compartment();
 const externalUpdate = Annotation.define();
 let editorView = null;
+let languageLoadGeneration = 0;
 let tagNormalizeTimer = null;
 let sessionSaveTimer = null;
 let structuredPasteTimer = null;
@@ -389,32 +384,81 @@ function initialContent() {
   return props.modelValue || props.initialValue || "";
 }
 
-function languageExtension(language = props.language) {
+function immediateLanguageExtension(language = props.language) {
   if (language === "markdown" || language === "md") {
     return [markdownLanguage, keymap.of(markdownKeymap)];
-  }
-  if (language === "ini" || language === "cfg" || language === "properties") {
-    return StreamLanguage.define(properties);
-  }
-  if (language === "json") {
-    return StreamLanguage.define(json);
-  }
-  if (language === "yaml" || language === "yml") {
-    return StreamLanguage.define(yaml);
-  }
-  if (language === "toml") {
-    return StreamLanguage.define(toml);
-  }
-  if (language === "xml") {
-    return StreamLanguage.define(xml);
-  }
-  if (language === "tex" || language === "latex") {
-    return StreamLanguage.define(stex);
   }
   if (language === "csv") {
     return StreamLanguage.define(csvLanguage);
   }
   return [];
+}
+
+function usesLazyLanguageMode(language = props.language) {
+  return [
+    "ini",
+    "cfg",
+    "properties",
+    "json",
+    "yaml",
+    "yml",
+    "toml",
+    "xml",
+    "tex",
+    "latex",
+  ].includes(language);
+}
+
+async function loadLazyLanguageExtension(language) {
+  if (language === "ini" || language === "cfg" || language === "properties") {
+    const { properties } = await import(
+      "@codemirror/legacy-modes/mode/properties"
+    );
+    return StreamLanguage.define(properties);
+  }
+  if (language === "json") {
+    const { json } = await import("@codemirror/legacy-modes/mode/javascript");
+    return StreamLanguage.define(json);
+  }
+  if (language === "yaml" || language === "yml") {
+    const { yaml } = await import("@codemirror/legacy-modes/mode/yaml");
+    return StreamLanguage.define(yaml);
+  }
+  if (language === "toml") {
+    const { toml } = await import("@codemirror/legacy-modes/mode/toml");
+    return StreamLanguage.define(toml);
+  }
+  if (language === "xml") {
+    const { xml } = await import("@codemirror/legacy-modes/mode/xml");
+    return StreamLanguage.define(xml);
+  }
+  if (language === "tex" || language === "latex") {
+    const { stex } = await import("@codemirror/legacy-modes/mode/stex");
+    return StreamLanguage.define(stex);
+  }
+  return [];
+}
+
+async function applyLanguageExtension(language) {
+  const generation = ++languageLoadGeneration;
+  editorView?.dispatch({
+    effects: languageCompartment.reconfigure(
+      immediateLanguageExtension(language),
+    ),
+  });
+  if (!usesLazyLanguageMode(language)) {
+    return;
+  }
+  try {
+    const extension = await loadLazyLanguageExtension(language);
+    if (generation === languageLoadGeneration && editorView) {
+      editorView.dispatch({
+        effects: languageCompartment.reconfigure(extension),
+      });
+    }
+  } catch (error) {
+    console.debug(`Could not load ${language} syntax mode`, error);
+  }
 }
 
 function wrappingExtension(value = props.wrap) {
@@ -442,7 +486,7 @@ function editorExtensions() {
       ...searchKeymap,
       ...historyKeymap,
     ]),
-    languageCompartment.of(languageExtension()),
+    languageCompartment.of(immediateLanguageExtension()),
     wrappingCompartment.of(wrappingExtension()),
     sourceTheme,
     syntaxHighlighting(sourceHighlightStyle),
@@ -892,6 +936,9 @@ onMounted(() => {
     passive: true,
   });
   restoreSessionState();
+  if (usesLazyLanguageMode(props.language)) {
+    void applyLanguageExtension(props.language);
+  }
   emit("ready");
 });
 
@@ -916,9 +963,7 @@ watch(
 watch(
   () => props.language,
   (language) => {
-    editorView?.dispatch({
-      effects: languageCompartment.reconfigure(languageExtension(language)),
-    });
+    void applyLanguageExtension(language);
   },
 );
 
@@ -932,6 +977,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  languageLoadGeneration += 1;
   window.clearTimeout(tagNormalizeTimer);
   window.clearTimeout(sessionSaveTimer);
   window.clearTimeout(structuredPasteTimer);

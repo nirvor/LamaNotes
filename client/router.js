@@ -5,6 +5,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import { authCheck, clearApiCaches } from "./api.js";
 import { desktopShell, setDesktopWindowTitle } from "./desktopShell.js";
 import { clearStoredToken, getStoredToken } from "./tokenStorage.js";
+import { scheduleIdleWork } from "./performanceScheduling.js";
 
 const loadHomeView = () => import("./views/Home.vue");
 const loadNoteView = () => import("./views/Note.vue");
@@ -89,16 +90,25 @@ router.beforeEach(async (to) => {
   }
   if (desktopShell.enabled && getStoredToken()) {
     authChecked = true;
-    void authCheck().catch((error) => {
-      if (error.response?.status === 401) {
-        clearApiCaches();
-        clearStoredToken();
-        void router.replace({
-          name: "login",
-          query: { [constants.params.redirect]: to.fullPath },
-        });
-      }
-    });
+    const validateStoredSession = () =>
+      authCheck().catch((error) => {
+        if (error.response?.status === 401) {
+          clearApiCaches();
+          clearStoredToken();
+          void router.replace({
+            name: "login",
+            query: { [constants.params.redirect]: to.fullPath },
+          });
+        }
+      });
+    if (to.name === "openFile") {
+      scheduleIdleWork(() => void validateStoredSession(), {
+        delay: 1100,
+        timeout: 2400,
+      });
+    } else {
+      void validateStoredSession();
+    }
     return;
   }
   try {

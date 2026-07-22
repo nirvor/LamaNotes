@@ -170,7 +170,7 @@
       </p>
 
       <ToastViewer
-        v-else-if="activeFile"
+        v-else-if="activeFile && !editMode"
         :key="`${activeFile.key}:${activeFile.previewRevision}`"
         :initialValue="activeFile.previewMarkdown"
         :enhance-note-lead="false"
@@ -291,13 +291,14 @@ import {
   shouldUseLargeFileMode,
 } from "../largeFileMode.js";
 import { buildLocalLibraryNote } from "../localNotePromotion.js";
+import { reportNativeReady } from "../nativeTelemetry.js";
+import { createDebouncedWork } from "../performanceScheduling.js";
 
 const ToastViewer = defineAsyncComponent(
   () => import("../components/toastui/ToastViewer.vue"),
 );
-const SourceEditor = defineAsyncComponent(
-  () => import("../components/editor/SourceEditor.vue"),
-);
+const loadSourceEditor = () => import("../components/editor/SourceEditor.vue");
+const SourceEditor = defineAsyncComponent(loadSourceEditor);
 const DocumentAutomationModal = defineAsyncComponent(
   () => import("../components/DocumentAutomationModal.vue"),
 );
@@ -319,6 +320,11 @@ const router = useRouter();
 const toast = useToast();
 const globalStore = useGlobalStore();
 const localFileStorageAdapter = createLocalFileStorageAdapter();
+
+if (desktopShell.enabled) {
+  // Overlap the editor chunk with native file handoff instead of waiting for it.
+  void loadSourceEditor();
+}
 
 const activeFile = computed(
   () => files.value.find((file) => file.key === activeKey.value) || null,
@@ -427,10 +433,15 @@ const statusIcon = computed(() =>
 let nativeWatcherTimer = null;
 let nativeWatcherBusy = false;
 let scrollSaveTimer = null;
+let localLoadStartedAt = performance.now();
+let localLoadGeneration = 0;
+let lastEditorReadyGeneration = -1;
+let lastFileReadyGeneration = -1;
 let textDropActivatedEditMode = false;
 let textDropEditorReady = null;
 let latestTextDropPosition = null;
 let textDropPreviewActive = false;
+const draftPersistence = createDebouncedWork(persistDraftState, 240);
 
 onMounted(() => {
   if (!supportsFileHandlingLaunchQueue() && !supportsNativeFileBridge()) {
@@ -448,6 +459,8 @@ onMounted(() => {
     previewExternalTextDrop,
   );
   window.addEventListener("nirvnotes:text-drag-end", endExternalTextDrop);
+  window.addEventListener("visibilitychange", nativeWatcherVisibilityChanged);
+  window.addEventListener("pagehide", flushDraftPersistence);
 });
 
 watch(externalFileLaunch, consumeExternalLaunch, { immediate: true });
@@ -484,6 +497,8 @@ watchEffect(() => {
 
 onUnmounted(() => {
   textDropPreviewActive = false;
+  flushDraftPersistence();
+  draftPersistence.cancel();
   window.clearInterval(nativeWatcherTimer);
   window.clearTimeout(scrollSaveTimer);
   saveActiveScroll();
@@ -494,6 +509,11 @@ onUnmounted(() => {
     previewExternalTextDrop,
   );
   window.removeEventListener("nirvnotes:text-drag-end", endExternalTextDrop);
+  window.removeEventListener(
+    "visibilitychange",
+    nativeWatcherVisibilityChanged,
+  );
+  window.removeEventListener("pagehide", flushDraftPersistence);
   document.body.classList.remove(
     "nirvnotes-text-drop-enabled",
     "nirvnotes-native-text-drag-active",
@@ -763,6 +783,7 @@ function closeExternalFile() {
     return;
   }
 
+  draftPersistence.cancel();
   closeFind({ restoreFocus: false });
 
   files.value.forEach((file) => {
@@ -785,6 +806,8 @@ function activateFile(key) {
   if (key === activeKey.value) {
     return;
   }
+  flushDraftPersistence();
+  beginLocalLoad();
   closeFind({ restoreFocus: false });
   saveActiveScroll();
   documentSession.leaveEdit();
@@ -805,12 +828,11 @@ async function fileInputChanged(event) {
 }
 
 async function loadFiles(selectedFiles, message) {
+  flushDraftPersistence();
+  beginLocalLoad();
   closeFind({ restoreFocus: false });
   saveActiveScroll();
-  const readableFiles = [];
-  for (const selectedFile of selectedFiles) {
-    readableFiles.push(await fileToPreview(selectedFile));
-  }
+  const readableFiles = await Promise.all(selectedFiles.map(fileToPreview));
 
   files.value = readableFiles;
   activeKey.value = readableFiles[0]?.key || null;
@@ -820,6 +842,7 @@ async function loadFiles(selectedFiles, message) {
     restoreActiveDraft();
     showStatus(message);
     restoreActiveScroll();
+    reportFileReady();
   }
 }
 
@@ -832,6 +855,8 @@ function createLocalDraft(draftId) {
     return;
   }
 
+  flushDraftPersistence();
+  beginLocalLoad();
   closeFind({ restoreFocus: false });
   saveActiveScroll();
   const storedContent = documentSession.loadDraft(storageKey) || "";
@@ -901,7 +926,10 @@ function clearLocalDraftState(file) {
 
 async function fileToPreview(selectedFile) {
   const { file, handle, nativePayload } = normalizeSelectedFile(selectedFile);
-  const content = await file.text();
+  const content =
+    typeof nativePayload?.content === "string"
+      ? nativePayload.content
+      : await file.text();
   const nativeMetadata = nativePayload || handle?.metadata || {};
   const extension = getExtension(file.name);
   const largeFile = shouldUseLargeFileMode(content, file.size);
@@ -1137,25 +1165,37 @@ function codeLanguageForExtension(extension = "") {
 }
 
 function markActiveFileDirty() {
-  if (!activeFile.value) {
+  const file = activeFile.value;
+  if (!file) {
     return;
   }
 
-  activeFile.value.dirty = activeFile.value.isNewDraft
-    ? Boolean(activeFile.value.draftContent)
-    : activeFile.value.draftContent !== activeFile.value.content;
-  if (activeFile.value.isNewDraft) {
-    const nextName = suggestedDraftName(activeFile.value.draftContent);
-    activeFile.value.name = nextName;
-    activeFile.value.size = new Blob([activeFile.value.draftContent]).size;
-    localStorage.setItem(localDraftNameKey(activeFile.value.draftId), nextName);
+  file.dirty = file.isNewDraft
+    ? Boolean(file.draftContent)
+    : file.draftContent !== file.content;
+  documentSession.setDirty(file.dirty);
+  draftPersistence.schedule(file);
+}
+
+function persistDraftState(file) {
+  if (!file) {
+    return;
   }
-  documentSession.setDirty(activeFile.value.dirty);
-  if (activeFile.value.dirty) {
-    documentSession.saveDraft(activeFile.value.draftContent);
+  if (file.isNewDraft) {
+    const nextName = suggestedDraftName(file.draftContent);
+    file.name = nextName;
+    file.size = new Blob([file.draftContent]).size;
+    localStorage.setItem(localDraftNameKey(file.draftId), nextName);
+  }
+  if (file.dirty) {
+    documentSession.saveDraft(file.draftContent, file.draftStorageKey);
   } else {
-    documentSession.clearDraft();
+    documentSession.clearDraft(file.draftStorageKey);
   }
+}
+
+function flushDraftPersistence() {
+  draftPersistence.flush();
 }
 
 function activeFileChangedHandler() {
@@ -1218,6 +1258,7 @@ function saveActiveFile(close = false, options = {}) {
 }
 
 async function persistActiveFile({ force = false } = {}) {
+  flushDraftPersistence();
   const file = activeFile.value;
   if (!file) {
     return false;
@@ -1360,11 +1401,15 @@ function startNativeWatcher() {
   if (!supportsNativeFileBridge() || nativeWatcherTimer) {
     return;
   }
-  nativeWatcherTimer = window.setInterval(pollNativeFileChanges, 800);
+  nativeWatcherTimer = window.setInterval(pollNativeFileChanges, 1200);
 }
 
 async function pollNativeFileChanges() {
-  if (nativeWatcherBusy || !files.value.some((file) => file.handle?.id)) {
+  if (
+    document.hidden ||
+    nativeWatcherBusy ||
+    !files.value.some((file) => file.handle?.id)
+  ) {
     return;
   }
   nativeWatcherBusy = true;
@@ -1391,6 +1436,12 @@ async function pollNativeFileChanges() {
     console.debug("Native file watcher unavailable", error);
   } finally {
     nativeWatcherBusy = false;
+  }
+}
+
+function nativeWatcherVisibilityChanged() {
+  if (!document.hidden) {
+    void pollNativeFileChanges();
   }
 }
 
@@ -1491,18 +1542,45 @@ function documentKeydownHandler(event) {
 }
 
 function reportEditorReady() {
-  performance.mark("nirvnotes-editor-ready");
-  const reporter = window.pywebview?.api?.report_client_ready;
-  if (!reporter) {
+  if (lastEditorReadyGeneration === localLoadGeneration) {
     return;
   }
-  Promise.resolve(
-    reporter({
-      phase: "editor",
-      route: router.currentRoute.value.fullPath,
-      browserMs: Math.round(performance.now()),
-    }),
-  ).catch(() => {});
+  lastEditorReadyGeneration = localLoadGeneration;
+  performance.mark("nirvnotes-editor-ready");
+  reportLocalReady("editor");
+}
+
+function beginLocalLoad() {
+  localLoadStartedAt = performance.now();
+  localLoadGeneration += 1;
+}
+
+function reportFileReady() {
+  const generation = localLoadGeneration;
+  nextTick(() => {
+    window.requestAnimationFrame(() => {
+      if (
+        generation !== localLoadGeneration ||
+        lastFileReadyGeneration === generation
+      ) {
+        return;
+      }
+      lastFileReadyGeneration = generation;
+      performance.mark("nirvnotes-file-ready");
+      reportLocalReady("file");
+    });
+  });
+}
+
+function reportLocalReady(phase) {
+  reportNativeReady({
+    phase,
+    route: router.currentRoute.value.fullPath,
+    browserMs: Math.round(performance.now()),
+    routeMs: Math.round(performance.now() - localLoadStartedAt),
+    fileBytes: activeFile.value?.size || 0,
+    loadId: localLoadGeneration,
+  });
 }
 
 function formatBytes(bytes = 0) {

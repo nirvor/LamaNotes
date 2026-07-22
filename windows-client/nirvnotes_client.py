@@ -509,6 +509,7 @@ class NirvNotesApi:
         update_base_url: str,
         source_url: str,
         credential_store: CredentialStore | None = None,
+        process_started_at: float | None = None,
     ) -> None:
         self._file_store = file_store
         self._pending_launch_files = file_store.payloads_for_paths(
@@ -519,6 +520,7 @@ class NirvNotesApi:
         self._update_base_url = update_base_url.rstrip("/")
         self._source_url = source_url.rstrip("/")
         self._credential_store = credential_store
+        self._process_started_at = process_started_at or time.monotonic()
         self._google_handoff_port = 0
         self._pending_google_login: dict[str, Any] | None = None
         self._google_login_lock = threading.Lock()
@@ -693,11 +695,14 @@ class NirvNotesApi:
     def report_client_ready(self, metrics: dict[str, Any] | None = None) -> None:
         metrics = metrics or {}
         logging.info(
-            "client ready phase=%s route=%s browser_ms=%s route_ms=%s",
+            "client ready phase=%s route=%s browser_ms=%s route_ms=%s native_ms=%s bytes=%s load_id=%s",
             metrics.get("phase", "shell"),
             metrics.get("route", ""),
             metrics.get("browserMs", ""),
             metrics.get("routeMs", ""),
+            round((time.monotonic() - self._process_started_at) * 1000),
+            metrics.get("fileBytes", ""),
+            metrics.get("loadId", ""),
         )
 
     def open_new_window(self, route: str = "/") -> dict[str, Any]:
@@ -2189,6 +2194,7 @@ def build_menu(window_ref: dict[str, webview.Window], base_url: str) -> list[Men
 
 
 def main() -> None:
+    process_started_at = time.monotonic()
     setup_logging()
     logging.info("process start pid=%s argv=%s", os.getpid(), sys.argv[1:])
     args = parse_args()
@@ -2218,6 +2224,7 @@ def main() -> None:
         browser_base_url,
         base_url,
         credential_store=credential_store,
+        process_started_at=process_started_at,
     )
     start_url = build_url(browser_base_url, args.files, args.route)
     logging.info("start url prepared %s", start_url)
