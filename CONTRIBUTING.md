@@ -36,6 +36,7 @@ boundary it changes.
 At minimum, run the checks relevant to the changed layer:
 
 ```shell
+npm test
 npm run build
 python -m compileall -q server windows-client
 ```

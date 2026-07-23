@@ -6,6 +6,7 @@ import contextlib
 import ctypes
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import ipaddress
 import json
 import logging
 from logging.handlers import RotatingFileHandler
@@ -31,6 +32,8 @@ from webview.menu import Menu, MenuAction, MenuSeparator
 import urllib3
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
+
+from update_manifest import verify_update_manifest_signature
 
 DEFAULT_URL = "https://notes.thuber.org"
 APP_NAME = "LamaNotes"
@@ -831,15 +834,20 @@ class LamaNotesApi:
             "currentCommit": metadata.get("commit", ""),
             "canInstall": bool(getattr(sys, "frozen", False)),
         }
-        manifest_url = parse.urljoin(
-            f"{self._update_base_url}/",
-            UPDATE_MANIFEST_PATH.lstrip("/"),
+        manifest_url = resolve_update_url(
+            self._update_base_url,
+            UPDATE_MANIFEST_PATH,
         )
 
         try:
             with request.urlopen(manifest_url, timeout=8) as response:
+                validate_update_response_url(manifest_url, response.geturl())
                 manifest = json.loads(response.read().decode("utf-8-sig"))
             validate_update_manifest(manifest)
+            signature_verified = verify_update_manifest_signature(
+                manifest,
+                metadata.get("updateSigningPublicKey", ""),
+            )
             status.update(
                 {
                     "available": is_update_available(metadata, manifest),
@@ -847,11 +855,12 @@ class LamaNotesApi:
                     "commit": manifest["commit"],
                     "size": int(manifest["size"]),
                     "sha256": manifest["sha256"].lower(),
-                    "downloadUrl": parse.urljoin(
-                        f"{self._update_base_url}/",
-                        str(manifest["downloadUrl"]).lstrip("/"),
+                    "downloadUrl": resolve_update_url(
+                        self._update_base_url,
+                        manifest["downloadUrl"],
                     ),
                     "file": Path(str(manifest["file"])).name,
+                    "signatureVerified": signature_verified,
                 }
             )
         except error.HTTPError as exc:
@@ -1046,9 +1055,17 @@ def load_client_metadata() -> dict[str, str]:
             "version": str(metadata.get("version", "dev")),
             "commit": str(metadata.get("commit", "")),
             "builtAt": str(metadata.get("builtAt", "")),
+            "updateSigningPublicKey": str(
+                metadata.get("updateSigningPublicKey", "")
+            ),
         }
     except (OSError, json.JSONDecodeError):
-        return {"version": "dev", "commit": "", "builtAt": ""}
+        return {
+            "version": "dev",
+            "commit": "",
+            "builtAt": "",
+            "updateSigningPublicKey": "",
+        }
 
 
 def validate_update_manifest(manifest: dict[str, Any]) -> None:
@@ -1065,6 +1082,60 @@ def validate_update_manifest(manifest: dict[str, Any]) -> None:
         raise ValueError("Windows update hash is invalid.")
     if int(manifest["size"]) <= 0:
         raise ValueError("Windows update package size is invalid.")
+
+
+def update_origin(url: str) -> tuple[str, str, int]:
+    try:
+        parsed = parse.urlsplit(str(url or ""))
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("Windows update URL is invalid.") from exc
+
+    scheme = parsed.scheme.lower()
+    hostname = (parsed.hostname or "").lower()
+    if (
+        scheme not in {"http", "https"}
+        or not hostname
+        or parsed.username
+        or parsed.password
+    ):
+        raise ValueError("Windows update URL is invalid.")
+
+    if scheme == "http":
+        try:
+            is_loopback = ipaddress.ip_address(hostname).is_loopback
+        except ValueError:
+            is_loopback = hostname == "localhost"
+        if not is_loopback:
+            raise ValueError("Windows updates require HTTPS outside loopback.")
+
+    return scheme, hostname, port or (443 if scheme == "https" else 80)
+
+
+def resolve_update_url(base_url: str, value: Any) -> str:
+    expected_origin = update_origin(base_url)
+    raw_value = str(value or "").strip()
+    parsed_value = parse.urlsplit(raw_value)
+    if (
+        not raw_value
+        or parsed_value.scheme
+        or parsed_value.netloc
+        or parsed_value.fragment
+    ):
+        raise ValueError("Windows update download URL must be same-origin.")
+
+    resolved = parse.urljoin(
+        f"{str(base_url).rstrip('/')}/",
+        raw_value.lstrip("/"),
+    )
+    if update_origin(resolved) != expected_origin:
+        raise ValueError("Windows update download URL must be same-origin.")
+    return resolved
+
+
+def validate_update_response_url(request_url: str, response_url: str) -> None:
+    if update_origin(request_url) != update_origin(response_url):
+        raise ValueError("Windows update redirect left the trusted origin.")
 
 
 def is_update_available(current: dict[str, str], manifest: dict[str, Any]) -> bool:
@@ -1173,6 +1244,7 @@ def download_update_package(url: str, destination: Path) -> None:
     destination.unlink(missing_ok=True)
     try:
         with request.urlopen(url, timeout=30) as response:
+            validate_update_response_url(url, response.geturl())
             with destination.open("wb") as output:
                 shutil.copyfileobj(response, output, length=1024 * 1024)
     except Exception:

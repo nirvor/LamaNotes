@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import subprocess
 import sys
 import tempfile
@@ -10,6 +11,9 @@ import json
 from unittest.mock import Mock, patch
 from pathlib import Path
 from urllib import error, parse, request
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from lamanotes_client import (
     ALLOWED_EXTENSIONS,
@@ -24,9 +28,16 @@ from lamanotes_client import (
     migrate_legacy_local_state,
     paths_from_native_drop_event,
     register_native_file_drop,
+    resolve_update_url,
     start_local_proxy,
     updater_process_creation_flags,
+    validate_update_response_url,
     validate_windows_update_archive,
+)
+from update_manifest import (
+    UPDATE_SIGNATURE_ALGORITHM,
+    canonical_update_manifest,
+    verify_update_manifest_signature,
 )
 
 
@@ -571,6 +582,140 @@ class LocalProxyTests(unittest.TestCase):
 
 
 class ClientUpdaterTests(unittest.TestCase):
+    def test_manifest_signing_tool_matches_client_verification(self) -> None:
+        private_key = Ed25519PrivateKey.generate()
+        manifest = {
+            "version": "abc123",
+            "commit": "abc123def456",
+            "file": "LamaNotes-win11-abc123.zip",
+            "sha256": "b" * 64,
+            "size": 67890,
+            "publishedAt": "2026-07-23T12:00:00+00:00",
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            key_path = root / "update-signing-key.pem"
+            manifest_path = root / "LamaNotes-update.json"
+            key_path.write_bytes(
+                private_key.private_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.PKCS8,
+                    encryption_algorithm=serialization.NoEncryption(),
+                )
+            )
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            signer = (
+                Path(__file__).parent
+                / "installer"
+                / "sign-update-manifest.py"
+            )
+
+            public_key = subprocess.run(
+                [
+                    sys.executable,
+                    str(signer),
+                    "public-key",
+                    "--private-key",
+                    str(key_path),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(signer),
+                    "sign",
+                    "--private-key",
+                    str(key_path),
+                    "--manifest",
+                    str(manifest_path),
+                ],
+                check=True,
+            )
+
+            signed_manifest = json.loads(
+                manifest_path.read_text(encoding="utf-8")
+            )
+            self.assertTrue(
+                verify_update_manifest_signature(
+                    signed_manifest,
+                    public_key,
+                )
+            )
+
+    def test_signed_update_manifest_verifies_and_detects_tampering(self) -> None:
+        private_key = Ed25519PrivateKey.generate()
+        public_key = base64.b64encode(
+            private_key.public_key().public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw,
+            )
+        ).decode("ascii")
+        manifest = {
+            "version": "abc123",
+            "commit": "abc123def456",
+            "file": "LamaNotes-win11-abc123.zip",
+            "sha256": "a" * 64,
+            "size": 12345,
+            "publishedAt": "2026-07-23T12:00:00+00:00",
+            "downloadUrl": "/api/windows-client-update/download",
+        }
+        manifest["signatureAlgorithm"] = UPDATE_SIGNATURE_ALGORITHM
+        manifest["signature"] = base64.b64encode(
+            private_key.sign(canonical_update_manifest(manifest))
+        ).decode("ascii")
+
+        self.assertTrue(verify_update_manifest_signature(manifest, public_key))
+
+        unsigned_manifest = dict(manifest)
+        unsigned_manifest.pop("signature")
+        with self.assertRaises(ValueError):
+            verify_update_manifest_signature(unsigned_manifest, public_key)
+
+        manifest["size"] += 1
+        with self.assertRaises(ValueError):
+            verify_update_manifest_signature(manifest, public_key)
+
+    def test_unsigned_update_manifest_remains_legacy_compatible_without_key(
+        self,
+    ) -> None:
+        self.assertFalse(verify_update_manifest_signature({}, ""))
+
+    def test_update_download_url_accepts_relative_loopback_path(self) -> None:
+        resolved = resolve_update_url(
+            "http://127.0.0.1:31992",
+            "/api/windows-client-update/download",
+        )
+
+        self.assertEqual(
+            resolved,
+            "http://127.0.0.1:31992/api/windows-client-update/download",
+        )
+
+    def test_update_download_url_rejects_absolute_origin(self) -> None:
+        with self.assertRaises(ValueError):
+            resolve_update_url(
+                "https://notes.example",
+                "https://downloads.example/LamaNotes.zip",
+            )
+
+    def test_update_download_url_rejects_plain_http_remote_origin(self) -> None:
+        with self.assertRaises(ValueError):
+            resolve_update_url(
+                "http://notes.example",
+                "/api/windows-client-update/download",
+            )
+
+    def test_update_response_rejects_cross_origin_redirect(self) -> None:
+        with self.assertRaises(ValueError):
+            validate_update_response_url(
+                "https://notes.example/api/windows-client-update/download",
+                "https://downloads.example/LamaNotes.zip",
+            )
+
     @unittest.skipUnless(sys.platform == "win32", "Windows process flags only")
     def test_updater_flags_do_not_combine_detached_and_no_window(self) -> None:
         flags = updater_process_creation_flags()

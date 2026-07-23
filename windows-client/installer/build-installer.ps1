@@ -1,6 +1,7 @@
 param(
   [string]$Version = "",
-  [switch]$SkipAppBuild
+  [switch]$SkipAppBuild,
+  [string]$UpdateSigningKeyPath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,6 +13,9 @@ $ArtifactsDir = Join-Path $InstallerRoot "artifacts"
 $BuildDir = Join-Path $InstallerRoot "build"
 $StageDir = Join-Path $BuildDir "LamaNotes-win11"
 $AppDist = Join-Path $WindowsClientRoot "dist\LamaNotes"
+$WindowsClientPython = Join-Path $WindowsClientRoot ".venv\Scripts\python.exe"
+$ManifestSigner = Join-Path $InstallerRoot "sign-update-manifest.py"
+$UpdateSigningPublicKey = ""
 
 function Write-Step([string]$Text) {
   Write-Host ""
@@ -32,6 +36,23 @@ function Get-GitValue([string]$ArgsLine) {
 
 Push-Location $RepoRoot
 try {
+  if ($UpdateSigningKeyPath) {
+    $UpdateSigningKeyPath = [System.IO.Path]::GetFullPath($UpdateSigningKeyPath)
+    if (!(Test-Path -LiteralPath $UpdateSigningKeyPath -PathType Leaf)) {
+      throw "The update signing key does not exist."
+    }
+    if (!(Test-Path -LiteralPath $WindowsClientPython -PathType Leaf)) {
+      throw "Build the Windows client before signing update artifacts."
+    }
+    $UpdateSigningPublicKey = (
+      & $WindowsClientPython $ManifestSigner public-key `
+        --private-key $UpdateSigningKeyPath
+    ).Trim()
+    if ($LASTEXITCODE -ne 0 -or -not $UpdateSigningPublicKey) {
+      throw "Could not derive the update signing public key."
+    }
+  }
+
   if (-not $Version) {
     $Version = Get-GitValue "rev-parse --short HEAD"
     if (-not $Version) {
@@ -43,11 +64,21 @@ try {
 
   if (-not $SkipAppBuild) {
     Write-Step "Building Windows app"
-    & (Join-Path $WindowsClientRoot "build.ps1") -Version $Version -Commit $Commit
+    & (Join-Path $WindowsClientRoot "build.ps1") `
+      -Version $Version `
+      -Commit $Commit `
+      -UpdateSigningPublicKey $UpdateSigningPublicKey
   }
 
   if (!(Test-Path (Join-Path $AppDist "LamaNotes.exe"))) {
     throw "Missing app build at $AppDist. Run windows-client\build.ps1 first."
+  }
+  if ($UpdateSigningKeyPath) {
+    $ClientMetadataPath = Join-Path $AppDist "_internal\client-version.json"
+    $ClientMetadata = Get-Content -LiteralPath $ClientMetadataPath -Raw | ConvertFrom-Json
+    if ($ClientMetadata.updateSigningPublicKey -ne $UpdateSigningPublicKey) {
+      throw "The Windows app was not built with the matching update public key."
+    }
   }
 
   Write-Step "Staging installer package"
@@ -110,7 +141,17 @@ try {
     size = $PackageInfo.Length
     publishedAt = (Get-Date).ToString("s")
   }
-  $UpdateManifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ArtifactsDir "LamaNotes-update.json") -Encoding UTF8
+  $UpdateManifestPath = Join-Path $ArtifactsDir "LamaNotes-update.json"
+  $UpdateManifest | ConvertTo-Json | Set-Content -LiteralPath $UpdateManifestPath -Encoding UTF8
+
+  if ($UpdateSigningKeyPath) {
+    & $WindowsClientPython $ManifestSigner sign `
+      --private-key $UpdateSigningKeyPath `
+      --manifest $UpdateManifestPath
+    if ($LASTEXITCODE -ne 0) {
+      throw "Could not sign the Windows update manifest."
+    }
+  }
 
   Write-Step "Done"
   Get-ChildItem $ArtifactsDir | Sort-Object LastWriteTime -Descending | Select-Object Name,Length,LastWriteTime

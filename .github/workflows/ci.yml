@@ -20,13 +20,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Client unit tests
-        run: >-
-          node --test
-          client/documentFind.test.js
-          client/libraryCache.test.js
-          client/localNotePromotion.test.js
-          client/noteSystemTags.test.js
-          client/publicationState.test.js
+        run: npm test
 
   server:
     runs-on: ubuntu-latest

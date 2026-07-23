@@ -1,7 +1,8 @@
 param(
   [string]$Name = "LamaNotes",
   [string]$Version = "",
-  [string]$Commit = ""
+  [string]$Commit = "",
+  [string]$UpdateSigningPublicKey = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,12 +28,20 @@ if (-not $Version) {
 if (-not $Version) {
   $Version = Get-Date -Format "yyyyMMdd-HHmmss"
 }
+$UpdateSigningPublicKey = $UpdateSigningPublicKey.Trim()
+if (
+  $UpdateSigningPublicKey -and
+  $UpdateSigningPublicKey -notmatch "^[A-Za-z0-9+/]{43}=$"
+) {
+  throw "UpdateSigningPublicKey must be one base64-encoded Ed25519 public key."
+}
 
 New-Item -ItemType Directory -Path $MetadataDir -Force | Out-Null
 [ordered]@{
   version = $Version
   commit = $Commit
   builtAt = (Get-Date).ToString("s")
+  updateSigningPublicKey = $UpdateSigningPublicKey
 } | ConvertTo-Json | Set-Content -LiteralPath $VersionMetadata -Encoding UTF8
 
 $ResolvedDist = [System.IO.Path]::GetFullPath($Dist).TrimEnd("\") + "\"
