@@ -688,15 +688,25 @@
 
 .toastui-editor-contents .lamanote-visual-wide {
   grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scrollbar-width: thin;
+}
+
+.toastui-editor-contents .lamanote-visual-wide > svg,
+.toastui-editor-contents .lamanote-visual-wide > img {
+  justify-self: start;
+  margin-inline: 0;
 }
 
 .toastui-editor-contents .lamanote-visual-wide > .lamanote-visual-takeaway,
 .toastui-editor-contents .lamanote-visual-wide > figcaption {
   position: sticky;
   left: 0;
+  box-sizing: border-box;
+  width: 100%;
+  justify-self: stretch;
 }
 
 .toastui-editor-contents .lamanote-plot svg,
