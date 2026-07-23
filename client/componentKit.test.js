@@ -22,7 +22,10 @@ test("plot and diagram scaffolds carry the visual quality contract", () => {
   assert.match(plot, /lamanote-plot lamanote-visual-frame/);
   assert.match(plot, /lamanote-visual-takeaway/);
   assert.match(plot, /quantities and units/);
-  assert.match(diagram, /lamanote-diagram lamanote-visual-frame/);
+  assert.match(
+    diagram,
+    /lamanote-diagram lamanote-visual-frame lamanote-visual-wide/,
+  );
   assert.match(diagram, /flow direction/);
   assert.ok(htmlComponentSnippets.some((snippet) => snippet.id === "section"));
 });

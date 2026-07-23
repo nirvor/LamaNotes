@@ -685,6 +685,12 @@
   box-shadow: 0 0.35rem 1.2rem rgb(0 0 0 / 0.09);
 }
 
+.toastui-editor-contents .lamanote-visual-wide {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+}
+
 .toastui-editor-contents .lamanote-plot svg,
 .toastui-editor-contents .lamanote-diagram svg,
 .toastui-editor-contents .lamanote-map svg,
@@ -840,6 +846,11 @@
     margin: 0.9rem auto;
     padding: 0.34rem;
     border-radius: 6px;
+  }
+
+  .toastui-editor-contents .lamanote-visual-wide > svg,
+  .toastui-editor-contents .lamanote-visual-wide > img {
+    min-width: 44rem;
   }
 
   .toastui-editor-contents .lamanote-hero img,

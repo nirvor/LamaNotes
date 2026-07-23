@@ -151,7 +151,7 @@ export const htmlComponentSnippets = [
     id: "diagram",
     label: "Diagram",
     body: () => `
-<figure class="lamanote-diagram lamanote-visual-frame" data-lamanotes-component="diagram">
+<figure class="lamanote-diagram lamanote-visual-frame lamanote-visual-wide" data-lamanotes-component="diagram">
   <img src="attachments/example-diagram.png" alt="Describe the actors, flow direction, decision points, and final outcomes" loading="lazy" decoding="async">
   <p class="lamanote-visual-takeaway">Takeaway: explain what the architecture or mechanism changes.</p>
   <figcaption><strong>Figure 2.</strong> Name the flow direction, define color meaning, and distinguish measured structure from illustration.</figcaption>
