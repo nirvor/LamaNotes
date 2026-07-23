@@ -675,6 +675,7 @@
 }
 
 .toastui-editor-contents .lamanote-visual-frame {
+  box-sizing: border-box;
   width: min(100%, 58rem);
   margin: 1.15rem auto;
   padding: 0.72rem;
@@ -686,9 +687,16 @@
 }
 
 .toastui-editor-contents .lamanote-visual-wide {
+  grid-template-columns: minmax(0, 1fr);
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scrollbar-width: thin;
+}
+
+.toastui-editor-contents .lamanote-visual-wide > .lamanote-visual-takeaway,
+.toastui-editor-contents .lamanote-visual-wide > figcaption {
+  position: sticky;
+  left: 0;
 }
 
 .toastui-editor-contents .lamanote-plot svg,
