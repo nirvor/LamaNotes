@@ -117,5 +117,76 @@ class LiveTagTests(unittest.TestCase):
         self.assertEqual(tags, {"private", "pinned"})
 
 
+class ResearchTopicFacetTests(unittest.TestCase):
+    def test_context_and_index_derive_strict_research_topics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            Path(directory, "research-note.html").write_text(
+                """<article>
+  <h1>Research note</h1>
+  <p>
+    #research #r-agent-tools #r-2026 #r-agent-tools
+    #r-double--dash #r-trailing- #r_under #other
+  </p>
+</article>""",
+                encoding="utf-8",
+            )
+            notes = object.__new__(FileSystemNotes)
+            notes.storage_path = directory
+
+            context = notes.get_context("research-note")
+            index_entry = notes.get_semantic_index()[0]
+
+            expected_topics = ["r-2026", "r-agent-tools"]
+            self.assertEqual(context.research_topics, expected_topics)
+            self.assertEqual(index_entry.research_topics, expected_topics)
+            self.assertEqual(
+                context.model_dump(by_alias=True)["researchTopics"],
+                expected_topics,
+            )
+            self.assertEqual(
+                index_entry.model_dump(by_alias=True)["researchTopics"],
+                expected_topics,
+            )
+            self.assertEqual(
+                index_entry.tags,
+                [
+                    "other",
+                    "r-2026",
+                    "r-agent-tools",
+                    "r-double--dash",
+                    "r-trailing-",
+                    "r_under",
+                    "research",
+                ],
+            )
+            self.assertNotIn(
+                "content",
+                index_entry.model_dump(by_alias=True),
+            )
+            self.assertNotIn(
+                "text",
+                index_entry.model_dump(by_alias=True),
+            )
+
+    def test_research_topics_require_exact_research_tag(self):
+        with tempfile.TemporaryDirectory() as directory:
+            Path(directory, "not-research.html").write_text(
+                "<article><p>#research-note #r-agent-tools</p></article>",
+                encoding="utf-8",
+            )
+            notes = object.__new__(FileSystemNotes)
+            notes.storage_path = directory
+
+            context = notes.get_context("not-research")
+            index_entry = notes.get_semantic_index()[0]
+
+            self.assertEqual(context.research_topics, [])
+            self.assertEqual(index_entry.research_topics, [])
+            self.assertEqual(
+                index_entry.tags,
+                ["r-agent-tools", "research-note"],
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

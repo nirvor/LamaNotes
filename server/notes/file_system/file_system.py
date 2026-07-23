@@ -8,7 +8,7 @@ import time
 from collections import Counter
 from datetime import datetime
 from html.parser import HTMLParser
-from typing import List, Literal, Set, Tuple
+from typing import Iterable, List, Literal, Set, Tuple
 
 import whoosh
 from whoosh import writing
@@ -54,6 +54,7 @@ HTML_METADATA_ONLY_TAGS = {"pinned"}
 TAG_META_NAMES = {"lamanotes-tags", "flatnotes-tags"}
 NOTE_KIND_META_NAMES = {"lamanotes-note-kind", "flatnotes-note-kind"}
 SUMMARY_META_NAMES = {"description", "lamanotes-summary", "flatnotes-summary"}
+RESEARCH_TOPIC_TAG_RE = re.compile(r"r-[a-z0-9]+(?:-[a-z0-9]+)*")
 
 StemmingFoldingAnalyzer = StemmingAnalyzer() | CharsetFilter(accent_map)
 
@@ -680,6 +681,7 @@ class FileSystemNotes(BaseNotes):
                     format=context.format,
                     note_kind=context.note_kind,
                     tags=context.tags,
+                    research_topics=context.research_topics,
                     summary=context.summary,
                     heading_count=len(context.headings),
                     link_count=len(context.links),
@@ -810,6 +812,13 @@ class FileSystemNotes(BaseNotes):
             for tag in re.findall(r"#?[a-zA-Z0-9_-]+", value or "")
         }
 
+    @staticmethod
+    def _research_topics(tags: Iterable[str]) -> List[str]:
+        tag_set = set(tags)
+        if "research" not in tag_set:
+            return []
+        return sorted(tag for tag in tag_set if RESEARCH_TOPIC_TAG_RE.fullmatch(tag))
+
     @classmethod
     def _html_to_text_and_meta_tags(
         cls, content: str
@@ -883,6 +892,9 @@ class FileSystemNotes(BaseNotes):
         else:
             context = cls._markdown_context_from_note(note)
 
+        context = context.model_copy(
+            update={"research_topics": cls._research_topics(context.tags)}
+        )
         return context.model_copy(
             update={"llm_text": cls._build_llm_text(context)}
         )

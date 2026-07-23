@@ -81,6 +81,7 @@ class NoteContext(CustomBaseModel):
     format: NoteFormat = "html"
     note_kind: NoteKind = "research"
     tags: List[str] = Field(default_factory=list)
+    research_topics: List[str] = Field(default_factory=list)
     summary: Optional[str] = Field(None)
     headings: List[NoteHeading] = Field(default_factory=list)
     links: List[NoteLink] = Field(default_factory=list)
@@ -98,6 +99,7 @@ class NoteIndexEntry(CustomBaseModel):
     format: NoteFormat = "html"
     note_kind: NoteKind = "research"
     tags: List[str] = Field(default_factory=list)
+    research_topics: List[str] = Field(default_factory=list)
     summary: Optional[str] = Field(None)
     heading_count: int = 0
     link_count: int = 0

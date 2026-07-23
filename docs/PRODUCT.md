@@ -28,6 +28,9 @@ temporary. A note enters the Library only through an explicit user action.
 - All active notes live in one server-side folder.
 - Search, sparse tags and pinning provide retrieval; there are no subfolders.
 - Tags describe content rather than recreate an organizational tree.
+- `research` stays an ordinary tag. On notes carrying that exact tag,
+  `r-<lowercase-ascii-slug>` tags may be exposed as derived topic facets; they
+  do not create folders or another stored hierarchy.
 - Media may enrich a note, but the text remains readable and machine-friendly.
 - The server is authoritative; the desktop cache is bounded and disposable.
 

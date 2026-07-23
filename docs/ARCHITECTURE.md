@@ -28,6 +28,12 @@ The FastAPI server owns authentication, HTML note storage, search metadata,
 attachments, publications and the bounded index consumed by the client. It
 stores no local Workspace paths.
 
+The bounded `/api/index` response and per-note context share a derived
+`researchTopics` field. It is populated only when the normalized tags contain
+the exact `research` tag, and then only with sorted, deduplicated
+`r-<lowercase-ascii-slug>` tags. The field does not persist a second index,
+note bodies or a folder hierarchy.
+
 ### Edge and deployment
 
 Caddy terminates public HTTPS, serves approved note assets and proxies the
