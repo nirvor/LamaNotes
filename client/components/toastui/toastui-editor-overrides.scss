@@ -312,7 +312,6 @@
 
 .toastui-editor-contents .lamanotes-note-lead-abstract {
   border: 1px solid rgb(var(--theme-border) / 0.62);
-  border-left: 2px solid rgb(var(--theme-brand) / 0.72);
   border-radius: 6px;
   padding: 0.44rem 0.64rem;
   background-color: rgb(var(--theme-background-elevated) / 0.28);
@@ -469,9 +468,70 @@
   max-width: 100%;
 }
 
+.toastui-editor-contents .lamanote-research {
+  width: 100%;
+}
+
+.toastui-editor-contents .lamanote-research-section {
+  margin: 1.55rem 0;
+}
+
+.toastui-editor-contents .lamanote-research-section > h2 {
+  margin: 0 0 0.62rem;
+}
+
+.toastui-editor-contents .lamanote-section-card {
+  padding: 1rem 1.1rem;
+  border: 1px solid rgb(var(--theme-heading) / 0.18);
+  border-radius: 8px;
+  background-color: rgb(var(--theme-background-elevated) / 0.5);
+  box-shadow: 0 0.3rem 1.1rem rgb(0 0 0 / 0.08);
+}
+
+.toastui-editor-contents
+  .lamanote-research-section--key
+  > .lamanote-section-card {
+  border-color: rgb(var(--theme-heading) / 0.3);
+  background-color: rgb(var(--theme-heading) / 0.07);
+}
+
+.toastui-editor-contents
+  .lamanote-research-section--evidence
+  > .lamanote-section-card {
+  background-color: rgb(var(--theme-background-elevated) / 0.72);
+}
+
+.toastui-editor-contents
+  .lamanote-research-section--analysis
+  > .lamanote-section-card {
+  border-color: rgb(var(--theme-heading) / 0.24);
+  background-color: rgb(var(--theme-heading) / 0.045);
+}
+
+.toastui-editor-contents
+  .lamanote-research-section--method
+  > .lamanote-section-card {
+  background-color: rgb(var(--theme-background-elevated) / 0.42);
+}
+
+.toastui-editor-contents
+  .lamanote-research-section--limits
+  > .lamanote-section-card {
+  border-color: rgb(var(--theme-text-muted) / 0.42);
+  background-color: rgb(var(--theme-background-elevated) / 0.78);
+}
+
+.toastui-editor-contents .lamanote-section-card > :first-child {
+  margin-top: 0;
+}
+
+.toastui-editor-contents .lamanote-section-card > :last-child {
+  margin-bottom: 0;
+}
+
 .toastui-editor-contents .lamanote-kicker {
   margin: 0 0 0.3rem;
-  color: rgb(var(--theme-brand));
+  color: rgb(var(--theme-heading));
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0;
@@ -577,7 +637,8 @@
 }
 
 .toastui-editor-contents .lamanote-callout {
-  border-left: 3px solid rgb(var(--theme-brand));
+  border-color: rgb(var(--theme-heading) / 0.24);
+  background-color: rgb(var(--theme-heading) / 0.055);
 }
 
 .toastui-editor-contents .lamanote-panel > :first-child,
@@ -613,6 +674,17 @@
   background: transparent;
 }
 
+.toastui-editor-contents .lamanote-visual-frame {
+  width: min(100%, 58rem);
+  margin: 1.15rem auto;
+  padding: 0.72rem;
+  overflow-x: hidden;
+  border: 1px solid rgb(var(--theme-border) / 0.82);
+  border-radius: 8px;
+  background-color: rgb(var(--theme-background-elevated) / 0.38);
+  box-shadow: 0 0.35rem 1.2rem rgb(0 0 0 / 0.09);
+}
+
 .toastui-editor-contents .lamanote-plot svg,
 .toastui-editor-contents .lamanote-diagram svg,
 .toastui-editor-contents .lamanote-map svg,
@@ -627,6 +699,31 @@
   margin: 0 auto;
   border: 0;
   background: transparent;
+}
+
+.toastui-editor-contents .lamanote-visual-frame svg,
+.toastui-editor-contents .lamanote-visual-frame img,
+.toastui-editor-contents .lamanote-hero.lamanote-visual-frame svg,
+.toastui-editor-contents .lamanote-hero.lamanote-visual-frame img {
+  width: 100%;
+  max-height: none;
+  object-fit: contain;
+}
+
+.toastui-editor-contents .lamanote-visual-frame figcaption {
+  margin-top: 0.62rem;
+  padding: 0 0.12rem 0.08rem;
+  color: rgb(var(--theme-text-muted));
+  font-size: 0.82rem;
+  line-height: 1.42;
+}
+
+.toastui-editor-contents .lamanote-visual-takeaway {
+  margin: 0.55rem 0 0;
+  color: rgb(var(--theme-text));
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .toastui-editor-contents .lamanote-source-list {
@@ -729,11 +826,32 @@
 }
 
 @media (max-width: 640px) {
+  .toastui-editor-contents .lamanote-research-section {
+    margin: 1.25rem 0;
+  }
+
+  .toastui-editor-contents .lamanote-section-card {
+    padding: 0.78rem 0.82rem;
+    border-radius: 6px;
+  }
+
+  .toastui-editor-contents .lamanote-visual-frame {
+    width: 100%;
+    margin: 0.9rem auto;
+    padding: 0.34rem;
+    border-radius: 6px;
+  }
+
   .toastui-editor-contents .lamanote-hero img,
   .toastui-editor-contents .lamanote-banner img,
   .toastui-editor-contents .lamanote-hero svg,
   .toastui-editor-contents .lamanote-banner svg {
     max-height: 10.5rem;
+  }
+
+  .toastui-editor-contents .lamanote-hero.lamanote-visual-frame img,
+  .toastui-editor-contents .lamanote-hero.lamanote-visual-frame svg {
+    max-height: none;
   }
 
   .toastui-editor-contents .lamanote-media-row,

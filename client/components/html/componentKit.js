@@ -19,7 +19,7 @@ export const htmlComponentSnippets = [
     id: "article",
     label: "Article",
     body: (selection) => `
-<article class="lamanote" data-lamanotes-component="article">
+<article class="lamanote lamanote-research" data-lamanotes-component="article">
   <p class="lamanote-kicker">Research Note</p>
   <p class="lamanote-deck">${selectedOrFallback(
     selection,
@@ -34,8 +34,12 @@ export const htmlComponentSnippets = [
     </ul>
   </section>
 
-  <h2>Notes</h2>
-  <p>Write the useful substance here.</p>
+  <section class="lamanote-research-section lamanote-research-section--evidence" data-lamanotes-component="section">
+    <h2>Evidence and interpretation</h2>
+    <div class="lamanote-section-card">
+      <p>Write the useful substance here. Keep established evidence, interpretation, and uncertainty visibly separate.</p>
+    </div>
+  </section>
 
   <section class="lamanote-source-list" data-lamanotes-component="sources">
     <h2>Sources</h2>
@@ -44,8 +48,23 @@ export const htmlComponentSnippets = [
     </ul>
   </section>
 
-  <p>#private</p>
+  <p>#private #research</p>
 </article>
+`,
+  },
+  {
+    id: "section",
+    label: "Research section",
+    body: (selection) => `
+<section class="lamanote-research-section lamanote-research-section--evidence" data-lamanotes-component="section">
+  <h2>Descriptive section title</h2>
+  <div class="lamanote-section-card">
+    <p>${selectedOrFallback(
+      selection,
+      "Evidence-backed section content. Group related subtopics in this one major section card.",
+    )}</p>
+  </div>
+</section>
 `,
   },
   {
@@ -121,9 +140,21 @@ export const htmlComponentSnippets = [
     id: "plot",
     label: "Plot",
     body: () => `
-<figure class="lamanote-plot" data-lamanotes-component="plot">
-  <img src="attachments/example-plot.png" alt="Plot description" loading="lazy" decoding="async">
-  <figcaption>Plot caption with the takeaway, not just the filename.</figcaption>
+<figure class="lamanote-plot lamanote-visual-frame" data-lamanotes-component="plot">
+  <img src="attachments/example-plot.png" alt="Describe the variables, comparison, direction, and important exception" loading="lazy" decoding="async">
+  <p class="lamanote-visual-takeaway">Takeaway: state the one relationship the reader should retain.</p>
+  <figcaption><strong>Figure 1.</strong> Define quantities and units, date the evidence, state important assumptions or uncertainty, and link the direct source.</figcaption>
+</figure>
+`,
+  },
+  {
+    id: "diagram",
+    label: "Diagram",
+    body: () => `
+<figure class="lamanote-diagram lamanote-visual-frame" data-lamanotes-component="diagram">
+  <img src="attachments/example-diagram.png" alt="Describe the actors, flow direction, decision points, and final outcomes" loading="lazy" decoding="async">
+  <p class="lamanote-visual-takeaway">Takeaway: explain what the architecture or mechanism changes.</p>
+  <figcaption><strong>Figure 2.</strong> Name the flow direction, define color meaning, and distinguish measured structure from illustration.</figcaption>
 </figure>
 `,
   },
