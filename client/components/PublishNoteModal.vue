@@ -1,5 +1,9 @@
 <template>
-  <Modal v-model="isVisible" class="lamanotes-publish-modal px-5 py-4">
+  <Modal
+    v-model="isVisible"
+    aria-label="Publish online"
+    class="lamanotes-publish-modal px-5 py-4"
+  >
     <div class="mb-3 text-lg font-semibold">Publish online</div>
     <label
       class="mb-1 block text-xs uppercase text-theme-text-muted"
@@ -28,6 +32,13 @@
     >
       {{ validationMessage || problemMessage }}
     </div>
+    <div
+      v-else-if="qualityWarning"
+      class="lamanotes-publish-quality-warning mt-2 text-sm"
+      role="status"
+    >
+      {{ qualityWarning }} Publishing remains available after review.
+    </div>
     <div v-else class="mt-2 text-sm text-theme-text-muted">
       This page will be publicly readable.
     </div>
@@ -54,6 +65,7 @@ const props = defineProps({
   suggestedSlug: { type: String, default: "" },
   busy: Boolean,
   problemMessage: { type: String, default: "" },
+  qualityWarning: { type: String, default: "" },
 });
 const emit = defineEmits(["publish"]);
 const isVisible = defineModel({ type: Boolean });
@@ -103,7 +115,20 @@ function submit() {
   flex: 1;
   background: transparent;
   color: rgb(var(--theme-text));
-  outline: none;
+}
+
+.lamanotes-publish-url-row:focus-within {
+  border-bottom-color: rgb(var(--theme-brand));
+  box-shadow: 0 2px 0 rgb(var(--theme-brand));
+}
+
+.lamanotes-publish-url-row input:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: 2px;
+}
+
+.lamanotes-publish-quality-warning {
+  color: rgb(var(--theme-warning));
 }
 
 @media (max-width: 420px) {

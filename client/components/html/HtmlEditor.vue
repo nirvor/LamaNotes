@@ -1,13 +1,12 @@
 <template>
   <div class="lamanotes-html-editor">
-    <div class="lamanotes-html-editor-toolbar">
+    <div class="lamanotes-html-editor-toolbar" aria-label="HTML note tools">
       <NoteKindSwitch
         v-if="showKindSwitch"
         :current-kind="currentKind"
         @set-kind="setKind"
       />
       <div class="lamanotes-html-editor-toolbar-group">
-        <span class="lamanotes-html-editor-label">HTML</span>
         <select
           v-model="selectedSnippet"
           class="lamanotes-html-editor-select"
@@ -21,10 +20,48 @@
             {{ snippet.label }}
           </option>
         </select>
-        <button type="button" @click="insertSelectedSnippet">Insert</button>
+        <button
+          type="button"
+          class="lamanotes-html-editor-icon-button"
+          title="Insert selected component"
+          aria-label="Insert selected component"
+          @click="insertSelectedSnippet"
+        >
+          <SvgIcon type="mdi" :path="mdiPlus" size="0.9rem" />
+        </button>
       </div>
-      <div class="lamanotes-html-editor-toolbar-group">
-        <button type="button" @click="chooseImage">Media</button>
+      <button
+        type="button"
+        class="lamanotes-html-editor-icon-button"
+        title="Insert media"
+        aria-label="Insert media"
+        @click="chooseImage"
+      >
+        <SvgIcon type="mdi" :path="mdiImageOutline" size="0.9rem" />
+      </button>
+      <button
+        type="button"
+        class="lamanotes-html-editor-icon-button"
+        :class="{ 'lamanotes-html-editor-icon-button-active': previewVisible }"
+        :title="previewVisible ? 'Show HTML source' : 'Show note preview'"
+        :aria-label="previewVisible ? 'Show HTML source' : 'Show note preview'"
+        :aria-pressed="previewVisible"
+        @click="togglePreview"
+      >
+        <SvgIcon
+          type="mdi"
+          :path="previewVisible ? mdiCodeTags : mdiEyeOutline"
+          size="0.9rem"
+        />
+      </button>
+      <div
+        v-if="placeholderWarnings.length"
+        class="lamanotes-html-editor-quality-warning"
+        role="status"
+        :title="placeholderWarningTitle"
+      >
+        <SvgIcon type="mdi" :path="mdiAlertOutline" size="0.88rem" />
+        <span>Template placeholders ({{ placeholderWarnings.length }})</span>
       </div>
       <input
         ref="fileInput"
@@ -35,28 +72,52 @@
       />
     </div>
     <textarea
+      v-show="!previewVisible"
       ref="textarea"
       v-model="content"
       class="lamanotes-html-editor-source"
       rows="1"
       spellcheck="false"
+      aria-label="Edit HTML note"
       @input="contentInputHandler"
       @keydown="keydownHandler"
       @paste="pasteHandler"
       @drop="dropHandler"
       @dragover.prevent
     ></textarea>
+    <div
+      v-if="previewVisible"
+      class="lamanotes-html-editor-preview"
+      role="region"
+      aria-label="HTML note preview"
+    >
+      <HtmlViewer
+        :initial-value="content"
+        :note-title="noteTitle"
+        :task-checkboxes-disabled="true"
+      />
+    </div>
   </div>
 </template>
 
 <script setup>
-import { nextTick, onMounted, ref } from "vue";
+import SvgIcon from "@jamescoyle/vue-icon";
+import {
+  mdiAlertOutline,
+  mdiCodeTags,
+  mdiEyeOutline,
+  mdiImageOutline,
+  mdiPlus,
+} from "@mdi/js";
+import { computed, nextTick, onMounted, ref } from "vue";
 
 import NoteKindSwitch from "../NoteKindSwitch.vue";
+import HtmlViewer from "./HtmlViewer.vue";
 import {
   createCodeBlockSnippet,
   createLinkCardSnippet,
   createMediaFigureSnippet,
+  findHtmlPlaceholderWarnings,
   getHtmlSnippet,
   htmlComponentSnippets,
 } from "./componentKit.js";
@@ -68,9 +129,10 @@ import {
 const props = defineProps({
   currentKind: {
     type: String,
-    default: "research",
+    default: "article",
   },
   initialValue: String,
+  noteTitle: String,
   addImageBlobHook: Function,
   showKindSwitch: Boolean,
 });
@@ -79,9 +141,20 @@ const emit = defineEmits(["change", "keydown", "ready", "set-kind"]);
 
 const content = ref(props.initialValue || "");
 const fileInput = ref();
+const previewVisible = ref(false);
 const selectedSnippet = ref(htmlComponentSnippets[0]?.id || "");
 const textarea = ref();
 let lastTagNormalizationUndo = null;
+
+const placeholderWarnings = computed(() =>
+  findHtmlPlaceholderWarnings(content.value),
+);
+const placeholderWarningTitle = computed(
+  () =>
+    `Review before publishing: ${placeholderWarnings.value
+      .map(({ label }) => label)
+      .join(", ")}`,
+);
 
 const htmlTagTokenPattern = /(^|[ \t])#([a-zA-Z0-9][a-zA-Z0-9_-]*)([ \t]?)/g;
 const htmlBottomTagParagraphPattern =
@@ -93,6 +166,15 @@ function chooseImage() {
 
 function setKind(kind) {
   emit("set-kind", kind);
+}
+
+async function togglePreview() {
+  previewVisible.value = !previewVisible.value;
+  if (!previewVisible.value) {
+    await nextTick();
+    resizeTextarea();
+    textarea.value?.focus();
+  }
 }
 
 function getSelectionText() {
@@ -449,7 +531,11 @@ function isWysiwygMode() {
 }
 
 function focusEditor() {
-  nextTick(() => textarea.value?.focus({ preventScroll: true }));
+  previewVisible.value = false;
+  nextTick(() => {
+    resizeTextarea();
+    textarea.value?.focus({ preventScroll: true });
+  });
   return textarea.value;
 }
 
@@ -474,25 +560,24 @@ defineExpose({
   display: flex;
   min-height: 65vh;
   flex-direction: column;
-  border: 1px solid rgb(var(--theme-border));
-  border-radius: 6px;
+  border: var(--ln-border-subtle);
+  border-radius: var(--ln-radius-card);
   overflow: visible;
   background-color: rgb(var(--theme-background));
 }
 
 .lamanotes-html-editor-toolbar {
   display: flex;
-  min-height: 1.82rem;
+  min-height: var(--ln-control-size);
   align-items: center;
   justify-content: flex-start;
   flex-wrap: wrap;
-  gap: 0.28rem;
-  padding: 0.16rem 0.5rem;
+  gap: 0.2rem;
+  padding: 0.12rem 0.28rem;
   border-bottom: 1px solid rgb(var(--theme-border));
   color: rgb(var(--theme-text-muted));
   background-color: rgb(var(--theme-background-elevated));
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: 0.78rem;
 }
 
 .lamanotes-html-editor-toolbar-group {
@@ -502,16 +587,11 @@ defineExpose({
   min-width: 0;
 }
 
-.lamanotes-html-editor-label {
-  flex: 0 0 auto;
-}
-
 .lamanotes-html-editor-select,
-.lamanotes-html-editor-toolbar button {
-  min-height: 1.42rem;
+.lamanotes-html-editor-icon-button {
+  min-height: var(--ln-control-size);
   border: 1px solid rgb(var(--theme-border));
-  border-radius: 5px;
-  padding: 0 0.45rem;
+  border-radius: var(--ln-radius-control);
   color: rgb(var(--theme-text));
   background-color: rgb(var(--theme-background));
   font-size: 0.78rem;
@@ -521,13 +601,42 @@ defineExpose({
 .lamanotes-html-editor-select {
   min-width: min(11rem, 48vw);
   max-width: 100%;
-  outline: none;
+  padding: 0 1.7rem 0 0.42rem;
+}
+
+.lamanotes-html-editor-icon-button {
+  display: inline-flex;
+  width: var(--ln-control-size);
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
 .lamanotes-html-editor-select:focus-visible,
-.lamanotes-html-editor-toolbar button:hover,
-.lamanotes-html-editor-toolbar button:focus-visible {
+.lamanotes-html-editor-icon-button:hover,
+.lamanotes-html-editor-icon-button:focus-visible,
+.lamanotes-html-editor-icon-button-active {
   border-color: rgb(var(--theme-brand));
+  color: rgb(var(--theme-brand));
+  background-color: rgb(var(--theme-background-elevated));
+}
+
+.lamanotes-html-editor-select:focus-visible,
+.lamanotes-html-editor-icon-button:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: 2px;
+}
+
+.lamanotes-html-editor-quality-warning {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.24rem;
+  margin-left: auto;
+  color: rgb(var(--theme-warning));
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .lamanotes-html-editor-source {
@@ -542,26 +651,52 @@ defineExpose({
   font-family: Consolas, "Lucida Console", Monaco, "Andale Mono", monospace;
   font-size: 0.9rem;
   line-height: 1.45;
-  outline: none;
   tab-size: 2;
 }
 
-@media (max-width: 640px) and (pointer: coarse),
-  (max-width: 640px) and (hover: none) {
+.lamanotes-html-editor-source:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: -2px;
+}
+
+.lamanotes-html-editor-preview {
+  min-height: 65vh;
+  padding: 1rem 1.1rem;
+  background-color: rgb(var(--theme-background));
+}
+
+@media (pointer: coarse), (hover: none) {
   .lamanotes-html-editor-toolbar {
-    min-height: 2.35rem;
-    gap: 0.4rem;
+    min-height: var(--ln-touch-target);
+    gap: 0.28rem;
     padding: 0.26rem;
   }
 
   .lamanotes-html-editor-toolbar-group {
-    gap: 0.45rem;
+    gap: 0.28rem;
   }
 
   .lamanotes-html-editor-select,
-  .lamanotes-html-editor-toolbar button {
-    min-height: 2rem;
-    padding: 0 0.65rem;
+  .lamanotes-html-editor-icon-button {
+    min-height: var(--ln-touch-target);
+  }
+
+  .lamanotes-html-editor-icon-button {
+    width: var(--ln-touch-target);
+  }
+
+  .lamanotes-html-editor-select {
+    padding-inline: 0.65rem 1.8rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .lamanotes-html-editor-quality-warning span {
+    display: none;
+  }
+
+  .lamanotes-html-editor-quality-warning {
+    margin-left: 0;
   }
 }
 </style>

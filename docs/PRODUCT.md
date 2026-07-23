@@ -50,7 +50,8 @@ note.
 ## Interaction standard
 
 The interface should feel closer to a small text editor than to a web
-dashboard.
+dashboard. `docs/DESIGN.md` defines the shared V2 tokens, content primitives,
+responsive rules and anti-patterns for every host and note type.
 
 - Local content appears before network-dependent surfaces initialize.
 - Common commands use compact familiar icons with labels available as

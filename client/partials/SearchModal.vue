@@ -1,5 +1,5 @@
 <template>
-  <Modal v-model="isVisible" class="border-none">
+  <Modal v-model="isVisible" aria-label="Search notes" class="border-none">
     <SearchInput
       large
       placeholder="Search by title, content or #tags..."

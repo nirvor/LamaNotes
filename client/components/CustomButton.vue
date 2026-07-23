@@ -42,6 +42,14 @@ defineProps({
 <style scoped>
 .lamanotes-custom-button {
   min-width: 0;
+  min-height: var(--ln-control-size);
+  border-radius: var(--ln-radius-control);
+  touch-action: manipulation;
+}
+
+.lamanotes-custom-button:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: 2px;
 }
 
 @media (max-width: 560px) {
@@ -49,6 +57,13 @@ defineProps({
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+}
+
+@media (pointer: coarse), (hover: none) {
+  .lamanotes-custom-button {
+    min-width: var(--ln-touch-target);
+    min-height: var(--ln-touch-target);
   }
 }
 </style>

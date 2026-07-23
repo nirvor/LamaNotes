@@ -263,15 +263,15 @@ defineExpose({
   display: flex;
   min-height: 65vh;
   flex-direction: column;
-  border: 1px solid rgb(var(--theme-border));
-  border-radius: 6px;
+  border: var(--ln-border-subtle);
+  border-radius: var(--ln-radius-card);
   overflow: visible;
   background-color: rgb(var(--theme-background));
 }
 
 .lamanotes-work-editor-toolbar {
   display: flex;
-  min-height: 1.42rem;
+  min-height: var(--ln-control-size);
   align-items: center;
   justify-content: flex-start;
   gap: 0.14rem;
@@ -285,10 +285,10 @@ defineExpose({
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.48rem;
-  height: 1.34rem;
+  width: var(--ln-control-size);
+  height: var(--ln-control-size);
   border: 1px solid rgb(var(--theme-border));
-  border-radius: 5px;
+  border-radius: var(--ln-radius-control);
   padding: 0;
   color: rgb(var(--theme-text));
   background-color: rgb(var(--theme-background));
@@ -325,17 +325,16 @@ defineExpose({
   background-color: rgb(var(--theme-background));
 }
 
-@media (max-width: 640px) and (pointer: coarse),
-  (max-width: 640px) and (hover: none) {
+@media (pointer: coarse), (hover: none) {
   .lamanotes-work-editor-toolbar {
     gap: 0.22rem;
-    min-height: 2.35rem;
+    min-height: var(--ln-touch-target);
     padding: 0.26rem;
   }
 
   .lamanotes-work-icon-button {
-    width: 2rem;
-    height: 2rem;
+    width: var(--ln-touch-target);
+    height: var(--ln-touch-target);
   }
 }
 </style>

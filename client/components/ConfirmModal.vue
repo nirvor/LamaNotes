@@ -1,8 +1,8 @@
 <template>
   <Modal
     v-model="isVisible"
-    :title="title"
-    :closeHandler="emitClose"
+    :aria-label="title || 'Confirmation'"
+    :close-handler-override="emitClose"
     class="px-6 py-4"
   >
     <!-- Title -->

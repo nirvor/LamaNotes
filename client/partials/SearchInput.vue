@@ -639,10 +639,11 @@ onBeforeUnmount(() => {
 .lamanotes-tag-cloud-item:hover,
 .lamanotes-tag-cloud-item:focus-visible {
   color: rgb(var(--theme-brand));
-  outline: none;
 }
 
 .lamanotes-tag-cloud-item:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: 2px;
   text-decoration: underline;
   text-underline-offset: 0.2rem;
 }
@@ -680,11 +681,26 @@ onBeforeUnmount(() => {
   border-bottom: 0;
 }
 
+@media (pointer: coarse), (hover: none) {
+  .lamanotes-tag-cloud-item,
+  .lamanotes-search-suggestion {
+    min-height: var(--ln-touch-target);
+  }
+
+  .lamanotes-tag-cloud-item {
+    padding-block: 0.45rem;
+  }
+}
+
 .lamanotes-search-suggestion:hover,
 .lamanotes-search-suggestion:focus-visible,
 .lamanotes-search-suggestion.is-selected {
   background: rgb(var(--theme-background));
-  outline: none;
+}
+
+.lamanotes-search-suggestion:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: -3px;
 }
 
 .lamanotes-search-suggestion.is-selected .lamanotes-search-suggestion-title {

@@ -72,11 +72,11 @@ defineExpose({ toggle });
 
 .lamanotes-menu-control {
   display: inline-grid;
-  width: 2rem;
-  height: 1.8rem;
+  width: var(--ln-control-size);
+  height: var(--ln-control-size);
   place-items: center;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--ln-radius-control);
   color: rgb(var(--theme-text-muted));
   background: transparent;
 }
@@ -86,11 +86,22 @@ defineExpose({ toggle });
   border-color: rgb(var(--theme-border));
   color: rgb(var(--theme-text));
   background: rgb(var(--theme-background-elevated));
-  outline: none;
+}
+
+.lamanotes-menu-control:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: 2px;
 }
 
 .lamanotes-menu-control-active {
   color: rgb(var(--theme-brand));
   background: rgb(var(--theme-background-elevated) / 0.58);
+}
+
+@media (pointer: coarse), (hover: none) {
+  .lamanotes-menu-control {
+    width: var(--ln-touch-target);
+    height: var(--ln-touch-target);
+  }
 }
 </style>

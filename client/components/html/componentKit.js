@@ -17,51 +17,66 @@ function selectedOrFallback(selection, fallback) {
 export const htmlComponentSnippets = [
   {
     id: "article",
-    label: "Article",
+    label: "Generic article",
     body: (selection) => `
-<article class="lamanote lamanote-research" data-lamanotes-component="article">
-  <p class="lamanote-kicker">Research Note</p>
+<article class="lamanote lamanote-article" data-lamanotes-component="article">
+  <p class="lamanote-kicker">Note</p>
+  <h1>Descriptive note title</h1>
   <p class="lamanote-deck">${selectedOrFallback(
     selection,
-    "One compact orientation sentence for the note.",
+    "Write one compact orientation sentence, or remove this deck.",
+  )}</p>
+
+  <section class="lamanote-section" data-lamanotes-component="section">
+    <h2>Descriptive section title</h2>
+    <div class="lamanote-section-card">
+      <p>Replace this scaffold with the useful substance, or remove the card when plain prose is enough.</p>
+    </div>
+  </section>
+</article>
+`,
+  },
+  {
+    id: "research-article",
+    label: "Research article",
+    body: (selection) => `
+<article class="lamanote lamanote-article lamanote-research" data-lamanotes-component="article">
+  <p class="lamanote-kicker">Research Note</p>
+  <h1>Descriptive research title</h1>
+  <p class="lamanote-deck">${selectedOrFallback(
+    selection,
+    "State the question, scope, and date in one compact orientation line.",
   )}</p>
 
   <section class="lamanote-summary" data-lamanotes-component="summary">
     <ul>
       <li>Main result or practical answer.</li>
-      <li>Most important constraint or caveat.</li>
-      <li>Concrete next action.</li>
+      <li>Most important constraint or uncertainty.</li>
+      <li>Concrete implication or next action.</li>
     </ul>
   </section>
 
-  <section class="lamanote-research-section lamanote-research-section--evidence" data-lamanotes-component="section">
+  <section class="lamanote-section lamanote-section--evidence" data-lamanotes-component="section">
     <h2>Evidence and interpretation</h2>
     <div class="lamanote-section-card">
-      <p>Write the useful substance here. Keep established evidence, interpretation, and uncertainty visibly separate.</p>
+      <p>Replace this scaffold with sourced evidence. Keep measurement, interpretation, and uncertainty visibly separate.</p>
     </div>
   </section>
 
-  <section class="lamanote-source-list" data-lamanotes-component="sources">
-    <h2>Sources</h2>
-    <ul>
-      <li><a href="https://example.com">Source title</a></li>
-    </ul>
-  </section>
-
-  <p>#private #research</p>
+  <p>#research #r-topic</p>
 </article>
 `,
   },
   {
     id: "section",
-    label: "Research section",
+    label: "Section",
     body: (selection) => `
-<section class="lamanote-research-section lamanote-research-section--evidence" data-lamanotes-component="section">
+<section class="lamanote-section" data-lamanotes-component="section">
   <h2>Descriptive section title</h2>
   <div class="lamanote-section-card">
     <p>${selectedOrFallback(
       selection,
-      "Evidence-backed section content. Group related subtopics in this one major section card.",
+      "Group one major topic and its related subtopics in this section card.",
     )}</p>
   </div>
 </section>
@@ -121,6 +136,19 @@ export const htmlComponentSnippets = [
 `,
   },
   {
+    id: "panel",
+    label: "Panel",
+    body: (selection) => `
+<aside class="lamanote-panel" data-lamanotes-component="panel">
+  <h3>Panel title</h3>
+  <p>${selectedOrFallback(
+    selection,
+    "Use a panel for a real decision, working instruction, or grouped reference.",
+  )}</p>
+</aside>
+`,
+  },
+  {
     id: "media-row",
     label: "Media row",
     body: () => `
@@ -141,6 +169,7 @@ export const htmlComponentSnippets = [
     label: "Plot",
     body: () => `
 <figure class="lamanote-plot lamanote-visual-frame" data-lamanotes-component="plot">
+  <p class="lamanote-visual-question"><strong>Question:</strong> State the quantitative comparison this plot answers.</p>
   <img src="attachments/example-plot.png" alt="Describe the variables, comparison, direction, and important exception" loading="lazy" decoding="async">
   <p class="lamanote-visual-takeaway">Takeaway: state the one relationship the reader should retain.</p>
   <figcaption><strong>Figure 1.</strong> Define quantities and units, date the evidence, state important assumptions or uncertainty, and link the direct source.</figcaption>
@@ -151,10 +180,21 @@ export const htmlComponentSnippets = [
     id: "diagram",
     label: "Diagram",
     body: () => `
-<figure class="lamanote-diagram lamanote-visual-frame lamanote-visual-wide" data-lamanotes-component="diagram">
+<figure class="lamanote-diagram lamanote-visual-frame" data-lamanotes-component="diagram">
   <img src="attachments/example-diagram.png" alt="Describe the actors, flow direction, decision points, and final outcomes" loading="lazy" decoding="async">
   <p class="lamanote-visual-takeaway">Takeaway: explain what the architecture or mechanism changes.</p>
   <figcaption><strong>Figure 2.</strong> Name the flow direction, define color meaning, and distinguish measured structure from illustration.</figcaption>
+</figure>
+`,
+  },
+  {
+    id: "wide-diagram",
+    label: "Wide diagram",
+    body: () => `
+<figure class="lamanote-diagram lamanote-visual-frame lamanote-visual-wide" data-lamanotes-component="diagram">
+  <img src="attachments/example-wide-diagram.png" alt="Describe each lane, the left-to-right flow, decision points, feedback, and final outcomes" loading="lazy" decoding="async">
+  <p class="lamanote-visual-takeaway">Takeaway: explain what the architecture or mechanism changes.</p>
+  <figcaption><strong>Figure 2.</strong> Use this wide variant only when readable labels require local horizontal panning.</figcaption>
 </figure>
 `,
   },
@@ -175,6 +215,15 @@ export const htmlComponentSnippets = [
 `,
   },
   {
+    id: "link-list",
+    label: "Link list",
+    body: () => `
+<ul class="lamanote-link-list" data-lamanotes-component="link-list">
+  <li><a href="https://example.com">Useful reference</a></li>
+</ul>
+`,
+  },
+  {
     id: "sources",
     label: "Sources",
     body: () => `
@@ -188,6 +237,31 @@ export const htmlComponentSnippets = [
   },
 ];
 
+const htmlPlaceholderChecks = [
+  {
+    id: "example-link",
+    label: "example.com link",
+    pattern: /https?:\/\/(?:www\.)?example\.com(?:[/"'<\s]|$)/i,
+  },
+  {
+    id: "example-media",
+    label: "example media path",
+    pattern:
+      /attachments\/example(?:[-_][a-z0-9_-]+)?\.(?:avif|gif|jpe?g|png|svg|webp)\b/i,
+  },
+  {
+    id: "research-topic",
+    label: "#r-topic facet",
+    pattern: /(^|[\s>])#r-topic(?:[\s<]|$)/i,
+  },
+  {
+    id: "scaffold-copy",
+    label: "component scaffold text",
+    pattern:
+      /(Descriptive (?:note|research|section) title|Replace this scaffold|Main result or practical answer|Important caveat or uncertainty|Concrete next action|Short descriptive alt text|Important practical caveat or interpretation|Use a panel for a real decision|<div class="lamanote-metric-(?:label|value)">(?:Metric|Value)<\/div>|Takeaway: (?:state|explain)|First useful event or action|Second useful event or action)/i,
+  },
+];
+
 export function getHtmlSnippet(id, selection = "") {
   const snippet = htmlComponentSnippets.find((item) => item.id === id);
   if (!snippet) {
@@ -195,6 +269,13 @@ export function getHtmlSnippet(id, selection = "") {
   }
 
   return snippet.body(selection);
+}
+
+export function findHtmlPlaceholderWarnings(html = "") {
+  const value = String(html || "");
+  return htmlPlaceholderChecks
+    .filter(({ pattern }) => pattern.test(value))
+    .map(({ id, label }) => ({ id, label }));
 }
 
 export function createMediaFigureSnippet(url, altText, metadata = {}) {

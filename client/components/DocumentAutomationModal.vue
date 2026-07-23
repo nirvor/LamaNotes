@@ -13,6 +13,7 @@
       aria-labelledby="lamanotes-automation-title"
       tabindex="-1"
       @keydown.esc.stop.prevent="close"
+      @keydown.tab="trapFocus"
     >
       <header class="lamanotes-automation-header">
         <div class="lamanotes-automation-heading">
@@ -89,7 +90,7 @@
 <script setup>
 import SvgIcon from "@jamescoyle/vue-icon";
 import { mdiArrowLeft, mdiCheck, mdiChevronRight, mdiClose } from "@mdi/js";
-import { nextTick, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 
 import {
   availableDocumentAutomations,
@@ -107,22 +108,33 @@ const dialog = ref();
 const problem = ref("");
 const result = ref(null);
 const selectedAction = ref(null);
+let returnFocusTarget;
 
 watch(
   visible,
-  (isVisible) => {
+  async (isVisible) => {
     if (!isVisible) {
       reset();
+      await nextTick();
+      returnFocus();
       return;
     }
+    returnFocusTarget =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : undefined;
     availableActions.value = availableDocumentAutomations(
       props.language,
       props.source,
     );
-    nextTick(() => dialog.value?.focus?.({ preventScroll: true }));
+    await nextTick();
+    const [firstFocusable] = getFocusableElements();
+    (firstFocusable || dialog.value)?.focus?.({ preventScroll: true });
   },
   { immediate: true },
 );
+
+onBeforeUnmount(returnFocus);
 
 function previewAction(action) {
   selectedAction.value = action;
@@ -145,6 +157,41 @@ function close() {
   visible.value = false;
 }
 
+function getFocusableElements() {
+  if (!dialog.value) {
+    return [];
+  }
+  return Array.from(
+    dialog.value.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((element) => !element.closest("[inert]"));
+}
+
+function trapFocus(event) {
+  const focusableElements = getFocusableElements();
+  if (!focusableElements.length) {
+    event.preventDefault();
+    dialog.value?.focus?.();
+    return;
+  }
+
+  const firstFocusable = focusableElements[0];
+  const lastFocusable = focusableElements.at(-1);
+  if (event.shiftKey && document.activeElement === firstFocusable) {
+    event.preventDefault();
+    lastFocusable.focus();
+  } else if (!event.shiftKey && document.activeElement === lastFocusable) {
+    event.preventDefault();
+    firstFocusable.focus();
+  }
+}
+
+function returnFocus() {
+  returnFocusTarget?.focus?.({ preventScroll: true });
+  returnFocusTarget = undefined;
+}
+
 function apply() {
   if (!result.value?.changed || problem.value) {
     return;
@@ -162,8 +209,7 @@ function apply() {
   display: grid;
   place-items: start center;
   padding: min(12vh, 6rem) 0.65rem 1rem;
-  background: rgb(2 6 12 / 0.48);
-  backdrop-filter: blur(3px);
+  background: rgb(2 6 12 / 0.7);
 }
 
 .lamanotes-automation-dialog {
@@ -171,11 +217,16 @@ function apply() {
   max-height: min(76vh, 42rem);
   overflow: auto;
   border: 1px solid rgb(var(--theme-border));
-  border-radius: 6px;
+  border-radius: var(--ln-radius-card);
   color: rgb(var(--theme-text));
   background: rgb(var(--theme-background));
-  box-shadow: 0 18px 45px rgb(0 0 0 / 0.28);
+  box-shadow: var(--ln-shadow-card);
   outline: none;
+}
+
+.lamanotes-automation-dialog:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: 2px;
 }
 
 .lamanotes-automation-header,
@@ -254,7 +305,14 @@ function apply() {
 .lamanotes-automation-option:focus-visible {
   color: rgb(var(--theme-heading));
   background: rgb(var(--theme-background-elevated) / 0.52);
-  outline: none;
+}
+
+.lamanotes-automation-header button:focus-visible,
+.lamanotes-automation-option:focus-visible,
+.lamanotes-automation-back:focus-visible,
+.lamanotes-automation-apply:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: 2px;
 }
 
 .lamanotes-automation-option span {
@@ -326,6 +384,19 @@ function apply() {
 .lamanotes-automation-apply {
   border-color: rgb(var(--theme-heading) / 0.72);
   color: rgb(var(--theme-heading));
+}
+
+@media (pointer: coarse), (hover: none) {
+  .lamanotes-automation-header button,
+  .lamanotes-automation-back,
+  .lamanotes-automation-apply,
+  .lamanotes-automation-option {
+    min-height: var(--ln-touch-target);
+  }
+
+  .lamanotes-automation-header button {
+    min-width: var(--ln-touch-target);
+  }
 }
 
 .lamanotes-automation-apply:disabled {

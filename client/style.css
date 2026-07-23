@@ -37,16 +37,40 @@
   }
 
   body {
-    --theme-brand: 39 179 205;
+    --theme-brand: 30 92 145;
     --theme-background: 255 255 255;
-    --theme-background-elevated: 243 244 245;
+    --theme-background-elevated: 244 247 250;
     --theme-heading: 30 92 145;
     --theme-link: 72 102 145;
     --theme-text: 44 49 57;
-    --theme-text-muted: 136 145 161;
-    --theme-text-very-muted: 193 199 208;
-    --theme-shadow: 236 238 240;
-    --theme-border: 236 238 240;
+    --theme-text-muted: 91 103 119;
+    --theme-text-very-muted: 104 116 132;
+    --theme-shadow: 215 224 232;
+    --theme-border: 213 222 231;
+    --theme-warning: 161 98 7;
+
+    --ln-secondary-text: var(--theme-text-muted);
+    --ln-space-1: 0.25rem;
+    --ln-space-2: 0.5rem;
+    --ln-space-3: 0.75rem;
+    --ln-space-4: 1rem;
+    --ln-space-5: 1.45rem;
+    --ln-radius-control: 0.32rem;
+    --ln-radius-card: 0.5rem;
+    --ln-border-subtle: 1px solid rgb(var(--theme-border) / 0.9);
+    --ln-shadow-card: 0 0.22rem 0.85rem rgb(17 36 57 / 0.08);
+    --ln-font-h1: 1.42rem;
+    --ln-font-h2: 1.28rem;
+    --ln-font-h3: 1.15rem;
+    --ln-control-size: 1.8rem;
+    --ln-touch-target: 2.65rem;
+    --ln-content-max: 68rem;
+    --ln-reading-max: 74ch;
+    --ln-visual-max: 58rem;
+    --ln-wide-min: 44rem;
+    --ln-section-gap: 1.45rem;
+
+    color-scheme: light;
   }
 
   html,
@@ -79,16 +103,28 @@
   }
 
   body.dark {
-    --theme-brand: 39 179 205;
+    --theme-brand: 142 203 255;
     --theme-background: 34 38 44;
     --theme-background-elevated: 44 49 57;
     --theme-heading: 142 203 255;
     --theme-link: 164 187 224;
     --theme-text: 255 255 255;
-    --theme-text-muted: 136 145 161;
-    --theme-text-very-muted: 94 107 128;
+    --theme-text-muted: 184 193 205;
+    --theme-text-very-muted: 155 168 185;
     --theme-shadow: none;
-    --theme-border: 94 107 128;
+    --theme-border: 78 91 108;
+    --theme-warning: 251 191 36;
+
+    color-scheme: dark;
+  }
+
+  :where(button, a, input, select, textarea, [role="button"]):focus-visible {
+    outline: 2px solid rgb(var(--theme-brand));
+    outline-offset: 2px;
+  }
+
+  :where(button, [role="button"]) {
+    -webkit-tap-highlight-color: transparent;
   }
 
   body.lamanotes-window-controls-overlay {
@@ -161,6 +197,32 @@
     .lamanotes-navbar-actions
     .lamanotes-icon-label-icon {
     margin-right: 0 !important;
+  }
+}
+
+.lamanotes-icon-only {
+  display: inline-flex;
+  min-width: var(--ln-control-size);
+  align-items: center;
+  justify-content: center;
+}
+
+.lamanotes-icon-only .lamanotes-icon-label-text {
+  display: none;
+}
+
+.lamanotes-icon-only .lamanotes-icon-label-icon {
+  margin-right: 0 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

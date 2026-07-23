@@ -31,7 +31,7 @@
         <CustomButton
           :iconPath="mdilHome"
           label="Home"
-          class="lamanotes-navbar-icon-only"
+          class="lamanotes-navbar-icon-only lamanotes-icon-only"
         />
       </RouterLink>
       <template v-for="action in leadingNoteActions" :key="action.key">
@@ -63,10 +63,16 @@
         v-if="showNewButton"
         :iconPath="mdilPlusCircle"
         label="New Note"
+        class="lamanotes-navbar-icon-only lamanotes-icon-only"
         @click="createNewNote"
       />
       <!-- Menu -->
-      <CustomButton :iconPath="mdilMenu" label="Menu" @click="toggleMenu" />
+      <CustomButton
+        :iconPath="mdilMenu"
+        label="Menu"
+        class="lamanotes-navbar-icon-only lamanotes-icon-only"
+        @click="toggleMenu"
+      />
       <PrimeMenu ref="menu" :model="menuItems" :popup="true" />
       <template v-for="action in trailingNoteActions" :key="action.key">
         <CustomButton
@@ -376,8 +382,8 @@ function showLogOutButton() {
 
 .lamanotes-navbar-context-action {
   display: inline-grid;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: var(--ln-control-size);
+  height: var(--ln-control-size);
   flex: 0 0 auto;
   place-items: center;
   border: 0;
@@ -426,7 +432,7 @@ function showLogOutButton() {
   }
 
   .lamanotes-navbar-actions :deep(.lamanotes-custom-button) {
-    min-width: 1.75rem;
+    min-width: var(--ln-control-size);
     padding-inline: 0.42rem;
   }
 
@@ -441,7 +447,7 @@ function showLogOutButton() {
 
 .lamanotes-navbar-actions :deep(.lamanotes-navbar-icon-only) {
   display: inline-flex;
-  min-width: 1.78rem;
+  min-width: var(--ln-control-size);
   align-items: center;
   justify-content: center;
   padding-inline: 0.42rem;
@@ -459,5 +465,18 @@ function showLogOutButton() {
 .lamanotes-navbar-actions
   :deep(.lamanotes-navbar-icon-only .lamanotes-icon-label-icon) {
   margin-right: 0 !important;
+}
+
+@media (pointer: coarse), (hover: none) {
+  .lamanotes-navbar-context-action {
+    width: var(--ln-touch-target);
+    height: var(--ln-touch-target);
+  }
+
+  .lamanotes-navbar-actions :deep(.lamanotes-custom-button),
+  .lamanotes-navbar-actions :deep(.lamanotes-navbar-icon-only) {
+    min-width: var(--ln-touch-target);
+    min-height: var(--ln-touch-target);
+  }
 }
 </style>

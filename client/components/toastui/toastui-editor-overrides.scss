@@ -51,17 +51,17 @@
 
   h1,
   .toastui-editor-md-heading1 {
-    font-size: 1.46rem;
+    font-size: var(--ln-font-h1);
   }
 
   h2,
   .toastui-editor-md-heading2 {
-    font-size: 1.28rem;
+    font-size: var(--ln-font-h2);
   }
 
   h3,
   .toastui-editor-md-heading3 {
-    font-size: 1.16rem;
+    font-size: var(--ln-font-h3);
   }
 
   h4,
@@ -422,15 +422,15 @@
   }
 
   h1 {
-    font-size: 1.42rem;
+    font-size: var(--ln-font-h1);
   }
 
   h2 {
-    font-size: 1.28rem;
+    font-size: var(--ln-font-h2);
   }
 
   h3 {
-    font-size: 1.15rem;
+    font-size: var(--ln-font-h3);
   }
 
   h4 {
@@ -468,54 +468,61 @@
   max-width: 100%;
 }
 
+.toastui-editor-contents .lamanote-article,
 .toastui-editor-contents .lamanote-research {
   width: 100%;
 }
 
-.toastui-editor-contents .lamanote-research-section {
-  margin: 1.55rem 0;
+.toastui-editor-contents .lamanote-reading {
+  max-width: var(--ln-reading-max);
 }
 
+.toastui-editor-contents .lamanote-section,
+.toastui-editor-contents .lamanote-research-section {
+  margin: var(--ln-section-gap) 0;
+}
+
+.toastui-editor-contents .lamanote-section > h2,
 .toastui-editor-contents .lamanote-research-section > h2 {
   margin: 0 0 0.62rem;
 }
 
 .toastui-editor-contents .lamanote-section-card {
   padding: 1rem 1.1rem;
-  border: 1px solid rgb(var(--theme-heading) / 0.18);
-  border-radius: 8px;
+  border: var(--ln-border-subtle);
+  border-radius: var(--ln-radius-card);
   background-color: rgb(var(--theme-background-elevated) / 0.5);
-  box-shadow: 0 0.3rem 1.1rem rgb(0 0 0 / 0.08);
+  box-shadow: var(--ln-shadow-card);
 }
 
 .toastui-editor-contents
-  .lamanote-research-section--key
+  :is(.lamanote-section--key, .lamanote-research-section--key)
   > .lamanote-section-card {
   border-color: rgb(var(--theme-heading) / 0.3);
   background-color: rgb(var(--theme-heading) / 0.07);
 }
 
 .toastui-editor-contents
-  .lamanote-research-section--evidence
+  :is(.lamanote-section--evidence, .lamanote-research-section--evidence)
   > .lamanote-section-card {
   background-color: rgb(var(--theme-background-elevated) / 0.72);
 }
 
 .toastui-editor-contents
-  .lamanote-research-section--analysis
+  :is(.lamanote-section--analysis, .lamanote-research-section--analysis)
   > .lamanote-section-card {
   border-color: rgb(var(--theme-heading) / 0.24);
   background-color: rgb(var(--theme-heading) / 0.045);
 }
 
 .toastui-editor-contents
-  .lamanote-research-section--method
+  :is(.lamanote-section--method, .lamanote-research-section--method)
   > .lamanote-section-card {
   background-color: rgb(var(--theme-background-elevated) / 0.42);
 }
 
 .toastui-editor-contents
-  .lamanote-research-section--limits
+  :is(.lamanote-section--limits, .lamanote-research-section--limits)
   > .lamanote-section-card {
   border-color: rgb(var(--theme-text-muted) / 0.42);
   background-color: rgb(var(--theme-background-elevated) / 0.78);
@@ -571,7 +578,11 @@
 
 .toastui-editor-contents .lamanote-summary {
   margin: 0 0 1rem;
+  padding: 0.72rem 0.82rem;
+  border: var(--ln-border-subtle);
+  border-radius: var(--ln-radius-card);
   color: rgb(var(--theme-text));
+  background-color: rgb(var(--theme-background-elevated) / 0.42);
   font-size: 0.92rem;
   line-height: 1.55;
 }
@@ -599,8 +610,8 @@
 .toastui-editor-contents .lamanote-metric,
 .toastui-editor-contents .lamanote-panel,
 .toastui-editor-contents .lamanote-callout {
-  border: 1px solid rgb(var(--theme-border));
-  border-radius: 6px;
+  border: var(--ln-border-subtle);
+  border-radius: var(--ln-radius-control);
   background-color: rgb(var(--theme-background-elevated) / 0.58);
 }
 
@@ -609,7 +620,7 @@
 }
 
 .toastui-editor-contents .lamanote-metric-label {
-  color: rgb(var(--theme-text-very-muted));
+  color: rgb(var(--ln-secondary-text));
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0;
@@ -626,7 +637,7 @@
 
 .toastui-editor-contents .lamanote-metric-note {
   margin-top: 0.18rem;
-  color: rgb(var(--theme-text-muted));
+  color: rgb(var(--ln-secondary-text));
   font-size: 0.78rem;
   line-height: 1.35;
 }
@@ -634,6 +645,11 @@
 .toastui-editor-contents .lamanote-panel,
 .toastui-editor-contents .lamanote-callout {
   padding: 0.75rem 0.85rem;
+}
+
+.toastui-editor-contents .lamanote blockquote {
+  border: var(--ln-border-subtle);
+  border-radius: var(--ln-radius-control);
 }
 
 .toastui-editor-contents .lamanote-callout {
@@ -676,14 +692,14 @@
 
 .toastui-editor-contents .lamanote-visual-frame {
   box-sizing: border-box;
-  width: min(100%, 58rem);
+  width: min(100%, var(--ln-visual-max));
   margin: 1.15rem auto;
   padding: 0.72rem;
   overflow-x: hidden;
-  border: 1px solid rgb(var(--theme-border) / 0.82);
-  border-radius: 8px;
+  border: var(--ln-border-subtle);
+  border-radius: var(--ln-radius-card);
   background-color: rgb(var(--theme-background-elevated) / 0.38);
-  box-shadow: 0 0.35rem 1.2rem rgb(0 0 0 / 0.09);
+  box-shadow: var(--ln-shadow-card);
 }
 
 .toastui-editor-contents .lamanote-visual-wide {
@@ -692,6 +708,22 @@
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scrollbar-width: thin;
+}
+
+.toastui-editor-contents .lamanote-visual-wide:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: 2px;
+}
+
+.toastui-editor-contents .lamanotes-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .toastui-editor-contents .lamanote-visual-wide > svg,
@@ -737,7 +769,14 @@
 .toastui-editor-contents .lamanote-visual-frame figcaption {
   margin-top: 0.62rem;
   padding: 0 0.12rem 0.08rem;
-  color: rgb(var(--theme-text-muted));
+  color: rgb(var(--ln-secondary-text));
+  font-size: 0.82rem;
+  line-height: 1.42;
+}
+
+.toastui-editor-contents .lamanote-visual-question {
+  margin: 0 0 0.62rem;
+  color: rgb(var(--ln-secondary-text));
   font-size: 0.82rem;
   line-height: 1.42;
 }
@@ -752,13 +791,13 @@
 
 .toastui-editor-contents .lamanote-source-list {
   margin-top: 1.35rem;
-  color: rgb(var(--theme-text-muted));
+  color: rgb(var(--ln-secondary-text));
   font-size: 0.86rem;
   line-height: 1.45;
 }
 
 .toastui-editor-contents .lamanote-source-list a {
-  color: rgb(var(--theme-text));
+  color: rgb(var(--theme-link));
 }
 
 .toastui-editor-contents .lamanote-timeline {
@@ -783,7 +822,7 @@
 }
 
 .toastui-editor-contents .lamanote-timeline time {
-  color: rgb(var(--theme-text-very-muted));
+  color: rgb(var(--ln-secondary-text));
   font-size: 0.78rem;
   font-weight: 600;
   line-height: 1.35;
@@ -850,6 +889,7 @@
 }
 
 @media (max-width: 640px) {
+  .toastui-editor-contents .lamanote-section,
   .toastui-editor-contents .lamanote-research-section {
     margin: 1.25rem 0;
   }
@@ -868,7 +908,7 @@
 
   .toastui-editor-contents .lamanote-visual-wide > svg,
   .toastui-editor-contents .lamanote-visual-wide > img {
-    min-width: 44rem;
+    min-width: var(--ln-wide-min);
   }
 
   .toastui-editor-contents .lamanote-hero img,
@@ -1012,8 +1052,7 @@ body.lamanotes-media-lightbox-open {
   padding: 0.2rem;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 6px;
-  background-color: rgba(18, 24, 32, 0.78);
-  backdrop-filter: blur(10px);
+  background-color: rgba(18, 24, 32, 0.96);
 }
 
 .lamanotes-media-lightbox-control {
@@ -1067,9 +1106,8 @@ body.lamanotes-media-lightbox-open {
     max(1rem, env(safe-area-inset-bottom));
   border-left: 1px solid rgba(255, 255, 255, 0.14);
   color: rgba(255, 255, 255, 0.9);
-  background-color: rgba(17, 24, 39, 0.94);
+  background-color: rgba(17, 24, 39, 0.98);
   box-shadow: -1rem 0 2.5rem rgba(0, 0, 0, 0.38);
-  backdrop-filter: blur(16px);
   touch-action: pan-y;
   transition: transform 180ms ease;
 }
@@ -1199,6 +1237,13 @@ body.lamanotes-media-lightbox-open {
 
   .lamanotes-media-lightbox-drawer {
     width: min(18rem, 86vw);
+  }
+}
+
+@media (pointer: coarse), (hover: none) {
+  .lamanotes-media-lightbox-control {
+    width: var(--ln-touch-target);
+    height: var(--ln-touch-target);
   }
 }
 
@@ -1514,9 +1559,6 @@ body.lamanotes-media-lightbox-open {
 
 @media (max-width: 640px) {
   .toastui-editor-contents.lamanotes-html-contents table {
-    display: table;
-    width: 100%;
-    table-layout: fixed;
     font-size: 0.82rem;
     line-height: 1.35;
   }
@@ -1524,6 +1566,8 @@ body.lamanotes-media-lightbox-open {
   .toastui-editor-contents.lamanotes-html-contents table th,
   .toastui-editor-contents.lamanotes-html-contents table td {
     padding: 0.45rem 0.5rem;
+    white-space: nowrap;
+    overflow-wrap: normal;
   }
 }
 

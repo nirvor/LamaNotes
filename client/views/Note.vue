@@ -14,13 +14,14 @@
     :suggested-slug="publication?.suggestedSlug || ''"
     :busy="publishBusy"
     :problem-message="publishProblemMessage"
+    :quality-warning="publicationQualityWarning"
     @publish="publishConfirmedHandler"
   />
 
   <ConfirmModal
     v-model="isUpdateModalVisible"
     title="Update online"
-    :message="`Replace ${publication?.canonicalUrl || 'the public page'} with the current saved note?`"
+    :message="publicationUpdateMessage"
     confirmButtonText="Update"
     confirmButtonStyle="cta"
     @confirm="startPublication()"
@@ -63,7 +64,7 @@
         'lamanotes-document-find-open': findVisible,
         'lamanotes-note-shell-wide': isWideDashboardNote,
         'lamanotes-note-shell-work': noteLayoutKind === 'work',
-        'lamanotes-note-shell-research': noteLayoutKind === 'research',
+        'lamanotes-note-shell-article': noteLayoutKind === 'article',
         'lamanotes-note-shell-markdown': noteLayoutKind === 'markdown',
       },
     ]"
@@ -172,11 +173,12 @@
         @set-kind="setNewNoteKind"
       />
       <HtmlEditor
-        v-if="editMode && editorFormat === 'html' && editorKind === 'research'"
+        v-if="editMode && editorFormat === 'html' && editorKind === 'article'"
         :key="editorKey"
         ref="contentEditor"
         :current-kind="editorKind"
         :initialValue="getInitialEditorValue()"
+        :note-title="newTitle"
         :addImageBlobHook="addImageBlobHook"
         :show-kind-switch="isNewNote"
         @change="editorContentChangedHandler"
@@ -241,6 +243,7 @@ import ConfirmModal from "../components/ConfirmModal.vue";
 import DocumentFindBar from "../components/DocumentFindBar.vue";
 import LoadingIndicator from "../components/LoadingIndicator.vue";
 import PublishNoteModal from "../components/PublishNoteModal.vue";
+import { findHtmlPlaceholderWarnings } from "../components/html/componentKit.js";
 import {
   buildWorkNoteHtml,
   extractWorkMarkdown,
@@ -318,7 +321,7 @@ const noteLayoutKind = computed(() => {
     return "work";
   }
   if (isHtmlFormat.value) {
-    return "research";
+    return "article";
   }
   return "markdown";
 });
@@ -350,6 +353,25 @@ const publishProblemMessage = computed(() =>
 const publicationMode = computed(() =>
   publicationToolbarMode(publication.value),
 );
+const publicationQualityWarning = computed(() => {
+  if (!isHtmlFormat.value || isWorkNote.value) {
+    return "";
+  }
+  const warnings = findHtmlPlaceholderWarnings(note.value.content || "");
+  return warnings.length
+    ? `Likely template placeholders remain: ${warnings
+        .map(({ label }) => label)
+        .join(", ")}.`
+    : "";
+});
+const publicationUpdateMessage = computed(() => {
+  const message = `Replace ${
+    publication.value?.canonicalUrl || "the public page"
+  } with the current saved note?`;
+  return publicationQualityWarning.value
+    ? `${message} ${publicationQualityWarning.value}`
+    : message;
+});
 let publicationPollTimer = null;
 let publicationPollAttempt = 0;
 let publicationRequestSequence = 0;
@@ -554,7 +576,7 @@ function setEditMode() {
       ? "work"
       : isNewNote.value
         ? loadNewNoteKind()
-        : "research";
+        : "article";
   } else {
     editorKind.value = "markdown";
   }
@@ -1174,8 +1196,12 @@ function loadDefaultEditorMode() {
 
 function loadNewNoteKind() {
   const key = "lamanotes:new-note-kind";
-  const kind = localStorage.getItem(key);
-  return kind || "work";
+  const storedKind = localStorage.getItem(key);
+  const kind = storedKind === "research" ? "article" : storedKind;
+  if (storedKind && kind !== storedKind) {
+    localStorage.setItem(key, kind);
+  }
+  return ["work", "article"].includes(kind) ? kind : "work";
 }
 
 function currentNewEditorContentLooksEdited() {
@@ -1188,7 +1214,7 @@ function currentNewEditorContentLooksEdited() {
     return Boolean(markdown);
   }
 
-  if (editorKind.value === "research" && contentEditor.value.getContent) {
+  if (editorKind.value === "article" && contentEditor.value.getContent) {
     return Boolean(contentEditor.value.getContent().trim());
   }
 
@@ -1505,6 +1531,7 @@ function updateNoteActions() {
       label: "Delete",
       iconPath: mdilDelete,
       visible: canModify.value && !isNewNote.value && Boolean(note.value.title),
+      iconOnly: true,
       handler: deleteHandler,
     },
     {
@@ -1512,6 +1539,7 @@ function updateNoteActions() {
       label: "Save",
       iconPath: mdilContentSave,
       visible: editMode.value,
+      iconOnly: true,
       handler: () => saveHandler(false),
       unsaved: unsavedChanges.value,
     },
@@ -1520,6 +1548,7 @@ function updateNoteActions() {
       label: editMode.value ? "Done" : "Edit",
       iconPath: editMode.value ? mdilCheck : mdilPencil,
       visible: canModify.value,
+      iconOnly: true,
       handler: editMode.value ? () => saveHandler(true) : toggleEditModeHandler,
     },
   ]);
@@ -1564,7 +1593,7 @@ function getEditorContent() {
   const content = contentEditor.value.getContent(
     newTitle.value || note.value.title,
   );
-  if (editorKind.value !== "research") {
+  if (editorKind.value !== "article") {
     return content;
   }
 
@@ -1632,7 +1661,7 @@ onUnmounted(() => {
 }
 
 .lamanotes-note-shell {
-  width: min(100%, 68rem);
+  width: min(100%, var(--ln-content-max));
   margin-inline: auto;
 }
 
@@ -1668,8 +1697,8 @@ onUnmounted(() => {
   width: min(100%, 58rem);
 }
 
-.lamanotes-note-shell-research {
-  width: min(100%, 76rem);
+.lamanotes-note-shell-article {
+  width: min(100%, var(--ln-content-max));
 }
 
 .lamanotes-note-shell-wide {

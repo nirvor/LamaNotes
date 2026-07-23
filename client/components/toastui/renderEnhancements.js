@@ -135,7 +135,9 @@ const latexRenderOptions = {
 let mermaidInstance;
 let katexInstance;
 let mermaidRenderCounter = 0;
+let wideVisualCounter = 0;
 let mediaLightboxElement;
+let mediaLightboxBackgroundStates = [];
 let mediaLightboxLastFocusedElement;
 let mediaLightboxObjectUrl = "";
 let mediaLightboxZoom = 1;
@@ -243,6 +245,7 @@ function closeImageLightbox() {
   setImageLightboxDrawerOpen(false);
   mediaLightboxElement.overlay.hidden = true;
   document.body.classList.remove(mediaLightboxOpenBodyClass);
+  setImageLightboxBackgroundInert(false);
   if (mediaLightboxObjectUrl) {
     URL.revokeObjectURL(mediaLightboxObjectUrl);
     mediaLightboxObjectUrl = "";
@@ -251,6 +254,78 @@ function closeImageLightbox() {
   if (mediaLightboxLastFocusedElement?.focus) {
     mediaLightboxLastFocusedElement.focus();
   }
+}
+
+function setImageLightboxBackgroundInert(isInert) {
+  if (isInert) {
+    if (mediaLightboxBackgroundStates.length || !mediaLightboxElement) {
+      return;
+    }
+    mediaLightboxBackgroundStates = [...document.body.children]
+      .filter(
+        (element) =>
+          element instanceof HTMLElement &&
+          element !== mediaLightboxElement.overlay,
+      )
+      .map((element) => ({
+        element,
+        inert: element.inert,
+      }));
+    mediaLightboxBackgroundStates.forEach(({ element }) => {
+      element.inert = true;
+    });
+    return;
+  }
+
+  mediaLightboxBackgroundStates.forEach(({ element, inert }) => {
+    element.inert = inert;
+  });
+  mediaLightboxBackgroundStates = [];
+}
+
+function getImageLightboxFocusableElements(overlay) {
+  return [
+    ...overlay.querySelectorAll(
+      "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
+    ),
+  ].filter(
+    (element) =>
+      element instanceof HTMLElement &&
+      !element.closest("[inert]") &&
+      !element.hidden &&
+      element.getClientRects().length > 0,
+  );
+}
+
+function trapImageLightboxFocus(event, overlay) {
+  if (event.key !== "Tab") {
+    return false;
+  }
+
+  const focusable = getImageLightboxFocusableElements(overlay);
+  if (!focusable.length) {
+    event.preventDefault();
+    return true;
+  }
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+    return true;
+  }
+  if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+    return true;
+  }
+  if (!overlay.contains(document.activeElement)) {
+    event.preventDefault();
+    first.focus();
+    return true;
+  }
+  return false;
 }
 
 function setImageLightboxZoom(nextZoom) {
@@ -567,7 +642,11 @@ function createImageLightbox() {
     if (overlay.hidden) {
       return;
     }
+    if (trapImageLightboxFocus(event, overlay)) {
+      return;
+    }
     if (event.key === "Escape") {
+      event.preventDefault();
       closeImageLightbox();
     } else if (event.key === "+" || event.key === "=") {
       setImageLightboxZoom(mediaLightboxZoom + 0.25);
@@ -651,6 +730,7 @@ function openImageLightbox(mediaElement) {
   copyButton.dataset.lamanotesImageUrl = url;
   overlay.hidden = false;
   document.body.classList.add(mediaLightboxOpenBodyClass);
+  setImageLightboxBackgroundInert(true);
   setImageLightboxZoom(1);
   setImageLightboxDrawerOpen(false);
   drawerButton.focus();
@@ -777,6 +857,75 @@ export function enhanceMediaImages(rootElement) {
       ].join(","),
     )
     .forEach(decorateMediaDiagram);
+}
+
+export function enhanceWideVisualPanning(rootElement) {
+  if (!rootElement) {
+    return;
+  }
+
+  const contentRoot = rootElement.querySelector(".toastui-editor-contents");
+  if (!contentRoot) {
+    return;
+  }
+
+  contentRoot.querySelectorAll(".lamanote-visual-wide").forEach((visual) => {
+    if (visual.dataset.lamanotesWideVisualEnhanced === "true") {
+      return;
+    }
+
+    visual.dataset.lamanotesWideVisualEnhanced = "true";
+    visual.setAttribute(
+      "aria-roledescription",
+      "horizontally scrollable visual",
+    );
+
+    const focusTarget = visual.querySelector(
+      'button, a[href], [role="button"], [tabindex]:not([tabindex="-1"])',
+    );
+    if (!focusTarget) {
+      visual.tabIndex = 0;
+    }
+
+    const keyboardTarget = focusTarget || visual;
+    const hint = document.createElement("span");
+    wideVisualCounter += 1;
+    hint.id = `lamanotes-wide-visual-hint-${wideVisualCounter}`;
+    hint.className = "lamanotes-visually-hidden";
+    hint.textContent =
+      "Scrollable visual. Use Left and Right Arrow, Home, and End to pan.";
+    visual.append(hint);
+
+    const describedBy = keyboardTarget.getAttribute("aria-describedby");
+    keyboardTarget.setAttribute(
+      "aria-describedby",
+      [describedBy, hint.id].filter(Boolean).join(" "),
+    );
+    keyboardTarget.setAttribute(
+      "aria-keyshortcuts",
+      "ArrowLeft ArrowRight Home End",
+    );
+
+    visual.addEventListener("keydown", (event) => {
+      if (
+        event.target !== keyboardTarget ||
+        !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      const panDistance = Math.max(48, visual.clientWidth * 0.8);
+      if (event.key === "Home") {
+        visual.scrollLeft = 0;
+      } else if (event.key === "End") {
+        visual.scrollLeft = visual.scrollWidth;
+      } else {
+        visual.scrollLeft +=
+          event.key === "ArrowRight" ? panDistance : -panDistance;
+      }
+    });
+  });
 }
 
 function normalizeLeadText(text) {
@@ -1003,7 +1152,10 @@ export function enhanceNoteLead(rootElement, options = {}) {
   }
 
   const abstractMatch = findLeadAbstractList(contentRoot);
-  const heroImage = getFirstLeadImage(contentRoot);
+  const structuredArticle = contentRoot.matches(
+    ".lamanote-article, .lamanote-research, [data-lamanotes-component='article']",
+  );
+  const heroImage = structuredArticle ? null : getFirstLeadImage(contentRoot);
   if (!abstractMatch && !heroImage) {
     return;
   }
@@ -1668,6 +1820,7 @@ export async function enhanceRenderedMarkdown(rootElement, options = {}) {
   enhanceInlineArrows(rootElement);
   enhanceCodeBlocks(rootElement);
   enhanceMediaImages(rootElement);
+  enhanceWideVisualPanning(rootElement);
   if (options.noteLead !== false) {
     enhanceNoteLead(rootElement, options);
   }
@@ -1679,4 +1832,5 @@ export async function enhanceRenderedMarkdown(rootElement, options = {}) {
     enhanceMermaidDiagrams(rootElement),
   ]);
   enhanceMediaImages(rootElement);
+  enhanceWideVisualPanning(rootElement);
 }

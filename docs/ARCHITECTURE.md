@@ -10,7 +10,8 @@ contracts.
 
 The Vue/Vite client contains the editor, note reader, search, Library index and
 small publishing tools. Rich rendering modules are loaded only when their
-content requires them.
+content requires them. The same theme tokens, article primitives and viewer
+stylesheet are used by web/PWA and the Windows WebView; see `docs/DESIGN.md`.
 
 ### Windows shell
 

@@ -1034,9 +1034,8 @@ defineExpose({
   border: 1px solid rgb(var(--theme-border));
   border-radius: 5px;
   color: rgb(var(--theme-text-muted));
-  background: rgb(var(--theme-background-elevated) / 0.97);
+  background: rgb(var(--theme-background-elevated));
   box-shadow: 0 8px 22px rgb(0 0 0 / 0.18);
-  backdrop-filter: blur(6px);
 }
 
 .lamanotes-structured-paste button {
@@ -1059,7 +1058,11 @@ defineExpose({
   border-color: rgb(var(--theme-border));
   color: rgb(var(--theme-heading));
   background: rgb(var(--theme-background));
-  outline: none;
+}
+
+.lamanotes-structured-paste button:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: 2px;
 }
 
 .lamanotes-structured-paste .lamanotes-structured-paste-close {

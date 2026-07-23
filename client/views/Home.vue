@@ -1,7 +1,7 @@
 <template>
   <div class="lamanotes-home">
     <div class="lamanotes-home-inner">
-      <SearchInput class="mb-4 shadow-[0_0_20px] shadow-theme-shadow" />
+      <SearchInput class="mb-4" />
       <LoadingIndicator
         ref="loadingIndicator"
         class="lamanotes-home-pinned min-h-56"
@@ -152,7 +152,7 @@ onBeforeUnmount(() => {
   display: flex;
   width: min(100%, 34rem);
   flex-direction: column;
-  padding-top: clamp(11rem, 25vh, 18rem);
+  padding-top: clamp(4.5rem, 14vh, 8rem);
 }
 
 .lamanotes-home-pinned {
@@ -207,7 +207,11 @@ onBeforeUnmount(() => {
 .lamanotes-home-pinned-link:focus-visible {
   color: rgb(var(--theme-text));
   border-bottom-color: rgb(var(--theme-brand) / 0.62);
-  outline: none;
+}
+
+.lamanotes-home-pinned-link:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: 2px;
 }
 
 .lamanotes-home-pinned-more {
@@ -219,11 +223,17 @@ onBeforeUnmount(() => {
 
 @media (max-width: 560px) {
   .lamanotes-home-inner {
-    padding-top: clamp(10rem, 30vh, 17rem);
+    padding-top: clamp(3.5rem, 12vh, 5.5rem);
   }
 
   .lamanotes-home-pinned-list {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (pointer: coarse), (hover: none) {
+  .lamanotes-home-pinned-link {
+    min-height: var(--ln-touch-target);
   }
 }
 </style>

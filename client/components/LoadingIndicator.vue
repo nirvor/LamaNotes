@@ -131,4 +131,12 @@ defineExpose({ setLoading, setFailed, setLoaded });
     height: 5em;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .loader,
+  .loader::before,
+  .loader::after {
+    animation: none;
+  }
+}
 </style>

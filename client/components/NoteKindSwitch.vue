@@ -11,21 +11,21 @@
     </button>
     <button
       type="button"
-      title="Research note"
-      aria-label="Research note"
+      title="HTML article"
+      aria-label="HTML article"
       :class="{
-        'lamanotes-note-kind-switch-active': currentKind === 'research',
+        'lamanotes-note-kind-switch-active': currentKind === 'article',
       }"
-      @click="setKind('research')"
+      @click="setKind('article')"
     >
-      <SvgIcon type="mdi" :path="mdiTextBoxSearchOutline" size="0.92rem" />
+      <SvgIcon type="mdi" :path="mdiLanguageHtml5" size="0.92rem" />
     </button>
   </div>
 </template>
 
 <script setup>
 import SvgIcon from "@jamescoyle/vue-icon";
-import { mdiBriefcaseOutline, mdiTextBoxSearchOutline } from "@mdi/js";
+import { mdiBriefcaseOutline, mdiLanguageHtml5 } from "@mdi/js";
 
 defineProps({
   currentKind: {
@@ -50,7 +50,7 @@ function setKind(kind) {
   margin-right: 0.2rem;
   padding: 0.06rem;
   border: 1px solid rgb(var(--theme-border));
-  border-radius: 6px;
+  border-radius: var(--ln-radius-control);
   background-color: rgb(var(--theme-background));
 }
 
@@ -58,9 +58,9 @@ function setKind(kind) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.55rem;
-  height: 1.34rem;
-  border-radius: 5px;
+  width: var(--ln-control-size);
+  height: var(--ln-control-size);
+  border-radius: var(--ln-radius-control);
   padding: 0;
   color: rgb(var(--theme-text-muted));
   touch-action: manipulation;
@@ -73,8 +73,7 @@ function setKind(kind) {
   background-color: rgb(var(--theme-background-elevated));
 }
 
-@media (max-width: 640px) and (pointer: coarse),
-  (max-width: 640px) and (hover: none) {
+@media (pointer: coarse), (hover: none) {
   .lamanotes-note-kind-switch {
     gap: 0.12rem;
     margin-right: 0.25rem;
@@ -82,8 +81,8 @@ function setKind(kind) {
   }
 
   .lamanotes-note-kind-switch button {
-    width: 1.86rem;
-    height: 1.86rem;
+    width: var(--ln-touch-target);
+    height: var(--ln-touch-target);
   }
 }
 </style>

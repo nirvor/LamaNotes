@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-full max-w-[700px] flex-col">
+  <div class="lamanotes-search-results flex h-full flex-col">
     <!-- Search Input -->
     <SearchInput
       :initialSearchTerm="effectiveSearchTerm"
@@ -13,7 +13,7 @@
         <CustomButton
           :label="`Sort By: ${sortByName}`"
           :iconPath="mdiSort"
-          class="mb-1"
+          class="lamanotes-icon-only mb-1"
           @click="toggleSortMenu"
         />
         <PrimeMenu ref="sortMenu" :model="menuItems" :popup="true" />
@@ -23,7 +23,7 @@
       <div
         v-for="result in results"
         :key="result.title"
-        class="mb-4 cursor-pointer rounded px-2 py-1 hover:bg-theme-background-elevated"
+        class="lamanotes-search-result"
       >
         <RouterLink
           :to="{ name: 'note', params: { title: result.title } }"
@@ -33,7 +33,12 @@
           <!-- Title and Tags -->
           <div>
             <span v-html="result.titleHighlightsOrTitle" class="mr-2"></span>
-            <Tag v-for="tag in result.tagMatches" :tag="tag" class="mr-1" />
+            <Tag
+              v-for="tag in result.tagMatches"
+              :key="tag"
+              :tag="tag"
+              class="mr-1"
+            />
           </div>
           <!-- Last Modified and Content Highlights -->
           <div>
@@ -184,7 +189,41 @@ onMounted(init);
 </script>
 
 <style>
+.lamanotes-search-results {
+  width: min(100%, 46rem);
+}
+
+.lamanotes-search-result {
+  min-width: 0;
+  border-bottom: 1px solid rgb(var(--theme-border) / 0.72);
+}
+
+.lamanotes-search-result > a {
+  display: block;
+  min-width: 0;
+  padding: 0.58rem 0.35rem;
+  color: rgb(var(--theme-text));
+  text-decoration: none;
+}
+
+.lamanotes-search-result:hover,
+.lamanotes-search-result:focus-within {
+  background: rgb(var(--theme-background-elevated) / 0.58);
+}
+
+.lamanotes-search-result > a:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: -2px;
+}
+
 .match {
   @apply text-theme-brand;
+}
+
+@media (pointer: coarse), (hover: none) {
+  .lamanotes-search-result > a {
+    min-height: var(--ln-touch-target);
+    padding-block: 0.72rem;
+  }
 }
 </style>

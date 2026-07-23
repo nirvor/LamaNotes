@@ -7,8 +7,8 @@
       'lamanotes-app-shell-dashboard': isDashboardRoute,
       'lamanotes-app-shell-note-work':
         isNoteRoute && globalStore.noteLayoutKind === 'work',
-      'lamanotes-app-shell-note-research':
-        isNoteRoute && globalStore.noteLayoutKind === 'research',
+      'lamanotes-app-shell-note-article':
+        isNoteRoute && globalStore.noteLayoutKind === 'article',
       'lamanotes-app-shell-note-markdown':
         isNoteRoute && globalStore.noteLayoutKind === 'markdown',
     }"
@@ -305,10 +305,13 @@ loadTheme();
 <style scoped>
 .lamanotes-app-shell {
   overflow: visible;
+  padding-right: max(0.375rem, env(safe-area-inset-right));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  padding-left: max(0.375rem, env(safe-area-inset-left));
 }
 
 .lamanotes-app-shell-note {
-  max-width: min(100%, 68rem);
+  max-width: min(100%, var(--ln-content-max));
 }
 
 .lamanotes-app-shell-note-work {
@@ -319,8 +322,8 @@ loadTheme();
   max-width: min(100%, 58rem);
 }
 
-.lamanotes-app-shell-note-research {
-  max-width: min(100%, 76rem);
+.lamanotes-app-shell-note-article {
+  max-width: min(100%, var(--ln-content-max));
 }
 
 .lamanotes-app-shell-dashboard,
