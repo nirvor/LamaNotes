@@ -360,6 +360,10 @@ class NativeFileStore:
                 return True
         return False
 
+    def registered_path(self, file_id: str) -> Path | None:
+        with self._lock:
+            return self._paths.get(str(file_id))
+
     def save(
         self,
         file_id: str,
@@ -686,6 +690,29 @@ class LamaNotesApi:
             list(paths or []),
             record_recent=True,
         )
+
+    def open_containing_folder(self, file_id: str) -> dict[str, Any]:
+        path = self._file_store.registered_path(file_id)
+        if path is None:
+            return {
+                "opened": False,
+                "error": "The local file is not open in LamaNotes.",
+            }
+        directory = path.parent
+        if not directory.is_dir():
+            return {
+                "opened": False,
+                "error": "The containing folder is unavailable.",
+            }
+        try:
+            os.startfile(str(directory))
+            return {"opened": True}
+        except OSError:
+            logging.exception("could not open containing folder")
+            return {
+                "opened": False,
+                "error": "Windows Explorer could not open the folder.",
+            }
 
     def create_native_file(
         self,

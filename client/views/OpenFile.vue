@@ -249,6 +249,7 @@ import {
   mdiFileAlertOutline,
   mdiFileCompare,
   mdiFileDocumentOutline,
+  mdiFolderOutline,
   mdiFolderOpenOutline,
   mdiHarddisk,
   mdiPencilOutline,
@@ -431,11 +432,22 @@ const toolbarPathContext = computed(() => {
   return {
     label: pathContext.label,
     title: pathContext.fullPath,
-    action: {
-      label: pathCopied.value ? "Full path copied" : "Copy full file path",
-      iconPath: pathCopied.value ? mdiCheck : mdiClipboardFileOutline,
-      handler: copyActiveFilePath,
-    },
+    actions: [
+      {
+        key: "copy-path",
+        label: pathCopied.value ? "Full path copied" : "Copy full file path",
+        iconPath: pathCopied.value ? mdiCheck : mdiClipboardFileOutline,
+        handler: copyActiveFilePath,
+      },
+      {
+        key: "open-folder",
+        label: "Open containing folder in File Explorer",
+        iconPath: mdiFolderOutline,
+        visible:
+          supportsNativeFileBridge() && Boolean(activeFile.value?.nativeFileId),
+        handler: openActiveFileFolder,
+      },
+    ],
   };
 });
 const externalStateMessage = computed(() => {
@@ -674,22 +686,6 @@ function updateOpenFileActions() {
       handler: copyActiveFile,
     },
     {
-      key: "external-keep",
-      label: keepingFile.value ? "Keeping..." : "Keep as note",
-      iconPath: mdiCloudUploadOutline,
-      visible: Boolean(file),
-      disabled: keepingFile.value,
-      iconOnly: true,
-      handler: keepActiveFileAsNote,
-    },
-    {
-      key: "external-choose",
-      label: "Open",
-      iconPath: mdiFolderOpenOutline,
-      iconOnly: true,
-      handler: chooseFile,
-    },
-    {
       key: "external-close",
       label: "Close",
       iconPath: mdiClose,
@@ -698,7 +694,23 @@ function updateOpenFileActions() {
       handler: closeExternalFile,
     },
   ]);
-  globalStore.setNoteMenuItems([]);
+  globalStore.setNoteMenuItems([
+    ...(file
+      ? [
+          {
+            label: keepingFile.value ? "Keeping..." : "Keep as note",
+            icon: mdiCloudUploadOutline,
+            disabled: keepingFile.value,
+            command: keepActiveFileAsNote,
+          },
+        ]
+      : []),
+    {
+      label: "Open local file",
+      icon: mdiFolderOpenOutline,
+      command: chooseFile,
+    },
+  ]);
   globalStore.setNoteLayout({ kind: "markdown" });
 }
 
@@ -978,6 +990,7 @@ async function fileToPreview(selectedFile) {
         .slice(2)}`,
     name: file.name,
     path: nativeMetadata.path || handle?.path || "",
+    nativeFileId: nativePayload?.id || handle?.id || "",
     size: file.size,
     type: file.type,
     extension,
@@ -1582,6 +1595,32 @@ async function copyActiveFilePath() {
       ),
     );
   }
+}
+
+async function openActiveFileFolder() {
+  const fileId = activeFile.value?.nativeFileId;
+  if (!fileId) {
+    return;
+  }
+
+  let result;
+  try {
+    result = await window.pywebview?.api?.open_containing_folder?.(
+      String(fileId),
+    );
+  } catch (error) {
+    console.error(error);
+  }
+  if (result?.opened) {
+    return;
+  }
+  toast.add(
+    getToastOptions(
+      result?.error || "Could not open the containing folder.",
+      "Open Folder Failed",
+      "error",
+    ),
+  );
 }
 
 function documentKeydownHandler(event) {

@@ -46,7 +46,8 @@ numbers.
 | `--ln-shadow-card`                                  | One restrained card shadow                                |
 | `--ln-font-h1`, `--ln-font-h2`, `--ln-font-h3`      | Normal note heading hierarchy                             |
 | `--ln-control-size`, `--ln-touch-target`            | Compact pointer controls and about 42px touch targets     |
-| `--ln-content-max`, `--ln-reading-max`              | Article shell and optional prose measure                  |
+| `--ln-content-max`, `--ln-toolbar-max`              | Article shell and shared toolbar measure                  |
+| `--ln-reading-max`                                  | Optional prose measure                                    |
 | `--ln-visual-max`, `--ln-wide-min`                  | Normal visual width and wide-visual pan width             |
 
 Amber and red are reserved for warnings, destructive actions, failure, and
@@ -167,6 +168,10 @@ silently rewrite content.
 ## App shell and host rules
 
 - Home, search, reader, editor, and Workspace use the same theme tokens.
+- Every route uses the same centered toolbar measure. Context actions grow to
+  the left; Home and Menu stay in the same two positions at the right edge.
+- Creation, file opening, publishing/promotion, and view preferences belong in
+  the Menu. The top row keeps only immediate document actions.
 - Known global actions are icon-first with a tooltip, `aria-label`, visible
   keyboard focus, and a compact visual footprint.
 - Ambiguous, rare, or destructive actions may keep short text. Delete remains

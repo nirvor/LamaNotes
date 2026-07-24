@@ -301,6 +301,50 @@ class LamaNotesApiTests(unittest.TestCase):
         finally:
             store.close()
 
+    def test_containing_folder_opens_only_for_a_registered_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sample.md"
+            path.write_text("# Sample\n", encoding="utf-8")
+            store = NativeFileStore()
+            try:
+                payload = store.payloads_for_paths([str(path)])[0]
+                api = LamaNotesApi(
+                    store,
+                    [],
+                    "https://notes.example",
+                    "https://notes.example",
+                )
+                with patch(
+                    "lamanotes_client.os.startfile",
+                    create=True,
+                ) as startfile:
+                    result = api.open_containing_folder(payload["id"])
+
+                self.assertTrue(result["opened"])
+                startfile.assert_called_once_with(str(path.resolve().parent))
+            finally:
+                store.close()
+
+    def test_containing_folder_rejects_an_unregistered_file_id(self) -> None:
+        store = NativeFileStore()
+        try:
+            api = LamaNotesApi(
+                store,
+                [],
+                "https://notes.example",
+                "https://notes.example",
+            )
+            with patch(
+                "lamanotes_client.os.startfile",
+                create=True,
+            ) as startfile:
+                result = api.open_containing_folder("C:\\not-open\\sample.md")
+
+            self.assertFalse(result["opened"])
+            startfile.assert_not_called()
+        finally:
+            store.close()
+
 
 class NativeShellIntegrationTests(unittest.TestCase):
     def test_windows_update_archive_requires_all_webview_runtimes(self) -> None:

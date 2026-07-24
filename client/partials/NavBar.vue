@@ -12,29 +12,18 @@
           {{ noteToolbarContext.label }}
         </span>
         <button
-          v-if="noteToolbarContext.action"
+          v-for="action in toolbarContextActions"
+          :key="action.key || action.label"
           type="button"
           class="lamanotes-navbar-context-action"
-          :title="noteToolbarContext.action.label"
-          :aria-label="noteToolbarContext.action.label"
-          @click="noteToolbarContext.action.handler"
+          :title="action.label"
+          :aria-label="action.label"
+          @click="action.handler"
         >
-          <SvgIcon
-            type="mdi"
-            :path="noteToolbarContext.action.iconPath"
-            size="0.88rem"
-          />
+          <SvgIcon type="mdi" :path="action.iconPath" size="0.88rem" />
         </button>
       </div>
-      <!-- Home -->
-      <RouterLink :to="{ name: 'home' }" class="lamanotes-navbar-action-link">
-        <CustomButton
-          :iconPath="mdilHome"
-          label="Home"
-          class="lamanotes-navbar-icon-only lamanotes-icon-only"
-        />
-      </RouterLink>
-      <template v-for="action in leadingNoteActions" :key="action.key">
+      <template v-for="action in noteActions" :key="action.key">
         <CustomButton
           v-if="action.visible !== false"
           :label="action.label"
@@ -58,14 +47,14 @@
           </span>
         </CustomButton>
       </template>
-      <!-- New Note -->
-      <CustomButton
-        v-if="showNewButton"
-        :iconPath="mdilPlusCircle"
-        label="New Note"
-        class="lamanotes-navbar-icon-only lamanotes-icon-only"
-        @click="createNewNote"
-      />
+      <!-- Stable global anchors -->
+      <RouterLink :to="{ name: 'home' }" class="lamanotes-navbar-action-link">
+        <CustomButton
+          :iconPath="mdilHome"
+          label="Home"
+          class="lamanotes-navbar-icon-only lamanotes-icon-only"
+        />
+      </RouterLink>
       <!-- Menu -->
       <CustomButton
         :iconPath="mdilMenu"
@@ -74,30 +63,6 @@
         @click="toggleMenu"
       />
       <PrimeMenu ref="menu" :model="menuItems" :popup="true" />
-      <template v-for="action in trailingNoteActions" :key="action.key">
-        <CustomButton
-          v-if="action.visible !== false"
-          :label="action.label"
-          :iconPath="action.iconPath"
-          :iconSize="action.iconSize"
-          :disabled="action.disabled"
-          :style="action.style || 'subtle'"
-          class="relative"
-          :class="{
-            'lamanotes-navbar-icon-only': action.iconOnly,
-            'lamanotes-navbar-action-active': action.active,
-          }"
-          @click="action.handler"
-        >
-          <div
-            v-if="action.unsaved"
-            class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-theme-brand"
-          ></div>
-          <span v-if="action.badge" class="lamanotes-navbar-action-badge">
-            {{ action.badge }}
-          </span>
-        </CustomButton>
-      </template>
     </div>
   </nav>
 </template>
@@ -140,14 +105,24 @@ let nativeUpdateCheckTimer = null;
 
 const emit = defineEmits(["toggleSearchModal"]);
 
+const showNewButton = computed(() => {
+  return globalStore.config.authType !== authTypes.readOnly;
+});
+
 const baseMenuItems = computed(() => {
-  const items = [
-    {
-      label: "New Window",
-      icon: mdilPlusBox,
-      command: openNewWindow,
-    },
-  ];
+  const items = [];
+  if (showNewButton.value) {
+    items.push({
+      label: "New Note",
+      icon: mdilPlusCircle,
+      command: createNewNote,
+    });
+  }
+  items.push({
+    label: "New Window",
+    icon: mdilPlusBox,
+    command: openNewWindow,
+  });
   if (nativeClientUpdate.available) {
     items.push({
       label: nativeClientUpdate.installing
@@ -178,36 +153,30 @@ const baseMenuItems = computed(() => {
           },
         }),
     },
+    { separator: true },
     {
-      label: "View options",
-      controls: [
-        {
-          label: "Toggle theme",
-          icon: mdiThemeLightDark,
-          command: toggleTheme,
-        },
-        {
-          label: globalStore.showLineNumbers
-            ? "Hide line numbers"
-            : "Show line numbers",
-          icon: mdiFormatListNumbered,
-          active: globalStore.showLineNumbers,
-          toggle: true,
-          command: globalStore.toggleLineNumbers,
-        },
-      ],
+      label: "Toggle theme",
+      icon: mdiThemeLightDark,
+      command: toggleTheme,
     },
     {
-      separator: true,
-      visible: showLogOutButton,
+      label: globalStore.showLineNumbers
+        ? "Hide line numbers"
+        : "Show line numbers",
+      icon: mdiFormatListNumbered,
+      active: globalStore.showLineNumbers,
+      toggle: true,
+      command: globalStore.toggleLineNumbers,
     },
-    {
+  );
+  if (showLogOutButton()) {
+    items.push({ separator: true });
+    items.push({
       label: "Log Out",
       icon: mdilLogout,
       command: logOut,
-      visible: showLogOutButton,
-    },
-  );
+    });
+  }
   return items;
 });
 
@@ -259,20 +228,19 @@ onBeforeUnmount(() => {
   window.removeEventListener("lamanotes:native-ready", checkForNativeUpdate);
 });
 
-const showNewButton = computed(() => {
-  return globalStore.config.authType !== authTypes.readOnly;
-});
-
 const noteActions = computed(() => globalStore.noteActions || []);
 const noteToolbarContext = computed(() => globalStore.noteToolbarContext);
 
-const leadingNoteActions = computed(() =>
-  noteActions.value.filter((action) => action.placement !== "end"),
-);
-
-const trailingNoteActions = computed(() =>
-  noteActions.value.filter((action) => action.placement === "end"),
-);
+const toolbarContextActions = computed(() => {
+  const context = noteToolbarContext.value;
+  if (!context) {
+    return [];
+  }
+  if (Array.isArray(context.actions)) {
+    return context.actions.filter((action) => action?.visible !== false);
+  }
+  return context.action ? [context.action] : [];
+});
 
 async function logOut() {
   await logOutSession().catch(() => {});
@@ -331,13 +299,16 @@ function showLogOutButton() {
   position: sticky;
   top: 0;
   z-index: 35;
-  width: 100%;
+  width: min(calc(100vw - 1rem), var(--ln-toolbar-max));
   min-width: 0;
-  max-width: 100%;
+  max-width: var(--ln-toolbar-max);
   box-sizing: border-box;
-  margin-inline: -0.45rem;
-  padding-inline: 0.45rem;
+  min-height: var(--ln-control-size);
+  margin-right: 0;
   margin-bottom: 0.35rem;
+  margin-left: 50%;
+  padding-inline: 0;
+  transform: translateX(-50%);
   background-color: rgb(var(--theme-background));
   isolation: isolate;
 }
