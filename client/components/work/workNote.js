@@ -442,7 +442,7 @@ function renderMarkdownToHtml(markdown = "") {
         if (task) {
           const checked = task[1].toLowerCase() === "x";
           items.push(
-            `<li class="task-list-item${checked ? " checked" : ""}" data-task-checked="${checked ? "true" : "false"}"><input type="checkbox"${checked ? " checked" : ""}> ${renderInlineMarkdown(task[2])}</li>`,
+            `<li class="task-list-item${checked ? " checked" : ""}" data-task-checked="${checked ? "true" : "false"}"><input class="lamanotes-task-checkbox" type="checkbox"${checked ? " checked" : ""}> ${renderInlineMarkdown(task[2])}</li>`,
           );
         } else {
           items.push(`<li>${renderInlineMarkdown(item)}</li>`);
@@ -488,6 +488,95 @@ function isWorkNoteHtml(value = "") {
   } catch {
     return false;
   }
+}
+
+function isChecklistNoteHtml(value = "") {
+  const taskItems = String(value).match(/<li\b[^>]*\btask-list-item\b/gi);
+  return (
+    (taskItems?.length || 0) >= 2 &&
+    /<input\b[^>]*\btype\s*=\s*["']?checkbox\b/i.test(value) &&
+    !/\blamanote-(?:article|research)\b/i.test(value) &&
+    !/<(?:audio|canvas|code|figure|iframe|pre|svg|table|video)\b/i.test(value)
+  );
+}
+
+function htmlChecklistToWorkMarkdown(value = "", title = "") {
+  if (!isChecklistNoteHtml(value)) {
+    return normalizeMarkdown(value);
+  }
+
+  const documentValue = parseHtml(value);
+  const root =
+    documentValue.querySelector("article, main") || documentValue.body;
+  const lines = [];
+
+  const appendText = (text = "") => {
+    const normalized = String(text).replace(/\s+/g, " ").trim();
+    if (normalized) {
+      lines.push(normalized, "");
+    }
+  };
+
+  const appendList = (list) => {
+    const ordered = list.tagName === "OL";
+    [...list.children].forEach((item, index) => {
+      if (item.tagName !== "LI") {
+        return;
+      }
+      const checkbox = item.querySelector(":scope > input[type='checkbox']");
+      const copy = item.cloneNode(true);
+      copy
+        .querySelectorAll(
+          ":scope > input[type='checkbox'], :scope > ul, :scope > ol",
+        )
+        .forEach((element) => element.remove());
+      const text = copy.textContent.replace(/\s+/g, " ").trim();
+      if (!text) {
+        return;
+      }
+      if (checkbox) {
+        const checked =
+          checkbox.checked ||
+          checkbox.hasAttribute("checked") ||
+          item.dataset.taskChecked === "true" ||
+          item.classList.contains("checked");
+        lines.push(`- [${checked ? "x" : " "}] ${text}`);
+      } else {
+        lines.push(`${ordered ? `${index + 1}.` : "-"} ${text}`);
+      }
+    });
+    lines.push("");
+  };
+
+  const visit = (element) => {
+    const tag = element.tagName;
+    if (/^H[1-6]$/.test(tag)) {
+      const text = element.textContent.replace(/\s+/g, " ").trim();
+      if (text && !(tag === "H1" && text === title)) {
+        lines.push(`${"#".repeat(Number(tag.slice(1)))} ${text}`, "");
+      }
+      return;
+    }
+    if (tag === "P") {
+      appendText(element.textContent);
+      return;
+    }
+    if (tag === "UL" || tag === "OL") {
+      appendList(element);
+      return;
+    }
+    if (tag === "HR") {
+      lines.push("---", "");
+      return;
+    }
+    if (["SCRIPT", "STYLE", "TEMPLATE"].includes(tag)) {
+      return;
+    }
+    [...element.children].forEach(visit);
+  };
+
+  [...root.children].forEach(visit);
+  return normalizeMarkdown(lines.join("\n"));
 }
 
 function extractWorkMarkdown(value = "") {
@@ -553,6 +642,8 @@ export {
   extractTagsFromMarkdown,
   extractWorkMarkdown,
   hasMovableWorkMarkdownTags,
+  htmlChecklistToWorkMarkdown,
+  isChecklistNoteHtml,
   isWorkNoteHtml,
   normalizeWorkMarkdownTags,
   renderMarkdownToHtml,

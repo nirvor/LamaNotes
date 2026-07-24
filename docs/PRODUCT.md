@@ -54,6 +54,9 @@ dashboard. `docs/DESIGN.md` defines the shared V2 tokens, content primitives,
 responsive rules and anti-patterns for every host and note type.
 
 - Local content appears before network-dependent surfaces initialize.
+- LamaNotes has one active note in one application window. Opening another
+  local file or Library note replaces it after Save, Discard or Cancel when
+  the current note has unsaved changes.
 - Common commands use compact familiar icons with labels available as
   tooltips and accessible names.
 - Reading and editing use one main vertical scroll surface.
@@ -61,6 +64,8 @@ responsive rules and anti-patterns for every host and note type.
   dashboard.
 - Persistent controls stay few; contextual controls appear only when useful.
 - A feature should not add a permanent panel merely because it can.
+- Existing HTML checklists may enter the simple Work-note editor on first
+  manual edit; ordinary HTML articles keep their source editor.
 
 ## Performance standard
 

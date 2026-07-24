@@ -1,7 +1,7 @@
 <template>
   <div class="lamanotes-home">
     <div class="lamanotes-home-inner">
-      <SearchInput class="mb-4" />
+      <SearchInput :auto-focus="homeSearchAutoFocus" class="mb-4" />
       <LoadingIndicator
         ref="loadingIndicator"
         class="lamanotes-home-pinned min-h-56"
@@ -61,9 +61,11 @@ import LoadingIndicator from "../components/LoadingIndicator.vue";
 import { searchSortOptions } from "../constants.js";
 import { useGlobalStore } from "../globalStore.js";
 import { isCloudNetworkError } from "../desktopShell.js";
+import { shouldAutoFocusSearch } from "../inputModality.js";
 import SearchInput from "../partials/SearchInput.vue";
 
 const globalStore = useGlobalStore();
+const homeSearchAutoFocus = shouldAutoFocusSearch(window);
 const loadingIndicator = ref();
 const notes = ref([]);
 const toast = useToast();

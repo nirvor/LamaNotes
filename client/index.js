@@ -37,8 +37,10 @@ app.use(ToastService);
 
 // Custom v-focus directive to focus on an element when mounted
 app.directive("focus", {
-  mounted(el) {
-    el.focus();
+  mounted(el, binding) {
+    if (binding.value !== false) {
+      el.focus({ preventScroll: true });
+    }
   },
 });
 

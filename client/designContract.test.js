@@ -111,6 +111,7 @@ test("all routes share stable global toolbar anchors and a row-based menu", () =
   assert.ok(actionsIndex >= 0 && actionsIndex < homeIndex);
   assert.ok(homeIndex < menuIndex);
   assert.match(navBarSource, /label: "New Note"[\s\S]*?command: createNewNote/);
+  assert.doesNotMatch(navBarSource, /New Window|openNewWindow|mdilPlusBox/);
   assert.doesNotMatch(navBarSource, /<!-- New Note -->/);
   assert.match(navBarSource, /label: "Toggle theme"/);
   assert.match(
@@ -152,4 +153,27 @@ test("local file promotion and opening live in the menu", () => {
     /nativeFileId: nativePayload\?\.id \|\| handle\?\.id/,
   );
   assert.match(openFileSource, /open_containing_folder/);
+});
+
+test("one document replaces the current one through Save or Discard", () => {
+  assert.doesNotMatch(openFileSource, /\s+multiple\s*\n/);
+  assert.match(openFileSource, /multiple: false/);
+  assert.doesNotMatch(openFileSource, /function activateFile/);
+  assert.match(openFileSource, /title="Unsaved Changes"/);
+  assert.match(openFileSource, /@confirm="saveBeforeFileDecision"/);
+  assert.match(openFileSource, /@reject="discardBeforeFileDecision"/);
+  assert.match(openFileSource, /onBeforeRouteLeave\(confirmFileNavigation\)/);
+  assert.match(noteSource, /onBeforeRouteLeave\(confirmNoteNavigation\)/);
+  assert.match(noteSource, /onBeforeRouteUpdate\(confirmNoteNavigation\)/);
+});
+
+test("task enhancement reuses and deduplicates source checkboxes", () => {
+  assert.match(
+    renderSource,
+    /querySelectorAll\(":scope > input\[type='checkbox'\]"\)/,
+  );
+  assert.match(renderSource, /candidate\.remove\(\)/);
+  assert.match(renderSource, /taskItem\.dataset\.taskChecked === "true"/);
+  assert.match(noteSource, /isChecklistNoteHtml\(note\.value\.content/);
+  assert.match(noteSource, /htmlChecklistToWorkMarkdown\(content/);
 });

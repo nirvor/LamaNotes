@@ -1363,6 +1363,10 @@ function decorateTaskCheckbox(checkbox, index, rootElement, taskListOptions) {
     "title",
     checkbox.disabled ? "Open edit mode to change this item" : "Toggle item",
   );
+  checkbox.setAttribute(
+    "aria-label",
+    checkbox.disabled ? "Checklist item" : "Toggle item",
+  );
 
   if (checkbox.lamanotesTaskChangeHandler) {
     checkbox.removeEventListener("change", checkbox.lamanotesTaskChangeHandler);
@@ -1393,17 +1397,30 @@ function decorateTaskCheckbox(checkbox, index, rootElement, taskListOptions) {
 }
 
 function ensureTaskCheckbox(taskItem) {
-  const existingCheckbox = taskItem.querySelector(
-    `:scope > input[type='checkbox'].${taskCheckboxClass}`,
-  );
-  if (existingCheckbox) {
-    return existingCheckbox;
+  const directCheckboxes = [
+    ...taskItem.querySelectorAll(":scope > input[type='checkbox']"),
+  ];
+  if (directCheckboxes.length) {
+    const checkbox =
+      directCheckboxes.find((candidate) =>
+        candidate.classList.contains(taskCheckboxClass),
+      ) || directCheckboxes[0];
+    checkbox.checked =
+      directCheckboxes.some((candidate) => candidate.checked) ||
+      taskItem.dataset.taskChecked === "true" ||
+      taskItem.classList.contains("checked");
+    directCheckboxes.forEach((candidate) => {
+      if (candidate !== checkbox) {
+        candidate.remove();
+      }
+    });
+    return checkbox;
   }
 
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
   checkbox.checked =
-    taskItem.hasAttribute("data-task-checked") ||
+    taskItem.dataset.taskChecked === "true" ||
     taskItem.classList.contains("checked");
 
   taskItem.insertBefore(checkbox, taskItem.firstChild);

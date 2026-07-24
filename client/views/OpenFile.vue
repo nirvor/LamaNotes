@@ -1,4 +1,17 @@
 <template>
+  <ConfirmModal
+    v-model="isFileDecisionVisible"
+    title="Unsaved Changes"
+    message="Do you want to save the current note before opening another one?"
+    confirmButtonText="Save"
+    confirmButtonStyle="success"
+    rejectButtonText="Discard"
+    rejectButtonStyle="danger"
+    @confirm="saveBeforeFileDecision"
+    @reject="discardBeforeFileDecision"
+    @cancel="cancelFileDecision"
+  />
+
   <section
     :class="[
       'lamanotes-open-file min-w-0 max-w-full',
@@ -58,7 +71,6 @@
       type="file"
       class="hidden"
       accept=".md,.txt,.cfg,.ini,.json,.yaml,.yml,.toml,.xml,.log,.csv,.tex,text/markdown,text/plain,text/csv,application/json,application/yaml,application/xml,application/x-tex"
-      multiple
       @change="fileInputChanged"
     />
 
@@ -115,24 +127,6 @@
         @click="overwriteExternalVersion"
       >
         <SvgIcon type="mdi" :path="mdiContentSaveAlertOutline" size="0.92rem" />
-      </button>
-    </div>
-
-    <div
-      v-if="files.length > 1"
-      class="mb-3 flex flex-wrap gap-1.5 print:hidden"
-    >
-      <button
-        v-for="file in files"
-        :key="file.key"
-        type="button"
-        class="rounded-full border border-theme-border px-2 py-0.5 text-xs hover:border-theme-brand hover:text-theme-brand"
-        :class="{
-          'border-theme-brand text-theme-brand': activeFile?.key === file.key,
-        }"
-        @click="activateFile(file.key)"
-      >
-        {{ file.name }}
       </button>
     </div>
 
@@ -265,11 +259,17 @@ import {
   watch,
   watchEffect,
 } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import {
+  onBeforeRouteLeave,
+  onBeforeRouteUpdate,
+  useRoute,
+  useRouter,
+} from "vue-router";
 import { useToast } from "primevue/usetoast";
 
 import { apiErrorHandler, createNote } from "../api.js";
 import { writePlainTextToClipboard } from "../clipboard.js";
+import ConfirmModal from "../components/ConfirmModal.vue";
 import DocumentFindBar from "../components/DocumentFindBar.vue";
 import CsvTablePreview from "../components/CsvTablePreview.vue";
 import IconLabel from "../components/IconLabel.vue";
@@ -318,6 +318,7 @@ const statusTone = ref("info");
 const pathCopied = ref(false);
 const compareOpen = ref(false);
 const keepingFile = ref(false);
+const isFileDecisionVisible = ref(false);
 const automationVisible = ref(false);
 const automationSource = ref("");
 const route = useRoute();
@@ -474,7 +475,11 @@ let textDropActivatedEditMode = false;
 let textDropEditorReady = null;
 let latestTextDropPosition = null;
 let textDropPreviewActive = false;
+let pendingFileDecision = null;
 const draftPersistence = createDebouncedWork(persistDraftState, 240);
+
+onBeforeRouteLeave(confirmFileNavigation);
+onBeforeRouteUpdate(confirmFileNavigation);
 
 onMounted(() => {
   if (!supportsFileHandlingLaunchQueue() && !supportsNativeFileBridge()) {
@@ -764,10 +769,6 @@ async function keepActiveFileAsNote() {
 }
 
 async function chooseFile() {
-  if (!confirmDiscardUnsavedChanges()) {
-    return;
-  }
-
   if (supportsNativeFileBridge()) {
     window.dispatchEvent(new CustomEvent("lamanotes:open-native-file-dialog"));
     return;
@@ -776,7 +777,7 @@ async function chooseFile() {
   if (window.showOpenFilePicker) {
     try {
       const handles = await window.showOpenFilePicker({
-        multiple: true,
+        multiple: false,
         types: [
           {
             description: "Text and configuration files",
@@ -793,14 +794,16 @@ async function chooseFile() {
           },
         ],
       });
-      const selectedFiles = [];
-      for (const handle of handles) {
-        selectedFiles.push({
+      const handle = handles[0];
+      if (handle) {
+        const selectedFile = {
           file: await handle.getFile(),
           handle,
-        });
+        };
+        await requestFileReplacement(() =>
+          loadFiles([selectedFile], "Loaded from local file picker."),
+        );
       }
-      await loadFiles(selectedFiles, "Loaded from local file picker.");
     } catch (error) {
       if (error?.name !== "AbortError") {
         showStatus("Could not open the local file.", "error");
@@ -814,10 +817,10 @@ async function chooseFile() {
 }
 
 function closeExternalFile() {
-  if (!confirmDiscardUnsavedChanges()) {
-    return;
-  }
+  void requestFileReplacement(closeExternalFileNow);
+}
 
+function closeExternalFileNow() {
   draftPersistence.cancel();
   closeFind({ restoreFocus: false });
 
@@ -834,51 +837,38 @@ function closeExternalFile() {
   clearDesktopFileSession();
   documentSession.leaveEdit();
   documentSession.setDirty(false);
-  router.push({ name: "home" });
-}
-
-function activateFile(key) {
-  if (key === activeKey.value) {
-    return;
-  }
-  flushDraftPersistence();
-  beginLocalLoad();
-  closeFind({ restoreFocus: false });
-  saveActiveScroll();
-  documentSession.leaveEdit();
-  activeKey.value = key;
-  restoreActiveDraft();
-  documentSession.setDirty(Boolean(activeFile.value?.dirty));
-  restoreActiveScroll();
+  return router.push({ name: "home" });
 }
 
 async function fileInputChanged(event) {
-  if (!confirmDiscardUnsavedChanges()) {
-    event.target.value = "";
-    return;
-  }
-
-  await loadFiles([...event.target.files], "Loaded from local file picker.");
+  const selectedFile = event.target.files?.[0];
   event.target.value = "";
+  if (selectedFile) {
+    await requestFileReplacement(() =>
+      loadFiles([selectedFile], "Loaded from local file picker."),
+    );
+  }
 }
 
 async function loadFiles(selectedFiles, message) {
+  const selectedFile = selectedFiles?.[0];
+  if (!selectedFile) {
+    return;
+  }
   flushDraftPersistence();
   beginLocalLoad();
   closeFind({ restoreFocus: false });
   saveActiveScroll();
-  const readableFiles = await Promise.all(selectedFiles.map(fileToPreview));
+  const readableFile = await fileToPreview(selectedFile);
 
-  files.value = readableFiles;
-  activeKey.value = readableFiles[0]?.key || null;
+  files.value = [readableFile];
+  activeKey.value = readableFile.key;
   documentSession.leaveEdit();
   documentSession.setDirty(false);
-  if (readableFiles.length) {
-    restoreActiveDraft();
-    showStatus(message);
-    restoreActiveScroll();
-    reportFileReady();
-  }
+  restoreActiveDraft();
+  showStatus(message);
+  restoreActiveScroll();
+  reportFileReady();
 }
 
 function createLocalDraft(draftId) {
@@ -886,10 +876,6 @@ function createLocalDraft(draftId) {
   if (activeFile.value?.draftStorageKey === storageKey) {
     return;
   }
-  if (!confirmDiscardUnsavedChanges()) {
-    return;
-  }
-
   flushDraftPersistence();
   beginLocalLoad();
   closeFind({ restoreFocus: false });
@@ -1369,12 +1355,81 @@ function handleActiveFileSaveError(error) {
   console.error(error);
 }
 
-function confirmDiscardUnsavedChanges() {
-  if (!files.value.some((file) => file.dirty)) {
+function confirmFileNavigation() {
+  if (!activeFile.value?.dirty) {
     return true;
   }
 
-  return window.confirm("Discard unsaved external file changes?");
+  return new Promise((resolve) => {
+    requestFileDecision(
+      () => resolve(true),
+      () => resolve(false),
+    );
+  });
+}
+
+function requestFileReplacement(action) {
+  if (!activeFile.value?.dirty) {
+    return Promise.resolve(action());
+  }
+
+  requestFileDecision(action);
+  return Promise.resolve(false);
+}
+
+function requestFileDecision(proceed, cancel = () => {}) {
+  pendingFileDecision = { proceed, cancel };
+  isFileDecisionVisible.value = true;
+}
+
+async function saveBeforeFileDecision() {
+  const decision = pendingFileDecision;
+  pendingFileDecision = null;
+  if (!decision) {
+    return;
+  }
+
+  const saved = await saveActiveFile(false);
+  if (!saved) {
+    decision.cancel();
+    return;
+  }
+  await decision.proceed();
+}
+
+async function discardBeforeFileDecision() {
+  const decision = pendingFileDecision;
+  pendingFileDecision = null;
+  if (!decision) {
+    return;
+  }
+
+  discardActiveChanges();
+  await decision.proceed();
+}
+
+function cancelFileDecision() {
+  const decision = pendingFileDecision;
+  pendingFileDecision = null;
+  decision?.cancel();
+}
+
+function discardActiveChanges() {
+  const file = activeFile.value;
+  if (!file) {
+    return;
+  }
+
+  draftPersistence.cancel();
+  documentSession.clearDraft(file.draftStorageKey);
+  if (file.isNewDraft) {
+    localStorage.removeItem(localDraftNameKey(file.draftId));
+  }
+  file.draftContent = file.content;
+  file.dirty = false;
+  refreshPreview(file);
+  documentSession.setDirty(false);
+  documentSession.leaveEdit();
 }
 
 function persistDesktopFiles() {
@@ -1543,12 +1598,13 @@ async function consumeExternalLaunch(launch) {
 
   lastConsumedLaunchId.value = launch.id;
   if (launch.files?.length) {
-    if (!confirmDiscardUnsavedChanges()) {
-      return;
-    }
-
-    await loadFiles(launch.files, launch.message || "Opened from Windows.");
-    restoreLaunchSession(launch.restoreSession);
+    await requestFileReplacement(async () => {
+      await loadFiles(
+        [launch.files[0]],
+        launch.message || "Opened from Windows.",
+      );
+      restoreLaunchSession(launch.restoreSession);
+    });
     return;
   }
 

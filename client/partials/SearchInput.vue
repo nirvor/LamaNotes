@@ -10,7 +10,7 @@
         type="text"
         ref="input"
         v-model="searchTerm"
-        v-focus
+        v-focus="autoFocus"
         class="w-full bg-transparent focus:outline-none"
         :placeholder="placeholder"
         @keydown="keydownHandler"
@@ -122,6 +122,7 @@ import {
 } from "../tagUsage.js";
 
 const props = defineProps({
+  autoFocus: { type: Boolean, default: true },
   initialSearchTerm: { type: String, default: "" },
   large: Boolean,
   placeholder: { type: String, default: "Search..." },

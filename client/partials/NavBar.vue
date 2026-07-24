@@ -76,7 +76,6 @@ import {
   mdilMagnify,
   mdilMenu,
   mdilNoteMultiple,
-  mdilPlusBox,
   mdilPlusCircle,
 } from "@mdi/light-js";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
@@ -118,11 +117,6 @@ const baseMenuItems = computed(() => {
       command: createNewNote,
     });
   }
-  items.push({
-    label: "New Window",
-    icon: mdilPlusBox,
-    command: openNewWindow,
-  });
   if (nativeClientUpdate.available) {
     items.push({
       label: nativeClientUpdate.installing
@@ -256,35 +250,6 @@ function toggleMenu(event) {
 
 function createNewNote() {
   return openNewNote(router);
-}
-
-async function openNewWindow() {
-  const targetRoute =
-    router.currentRoute.value.name === "openFile"
-      ? router.resolve({ name: "home" })
-      : router.resolve(router.currentRoute.value.fullPath || { name: "home" });
-
-  if (window.pywebview?.api?.open_new_window) {
-    let result;
-    try {
-      result = await window.pywebview.api.open_new_window(targetRoute.href);
-    } catch (error) {
-      console.error(error);
-      result = { started: false };
-    }
-    if (!result?.started) {
-      toast.add(
-        getToastOptions(
-          result?.error || "Could not open a new LamaNotes window.",
-          "New Window Failed",
-          "error",
-        ),
-      );
-    }
-    return;
-  }
-
-  window.open(targetRoute.href, "_blank", "noopener");
 }
 
 function showLogOutButton() {

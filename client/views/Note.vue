@@ -36,8 +36,9 @@
     confirmButtonStyle="success"
     rejectButtonText="Discard"
     rejectButtonStyle="danger"
-    @confirm="saveHandler(true)"
-    @reject="closeNote"
+    @confirm="saveNoteDecision"
+    @reject="discardNoteDecision"
+    @cancel="cancelNoteDecision"
   />
 
   <!-- Draft Modal -->
@@ -224,7 +225,7 @@ import {
   watch,
   watchEffect,
 } from "vue";
-import { useRouter } from "vue-router";
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from "vue-router";
 
 import {
   apiErrorHandler,
@@ -247,6 +248,8 @@ import { findHtmlPlaceholderWarnings } from "../components/html/componentKit.js"
 import {
   buildWorkNoteHtml,
   extractWorkMarkdown,
+  htmlChecklistToWorkMarkdown,
+  isChecklistNoteHtml,
   isWorkNoteHtml,
 } from "../components/work/workNote.js";
 import { authTypes } from "../constants.js";
@@ -265,6 +268,8 @@ import {
 } from "../publicationState.js";
 import {
   documentHasSystemTag,
+  getLamaNotesMetaTags,
+  isSystemTag,
   setDocumentSystemTag,
   synchronizeDocumentTags,
 } from "../noteSystemTags.js";
@@ -375,6 +380,7 @@ const publicationUpdateMessage = computed(() => {
 let publicationPollTimer = null;
 let publicationPollAttempt = 0;
 let publicationRequestSequence = 0;
+let pendingNoteDecision = null;
 const isPinned = computed(() =>
   documentHasSystemTag(
     note.value.content || "",
@@ -429,6 +435,9 @@ const editMode = documentSession.editMode;
 const unsavedChanges = documentSession.dirty;
 const noteContentDblClickHandler = documentSession.contentDblClickHandler;
 const noteContentPointerUpHandler = documentSession.contentPointerUpHandler;
+
+onBeforeRouteLeave(confirmNoteNavigation);
+onBeforeRouteUpdate(confirmNoteNavigation);
 const {
   close: closeFind,
   contentChanged: documentFindContentChanged,
@@ -572,11 +581,13 @@ function setEditMode() {
     : note.value.title;
   editorFormat.value = note.value.format || "html";
   if (editorFormat.value === "html") {
-    editorKind.value = isWorkNoteHtml(note.value.content || "")
-      ? "work"
-      : isNewNote.value
-        ? loadNewNoteKind()
-        : "article";
+    editorKind.value =
+      isWorkNoteHtml(note.value.content || "") ||
+      isChecklistNoteHtml(note.value.content || "")
+        ? "work"
+        : isNewNote.value
+          ? loadNewNoteKind()
+          : "article";
   } else {
     editorKind.value = "markdown";
   }
@@ -600,7 +611,10 @@ function getInitialEditorValue() {
   const draftContent = documentSession.loadDraft();
   const content = draftContent ? draftContent : note.value.content;
   if (editorFormat.value === "html" && editorKind.value === "work") {
-    return content ? extractWorkMarkdown(content) : "";
+    if (isWorkNoteHtml(content)) {
+      return extractWorkMarkdown(content);
+    }
+    return htmlChecklistToWorkMarkdown(content, note.value.title);
   }
 
   return content;
@@ -662,13 +676,18 @@ async function persistNote() {
     format: editorFormat.value,
   });
   note.value = data;
-  if (wasNew) {
-    await router.push({
-      name: "note",
-      params: { title: note.value.title },
-    });
-  } else {
-    await router.replace({ name: "note", params: { title: note.value.title } });
+  if (!pendingNoteDecision) {
+    if (wasNew) {
+      await router.push({
+        name: "note",
+        params: { title: note.value.title },
+      });
+    } else {
+      await router.replace({
+        name: "note",
+        params: { title: note.value.title },
+      });
+    }
   }
   return data;
 }
@@ -1038,12 +1057,50 @@ function closeHandler() {
   }
 }
 
-function closeNote() {
+function confirmNoteNavigation() {
+  if (!editMode.value || !isContentChanged()) {
+    return true;
+  }
+
+  return new Promise((resolve) => {
+    pendingNoteDecision = {
+      proceed: () => resolve(true),
+      cancel: () => resolve(false),
+    };
+    isSaveChangesModalVisible.value = true;
+  });
+}
+
+async function saveNoteDecision() {
+  const decision = pendingNoteDecision;
+  const saved = await saveHandler(true);
+  pendingNoteDecision = null;
+  if (!saved) {
+    decision?.cancel();
+    return;
+  }
+  decision?.proceed();
+}
+
+function discardNoteDecision() {
+  const decision = pendingNoteDecision;
+  pendingNoteDecision = null;
+  closeNote({ navigateHome: !decision });
+  decision?.proceed();
+}
+
+function cancelNoteDecision() {
+  const decision = pendingNoteDecision;
+  pendingNoteDecision = null;
+  decision?.cancel();
+}
+
+function closeNote({ navigateHome = true } = {}) {
   clearContentChangedTimeout();
   documentSession.clearDraft();
   documentSession.setDirty(false);
   documentSession.leaveEdit();
-  if (isNewNote.value) {
+  if (navigateHome && isNewNote.value) {
     router.push({ name: "home" });
   }
 }
@@ -1588,6 +1645,17 @@ function getEditorContent() {
 
   if (editorFormat.value === "markdown") {
     return contentEditor.value.getMarkdown();
+  }
+
+  if (editorKind.value === "work") {
+    const systemTags = getLamaNotesMetaTags(note.value.content || "").filter(
+      isSystemTag,
+    );
+    return buildWorkNoteHtml(
+      newTitle.value || note.value.title,
+      contentEditor.value.getMarkdown(),
+      { systemTags },
+    );
   }
 
   const content = contentEditor.value.getContent(

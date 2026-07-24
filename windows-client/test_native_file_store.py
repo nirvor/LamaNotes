@@ -8,7 +8,7 @@ import time
 import unittest
 import zipfile
 import json
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 from pathlib import Path
 from urllib import error, parse, request
 
@@ -25,6 +25,7 @@ from lamanotes_client import (
     add_to_windows_recent_documents,
     dpapi_protect,
     dpapi_unprotect,
+    handoff_to_existing_instance,
     migrate_legacy_local_state,
     paths_from_native_drop_event,
     register_native_file_drop,
@@ -42,6 +43,52 @@ from update_manifest import (
 
 
 class LamaNotesApiTests(unittest.TestCase):
+    def test_open_local_files_selects_only_one_file(self) -> None:
+        store = Mock()
+        store.payloads_for_paths.return_value = [{"name": "first.md"}]
+        api = LamaNotesApi(
+            store,
+            [],
+            "https://notes.example",
+            "https://notes.example",
+        )
+        store.payloads_for_paths.reset_mock()
+        api._window = Mock()
+        api._window.create_file_dialog.return_value = [
+            "C:/work/first.md",
+            "C:/work/second.md",
+        ]
+
+        result = api.open_local_files()
+
+        self.assertEqual(result, [{"name": "first.md"}])
+        self.assertFalse(
+            api._window.create_file_dialog.call_args.kwargs["allow_multiple"]
+        )
+        store.payloads_for_paths.assert_called_once_with(
+            ["C:/work/first.md"],
+            record_recent=True,
+        )
+
+    def test_legacy_open_new_window_bridge_reuses_current_window(self) -> None:
+        store = Mock()
+        api = LamaNotesApi(
+            store,
+            [],
+            "https://notes.example",
+            "https://notes.example",
+        )
+
+        with (
+            patch("lamanotes_client.activate_current_process_window") as activate,
+            patch("lamanotes_client.subprocess.Popen") as popen,
+        ):
+            result = api.open_new_window("/note/example")
+
+        self.assertEqual(result, {"started": False, "reused": True})
+        activate.assert_called_once_with()
+        popen.assert_not_called()
+
     def test_create_native_file_uses_save_dialog_and_returns_writable_payload(
         self,
     ) -> None:
@@ -467,6 +514,59 @@ class NativeShellIntegrationTests(unittest.TestCase):
         api.open_external_paths.assert_called_once_with(
             ["C:/work/first.md"],
             "http://127.0.0.1:31992",
+        )
+
+
+class SingleInstanceHandoffTests(unittest.TestCase):
+    def test_launch_without_file_activates_existing_instance(self) -> None:
+        response = MagicMock()
+        response.status = 200
+        response.__enter__.return_value = response
+        with (
+            patch(
+                "lamanotes_client.load_instance_records",
+                return_value=[{"pid": 42, "port": 31992}],
+            ),
+            patch(
+                "lamanotes_client.request.urlopen", return_value=response
+            ) as open_url,
+        ):
+            reused = handoff_to_existing_instance([])
+
+        self.assertTrue(reused)
+        sent_request = open_url.call_args.args[0]
+        self.assertEqual(
+            sent_request.full_url,
+            "http://127.0.0.1:31992/activate",
+        )
+        self.assertEqual(json.loads(sent_request.data), {"files": []})
+
+    def test_file_handoff_keeps_only_the_first_file(self) -> None:
+        response = MagicMock()
+        response.status = 200
+        response.__enter__.return_value = response
+        with (
+            patch(
+                "lamanotes_client.load_instance_records",
+                return_value=[{"pid": 42, "port": 31992}],
+            ),
+            patch(
+                "lamanotes_client.request.urlopen", return_value=response
+            ) as open_url,
+        ):
+            reused = handoff_to_existing_instance(
+                ["C:/work/first.md", "C:/work/second.md"]
+            )
+
+        self.assertTrue(reused)
+        sent_request = open_url.call_args.args[0]
+        self.assertEqual(
+            sent_request.full_url,
+            "http://127.0.0.1:31992/open-files",
+        )
+        self.assertEqual(
+            json.loads(sent_request.data),
+            {"files": ["C:/work/first.md"]},
         )
 
 

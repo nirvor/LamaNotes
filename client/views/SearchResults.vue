@@ -2,6 +2,7 @@
   <div class="lamanotes-search-results flex h-full flex-col">
     <!-- Search Input -->
     <SearchInput
+      :auto-focus="searchInputAutoFocus"
       :initialSearchTerm="effectiveSearchTerm"
       class="mb-2"
       showAllOnClear
@@ -82,6 +83,7 @@ import LoadingIndicator from "../components/LoadingIndicator.vue";
 import PrimeMenu from "../components/PrimeMenu.vue";
 import Tag from "../components/Tag.vue";
 import { params, searchSortOptions } from "../constants.js";
+import { shouldAutoFocusSearch } from "../inputModality.js";
 import SearchInput from "../partials/SearchInput.vue";
 
 const props = defineProps({
@@ -93,6 +95,7 @@ const props = defineProps({
 });
 
 const loadingIndicator = ref();
+const searchInputAutoFocus = shouldAutoFocusSearch(window);
 const results = ref([]);
 const router = useRouter();
 const sortMenu = ref();

@@ -681,13 +681,13 @@ class LamaNotesApi:
 
         paths = self._window.create_file_dialog(
             webview.OPEN_DIALOG,
-            allow_multiple=True,
+            allow_multiple=False,
             file_types=(
                 "Text and config (*.md;*.txt;*.cfg;*.ini;*.json;*.yaml;*.yml;*.toml;*.xml;*.log;*.csv;*.tex)",
             ),
         )
         return self._file_store.payloads_for_paths(
-            list(paths or []),
+            list(paths or [])[:1],
             record_recent=True,
         )
 
@@ -769,37 +769,13 @@ class LamaNotesApi:
         )
 
     def open_new_window(self, route: str = "/") -> dict[str, Any]:
-        normalized_route = normalize_app_route(route)
-        command = current_client_command() + [
-            "--url",
-            self._source_url,
-            "--route",
-            normalized_route,
-            "--proxy-port",
-            "0",
-        ]
-        creation_flags = 0
-        if sys.platform == "win32":
-            creation_flags = (
-                subprocess.CREATE_NEW_PROCESS_GROUP
-                | subprocess.DETACHED_PROCESS
-                | subprocess.CREATE_NO_WINDOW
-            )
+        # Kept as a compatibility bridge for an older bundled frontend.
+        # LamaNotes intentionally reuses one window and one active note.
+        activate_current_process_window()
+        return {"started": False, "reused": True}
 
-        try:
-            subprocess.Popen(
-                command,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                close_fds=True,
-                creationflags=creation_flags,
-            )
-            logging.info("opened new LamaNotes window route=%s", normalized_route)
-            return {"started": True, "route": normalized_route}
-        except OSError as exc:
-            logging.exception("could not open a new LamaNotes window")
-            return {"started": False, "error": str(exc)}
+    def activate_window(self) -> None:
+        activate_current_process_window()
 
     def open_external_url(self, url: str) -> dict[str, Any]:
         try:
@@ -826,7 +802,7 @@ class LamaNotesApi:
 
     def open_external_paths(self, paths: list[str], browser_base_url: str) -> int:
         payloads = self._file_store.payloads_for_paths(
-            paths,
+            paths[:1],
             record_recent=True,
         )
         if not payloads:
@@ -1054,12 +1030,6 @@ def resource_path(relative_path: str) -> str:
         if candidate.exists():
             return str(candidate)
     return str(candidates[0])
-
-
-def current_client_command() -> list[str]:
-    if getattr(sys, "frozen", False):
-        return [str(Path(sys.executable).resolve())]
-    return [str(Path(sys.executable).resolve()), str(Path(__file__).resolve())]
 
 
 def normalize_app_route(value: Any) -> str:
@@ -1926,6 +1896,14 @@ class HandoffHandler(BaseHTTPRequestHandler):
             )
 
     def do_POST(self) -> None:
+        if self.path == "/activate":
+            threading.Thread(
+                target=self.server.api.activate_window,  # type: ignore[attr-defined]
+                daemon=True,
+            ).start()
+            self._send_json(200, {"ok": True})
+            return
+
         if self.path != "/open-files":
             self._send_json(404, {"ok": False, "error": "not_found"})
             return
@@ -1938,7 +1916,9 @@ class HandoffHandler(BaseHTTPRequestHandler):
             if not isinstance(paths, list):
                 raise ValueError("files must be a list")
 
-            clean_paths = [str(path) for path in paths if isinstance(path, str)]
+            clean_paths = [
+                str(path) for path in paths if isinstance(path, str)
+            ][:1]
             if not self.server.api.has_openable_external_paths(  # type: ignore[attr-defined]
                 clean_paths,
             ):
@@ -2048,19 +2028,18 @@ def start_instance_registration(command_port: int) -> threading.Event:
     return stop_event
 
 
-def handoff_files_to_existing_instance(paths: list[str]) -> bool:
-    if not paths:
-        return False
-
+def handoff_to_existing_instance(paths: list[str] | None = None) -> bool:
+    clean_paths = list(paths or [])[:1]
     records = load_instance_records()
     for record in records:
         port = record.get("port")
         if not isinstance(port, int):
             continue
 
-        payload = json.dumps({"files": paths}).encode("utf-8")
+        endpoint = "/open-files" if clean_paths else "/activate"
+        payload = json.dumps({"files": clean_paths}).encode("utf-8")
         handoff_request = request.Request(
-            f"http://127.0.0.1:{port}/open-files",
+            f"http://127.0.0.1:{port}{endpoint}",
             data=payload,
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -2072,16 +2051,20 @@ def handoff_files_to_existing_instance(paths: list[str]) -> bool:
             ) as response:
                 if 200 <= response.status < 300:
                     logging.info(
-                        "handed off files to pid=%s port=%s count=%s",
+                        "reused LamaNotes pid=%s port=%s files=%s",
                         record.get("pid"),
                         port,
-                        len(paths),
+                        len(clean_paths),
                     )
                     return True
         except Exception:
             remove_instance_record(record)
 
     return False
+
+
+def handoff_files_to_existing_instance(paths: list[str]) -> bool:
+    return handoff_to_existing_instance(paths)
 
 
 def load_instance_records() -> list[dict[str, Any]]:
@@ -2418,8 +2401,8 @@ def main() -> None:
     setup_logging()
     logging.info("process start pid=%s argv=%s", os.getpid(), sys.argv[1:])
     args = parse_args()
-    if args.files and handoff_files_to_existing_instance(args.files):
-        logging.info("process exiting after external file handoff")
+    if handoff_to_existing_instance(args.files):
+        logging.info("process exiting after existing window reuse")
         return
 
     file_store = NativeFileStore()

@@ -21,7 +21,9 @@ window/session state, native open/save, local drafts, update installation and
 the system-browser authentication handoff.
 
 Local files are opened through this shell. They do not pass through the hosted
-Library service.
+Library service. A second launch activates the registered running instance and
+hands at most one file to it; the client then applies the shared
+Save/Discard/Cancel replacement guard.
 
 ### Library server
 
@@ -46,8 +48,8 @@ Library content and deployment state remain outside the source repository.
 ### Open a local file
 
 1. Windows passes a path to the desktop shell.
-2. The shell reads the file and returns content plus safe metadata to the
-   bundled client.
+2. The shell activates the existing LamaNotes instance, reads at most one
+   file and returns content plus safe metadata to the bundled client.
 3. The editor renders immediately.
 4. Authentication and optional Library warm-up continue later in the
    background.
