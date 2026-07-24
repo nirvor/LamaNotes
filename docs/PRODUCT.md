@@ -54,9 +54,12 @@ dashboard. `docs/DESIGN.md` defines the shared V2 tokens, content primitives,
 responsive rules and anti-patterns for every host and note type.
 
 - Local content appears before network-dependent surfaces initialize.
-- LamaNotes has one active note in one application window. Opening another
-  local file or Library note replaces it after Save, Discard or Cancel when
-  the current note has unsaved changes.
+- LamaNotes has one active note per application window. An explicit app launch
+  without a file may create another independent window, including on another
+  Windows virtual desktop; it does not create tabs or another sync layer.
+- Opening another local file or Library note in a window replaces it after
+  Save, Discard or Cancel when the current note has unsaved changes. A Windows
+  file launch hands one path to the most recently active LamaNotes window.
 - Common commands use compact familiar icons with labels available as
   tooltips and accessible names.
 - Reading and editing use one main vertical scroll surface.

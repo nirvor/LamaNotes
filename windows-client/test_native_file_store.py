@@ -26,6 +26,7 @@ from lamanotes_client import (
     dpapi_protect,
     dpapi_unprotect,
     handoff_to_existing_instance,
+    load_instance_records,
     migrate_legacy_local_state,
     paths_from_native_drop_event,
     register_native_file_drop,
@@ -518,28 +519,19 @@ class NativeShellIntegrationTests(unittest.TestCase):
 
 
 class SingleInstanceHandoffTests(unittest.TestCase):
-    def test_launch_without_file_activates_existing_instance(self) -> None:
-        response = MagicMock()
-        response.status = 200
-        response.__enter__.return_value = response
+    def test_launch_without_file_starts_independent_instance(self) -> None:
         with (
             patch(
                 "lamanotes_client.load_instance_records",
                 return_value=[{"pid": 42, "port": 31992}],
-            ),
-            patch(
-                "lamanotes_client.request.urlopen", return_value=response
-            ) as open_url,
+            ) as load_records,
+            patch("lamanotes_client.request.urlopen") as open_url,
         ):
             reused = handoff_to_existing_instance([])
 
-        self.assertTrue(reused)
-        sent_request = open_url.call_args.args[0]
-        self.assertEqual(
-            sent_request.full_url,
-            "http://127.0.0.1:31992/activate",
-        )
-        self.assertEqual(json.loads(sent_request.data), {"files": []})
+        self.assertFalse(reused)
+        load_records.assert_not_called()
+        open_url.assert_not_called()
 
     def test_file_handoff_keeps_only_the_first_file(self) -> None:
         response = MagicMock()
@@ -568,6 +560,46 @@ class SingleInstanceHandoffTests(unittest.TestCase):
             json.loads(sent_request.data),
             {"files": ["C:/work/first.md"]},
         )
+
+    def test_instance_records_prefer_most_recently_active_window(self) -> None:
+        now = time.time()
+        with tempfile.TemporaryDirectory() as root:
+            instance_root = Path(root)
+            records = [
+                {
+                    "pid": 41,
+                    "port": 31992,
+                    "startedAt": now - 20,
+                    "lastSeen": now,
+                    "lastActive": now - 10,
+                },
+                {
+                    "pid": 42,
+                    "port": 31993,
+                    "startedAt": now - 10,
+                    "lastSeen": now,
+                    "lastActive": now - 1,
+                },
+            ]
+            for record in records:
+                (instance_root / f"{record['pid']}.json").write_text(
+                    json.dumps(record),
+                    encoding="utf-8",
+                )
+
+            with (
+                patch(
+                    "lamanotes_client.instance_dir",
+                    return_value=instance_root,
+                ),
+                patch(
+                    "lamanotes_client.is_process_running",
+                    return_value=True,
+                ),
+            ):
+                loaded = load_instance_records()
+
+        self.assertEqual([record["port"] for record in loaded], [31993, 31992])
 
 
 class NativeFileStoreTests(unittest.TestCase):

@@ -2030,16 +2030,18 @@ def start_instance_registration(command_port: int) -> threading.Event:
 
 def handoff_to_existing_instance(paths: list[str] | None = None) -> bool:
     clean_paths = list(paths or [])[:1]
+    if not clean_paths:
+        return False
+
     records = load_instance_records()
     for record in records:
         port = record.get("port")
         if not isinstance(port, int):
             continue
 
-        endpoint = "/open-files" if clean_paths else "/activate"
         payload = json.dumps({"files": clean_paths}).encode("utf-8")
         handoff_request = request.Request(
-            f"http://127.0.0.1:{port}{endpoint}",
+            f"http://127.0.0.1:{port}/open-files",
             data=payload,
             headers={"Content-Type": "application/json"},
             method="POST",
