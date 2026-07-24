@@ -55,6 +55,24 @@ TAG_META_NAMES = {"lamanotes-tags", "flatnotes-tags"}
 NOTE_KIND_META_NAMES = {"lamanotes-note-kind", "flatnotes-note-kind"}
 SUMMARY_META_NAMES = {"description", "lamanotes-summary", "flatnotes-summary"}
 RESEARCH_TOPIC_TAG_RE = re.compile(r"r-[a-z0-9]+(?:-[a-z0-9]+)*")
+RESEARCH_ID_RE = re.compile(r"lr-[a-f0-9]{32}")
+RESEARCH_ID_META_NAMES = {
+    "lamanotes-research-id",
+    "flatnotes-research-id",
+}
+RESEARCH_ORIGIN_META_NAMES = {
+    "lamanotes-research-origin",
+    "flatnotes-research-origin",
+}
+RESEARCH_PARENT_META_NAMES = {
+    "lamanotes-research-parent",
+    "flatnotes-research-parent",
+}
+RESEARCH_TOPIC_META_NAMES = {
+    "lamanotes-research-topic",
+    "flatnotes-research-topic",
+}
+RESEARCH_ORIGINS = {"lamastart", "codex"}
 
 StemmingFoldingAnalyzer = StemmingAnalyzer() | CharsetFilter(accent_map)
 
@@ -262,6 +280,10 @@ class NoteSemanticParser(HTMLParser):
         self.components = Counter()
         self.meta_tags: Set[str] = set()
         self.meta_description: str | None = None
+        self.primary_research_topic: str | None = None
+        self.research_id: str | None = None
+        self.research_origin: str | None = None
+        self.parent_research_id: str | None = None
         self.note_kind: NoteKind = "research"
         self.skip_depth = 0
         self.summary_depth = 0
@@ -465,6 +487,22 @@ class NoteSemanticParser(HTMLParser):
             description = self._normalize(attrs_dict.get("content", ""))
             if description:
                 self.meta_description = description
+        elif name in RESEARCH_TOPIC_META_NAMES:
+            topic = attrs_dict.get("content", "").strip().casefold()
+            if RESEARCH_TOPIC_TAG_RE.fullmatch(topic):
+                self.primary_research_topic = topic
+        elif name in RESEARCH_ID_META_NAMES:
+            research_id = attrs_dict.get("content", "").strip().casefold()
+            if RESEARCH_ID_RE.fullmatch(research_id):
+                self.research_id = research_id
+        elif name in RESEARCH_ORIGIN_META_NAMES:
+            origin = attrs_dict.get("content", "").strip().casefold()
+            if origin in RESEARCH_ORIGINS:
+                self.research_origin = origin
+        elif name in RESEARCH_PARENT_META_NAMES:
+            parent_id = attrs_dict.get("content", "").strip().casefold()
+            if RESEARCH_ID_RE.fullmatch(parent_id):
+                self.parent_research_id = parent_id
 
     def _pop_element(self, tag: str):
         if tag in self.VOID_TAGS:
@@ -682,6 +720,10 @@ class FileSystemNotes(BaseNotes):
                     note_kind=context.note_kind,
                     tags=context.tags,
                     research_topics=context.research_topics,
+                    primary_research_topic=context.primary_research_topic,
+                    research_id=context.research_id,
+                    research_origin=context.research_origin,
+                    parent_research_id=context.parent_research_id,
                     summary=context.summary,
                     heading_count=len(context.headings),
                     link_count=len(context.links),
@@ -880,6 +922,10 @@ class FileSystemNotes(BaseNotes):
                 format=note.format,
                 note_kind=parser.note_kind,
                 tags=sorted(tags.union(parser.meta_tags)),
+                primary_research_topic=parser.primary_research_topic,
+                research_id=parser.research_id,
+                research_origin=parser.research_origin,
+                parent_research_id=parser.parent_research_id,
                 summary=summary,
                 headings=parser.headings,
                 links=parser.links,
@@ -892,8 +938,25 @@ class FileSystemNotes(BaseNotes):
         else:
             context = cls._markdown_context_from_note(note)
 
+        research_topics = cls._research_topics(context.tags)
+        primary_topic = (
+            context.primary_research_topic
+            if context.primary_research_topic in research_topics
+            else research_topics[0] if len(research_topics) == 1 else None
+        )
+        is_research = "research" in context.tags
         context = context.model_copy(
-            update={"research_topics": cls._research_topics(context.tags)}
+            update={
+                "research_topics": research_topics,
+                "primary_research_topic": primary_topic,
+                "research_id": context.research_id if is_research else None,
+                "research_origin": (
+                    context.research_origin if is_research else None
+                ),
+                "parent_research_id": (
+                    context.parent_research_id if is_research else None
+                ),
+            }
         )
         return context.model_copy(
             update={"llm_text": cls._build_llm_text(context)}
@@ -949,6 +1012,14 @@ class FileSystemNotes(BaseNotes):
             lines.append(
                 "Tags: " + " ".join(f"#{tag}" for tag in context.tags)
             )
+        if context.research_id:
+            lines.append(f"Research ID: {context.research_id}")
+        if context.primary_research_topic:
+            lines.append(
+                f"Primary Research Topic: #{context.primary_research_topic}"
+            )
+        if context.parent_research_id:
+            lines.append(f"Parent Research ID: {context.parent_research_id}")
         if context.summary:
             lines.extend(["", "Summary:", context.summary])
         if context.headings:

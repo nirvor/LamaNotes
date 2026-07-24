@@ -82,6 +82,10 @@ class NoteContext(CustomBaseModel):
     note_kind: NoteKind = "research"
     tags: List[str] = Field(default_factory=list)
     research_topics: List[str] = Field(default_factory=list)
+    primary_research_topic: Optional[str] = Field(None)
+    research_id: Optional[str] = Field(None)
+    research_origin: Optional[Literal["lamastart", "codex"]] = Field(None)
+    parent_research_id: Optional[str] = Field(None)
     summary: Optional[str] = Field(None)
     headings: List[NoteHeading] = Field(default_factory=list)
     links: List[NoteLink] = Field(default_factory=list)
@@ -100,6 +104,10 @@ class NoteIndexEntry(CustomBaseModel):
     note_kind: NoteKind = "research"
     tags: List[str] = Field(default_factory=list)
     research_topics: List[str] = Field(default_factory=list)
+    primary_research_topic: Optional[str] = Field(None)
+    research_id: Optional[str] = Field(None)
+    research_origin: Optional[Literal["lamastart", "codex"]] = Field(None)
+    parent_research_id: Optional[str] = Field(None)
     summary: Optional[str] = Field(None)
     heading_count: int = 0
     link_count: int = 0

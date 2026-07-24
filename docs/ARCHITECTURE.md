@@ -39,6 +39,14 @@ the exact `research` tag, and then only with sorted, deduplicated
 `r-<lowercase-ascii-slug>` tags. The field does not persist a second index,
 note bodies or a folder hierarchy.
 
+New Research Notes may additionally carry four small provenance fields:
+`researchId`, `primaryResearchTopic`, `researchOrigin` and an optional
+`parentResearchId`. They are derived from `lamanotes-research-*` HTML metadata
+and exposed through the same bounded index. The stable Research ID identifies
+the note across title changes; the primary topic is the single broad retrieval
+facet used by LamaStart. These fields do not create another Library, queue or
+sync store.
+
 ### Edge and deployment
 
 Caddy terminates public HTTPS, serves approved note assets and proxies the

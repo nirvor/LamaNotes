@@ -67,7 +67,7 @@ class LiveTagTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             note_path = Path(directory, "cached.html")
             note_path.write_text(
-                '<article><h1>Cached</h1><p>#work</p></article>',
+                "<article><h1>Cached</h1><p>#work</p></article>",
                 encoding="utf-8",
             )
             notes = object.__new__(FileSystemNotes)
@@ -84,7 +84,7 @@ class LiveTagTests(unittest.TestCase):
             first = notes.get_semantic_index()
             second = notes.get_semantic_index()
             note_path.write_text(
-                '<article><h1>Changed</h1><p>#work #current</p></article>',
+                "<article><h1>Changed</h1><p>#work #current</p></article>",
                 encoding="utf-8",
             )
             third = notes.get_semantic_index()
@@ -118,6 +118,53 @@ class LiveTagTests(unittest.TestCase):
 
 
 class ResearchTopicFacetTests(unittest.TestCase):
+    def test_index_exposes_stable_research_provenance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            Path(directory, "provenance.html").write_text(
+                """<!doctype html>
+<html>
+  <head>
+    <meta name="lamanotes-tags" content="private,research,r-agent-tools">
+    <meta name="lamanotes-research-topic" content="r-agent-tools">
+    <meta name="lamanotes-research-id"
+          content="lr-0123456789abcdef0123456789abcdef">
+    <meta name="lamanotes-research-origin" content="lamastart">
+    <meta name="lamanotes-research-parent"
+          content="lr-fedcba9876543210fedcba9876543210">
+  </head>
+  <body><article><p>#private #research #r-agent-tools</p></article></body>
+</html>""",
+                encoding="utf-8",
+            )
+            notes = object.__new__(FileSystemNotes)
+            notes.storage_path = directory
+
+            context = notes.get_context("provenance")
+            entry = notes.get_semantic_index()[0]
+
+            self.assertEqual(
+                context.primary_research_topic,
+                "r-agent-tools",
+            )
+            self.assertEqual(
+                entry.research_id,
+                "lr-0123456789abcdef0123456789abcdef",
+            )
+            self.assertEqual(entry.research_origin, "lamastart")
+            self.assertEqual(
+                entry.parent_research_id,
+                "lr-fedcba9876543210fedcba9876543210",
+            )
+            payload = entry.model_dump(by_alias=True)
+            self.assertEqual(
+                payload["primaryResearchTopic"],
+                "r-agent-tools",
+            )
+            self.assertEqual(
+                payload["researchId"],
+                "lr-0123456789abcdef0123456789abcdef",
+            )
+
     def test_context_and_index_derive_strict_research_topics(self):
         with tempfile.TemporaryDirectory() as directory:
             Path(directory, "research-note.html").write_text(
@@ -139,6 +186,8 @@ class ResearchTopicFacetTests(unittest.TestCase):
             expected_topics = ["r-2026", "r-agent-tools"]
             self.assertEqual(context.research_topics, expected_topics)
             self.assertEqual(index_entry.research_topics, expected_topics)
+            self.assertIsNone(context.primary_research_topic)
+            self.assertIsNone(index_entry.primary_research_topic)
             self.assertEqual(
                 context.model_dump(by_alias=True)["researchTopics"],
                 expected_topics,
@@ -182,6 +231,7 @@ class ResearchTopicFacetTests(unittest.TestCase):
 
             self.assertEqual(context.research_topics, [])
             self.assertEqual(index_entry.research_topics, [])
+            self.assertIsNone(context.research_id)
             self.assertEqual(
                 index_entry.tags,
                 ["r-agent-tools", "research-note"],
