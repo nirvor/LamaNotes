@@ -6,6 +6,7 @@ from .models import (
     NoteContext,
     NoteCreate,
     NoteIndexEntry,
+    ResearchNoteUpdate,
     NoteUpdate,
     SearchResult,
 )
@@ -25,6 +26,11 @@ class BaseNotes(ABC):
     @abstractmethod
     def update(self, title: str, new_data: NoteUpdate) -> Note:
         """Update a specific note."""
+        pass
+
+    @abstractmethod
+    def update_research_note(self, data: ResearchNoteUpdate) -> NoteIndexEntry:
+        """Update the title and primary topic of a Research Note."""
         pass
 
     @abstractmethod

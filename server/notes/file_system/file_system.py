@@ -1,4 +1,5 @@
 import glob
+import math
 import os
 import re
 import shutil
@@ -11,6 +12,7 @@ from html.parser import HTMLParser
 from typing import Iterable, List, Literal, Set, Tuple
 
 import whoosh
+from bs4 import BeautifulSoup, NavigableString
 from whoosh import writing
 from whoosh.analysis import CharsetFilter, StemmingAnalyzer
 from whoosh.fields import DATETIME, ID, KEYWORD, TEXT, SchemaClass
@@ -31,6 +33,7 @@ from publications.metadata import (
 )
 
 from ..base import BaseNotes
+from ..errors import ResearchNoteConflictError, ResearchNoteContractError
 from ..models import (
     Note,
     NoteComponent,
@@ -43,6 +46,7 @@ from ..models import (
     NoteLink,
     NoteMedia,
     NoteUpdate,
+    ResearchNoteUpdate,
     SearchResult,
 )
 
@@ -73,6 +77,11 @@ RESEARCH_TOPIC_META_NAMES = {
     "flatnotes-research-topic",
 }
 RESEARCH_ORIGINS = {"lamastart", "codex"}
+VISIBLE_RESEARCH_TAG_RE = re.compile(
+    r"(?<![A-Za-z0-9_-])#(?:research|r-[a-z0-9]+(?:-[a-z0-9]+)*)"
+    r"(?![A-Za-z0-9_-])",
+    flags=re.IGNORECASE,
+)
 
 StemmingFoldingAnalyzer = StemmingAnalyzer() | CharsetFilter(accent_map)
 
@@ -630,6 +639,68 @@ class FileSystemNotes(BaseNotes):
                 format=self._format_from_path(filepath),
             )
 
+    def update_research_note(self, data: ResearchNoteUpdate) -> NoteIndexEntry:
+        """Safely update the title and one primary r-* topic."""
+        with PUBLICATION_FILE_LOCK:
+            context = self._resolve_research_note(data)
+            filepath = self._existing_path_from_title(context.title)
+            if self._format_from_path(filepath) != "html":
+                raise ResearchNoteContractError(
+                    "Only HTML Research Notes can be edited."
+                )
+
+            actual_mtime = os.path.getmtime(filepath)
+            if not math.isclose(
+                actual_mtime,
+                data.expected_last_modified,
+                rel_tol=0,
+                abs_tol=1e-6,
+            ):
+                raise ResearchNoteConflictError(
+                    "The Research Note changed after the Library was loaded."
+                )
+
+            next_title = data.new_title
+            next_filepath = self._path_from_title(next_title, "html")
+            if filepath != next_filepath:
+                self._raise_if_title_exists(next_title, ignore_path=filepath)
+
+            existing_content = self._read_file(filepath)
+            next_content = self._rewrite_research_note_html(
+                existing_content,
+                new_title=next_title,
+                research_topic=data.primary_research_topic,
+            )
+            self._validate_research_note_html(
+                next_content,
+                research_topic=data.primary_research_topic,
+            )
+
+            if filepath == next_filepath:
+                self._write_file(filepath, next_content, overwrite=True)
+            else:
+                self._write_file(next_filepath, next_content)
+                try:
+                    os.remove(filepath)
+                except OSError:
+                    os.remove(next_filepath)
+                    raise
+
+            self._invalidate_semantic_index_cache()
+            updated = self.get_context(next_title)
+            if (
+                updated.primary_research_topic != data.primary_research_topic
+                or updated.research_topics != [data.primary_research_topic]
+                or (
+                    data.research_id is not None
+                    and updated.research_id != data.research_id
+                )
+            ):
+                raise ResearchNoteContractError(
+                    "The updated Research Note failed verification."
+                )
+            return self._index_entry_from_context(updated)
+
     def delete(self, title: str) -> None:
         """Delete a specific note."""
         is_valid_filename(title)
@@ -713,32 +784,201 @@ class FileSystemNotes(BaseNotes):
             ]
             contexts.sort(key=lambda item: item.last_modified, reverse=True)
             index = [
-                NoteIndexEntry(
-                    title=context.title,
-                    last_modified=context.last_modified,
-                    format=context.format,
-                    note_kind=context.note_kind,
-                    tags=context.tags,
-                    research_topics=context.research_topics,
-                    primary_research_topic=context.primary_research_topic,
-                    research_id=context.research_id,
-                    research_origin=context.research_origin,
-                    parent_research_id=context.parent_research_id,
-                    summary=context.summary,
-                    heading_count=len(context.headings),
-                    link_count=len(context.links),
-                    media_count=len(context.media),
-                    source_count=len(context.sources),
-                    component_count=sum(
-                        component.count for component in context.components
-                    ),
-                    word_count=context.word_count,
-                )
-                for context in contexts
+                self._index_entry_from_context(context) for context in contexts
             ]
             self._semantic_index_cache_signature = signature
             self._semantic_index_cache = index
             return list(index)
+
+    @staticmethod
+    def _index_entry_from_context(context: NoteContext) -> NoteIndexEntry:
+        return NoteIndexEntry(
+            title=context.title,
+            last_modified=context.last_modified,
+            format=context.format,
+            note_kind=context.note_kind,
+            tags=context.tags,
+            research_topics=context.research_topics,
+            primary_research_topic=context.primary_research_topic,
+            research_id=context.research_id,
+            research_origin=context.research_origin,
+            parent_research_id=context.parent_research_id,
+            summary=context.summary,
+            heading_count=len(context.headings),
+            link_count=len(context.links),
+            media_count=len(context.media),
+            source_count=len(context.sources),
+            component_count=sum(
+                component.count for component in context.components
+            ),
+            word_count=context.word_count,
+        )
+
+    def _resolve_research_note(self, data: ResearchNoteUpdate) -> NoteContext:
+        if data.research_id:
+            matches = [
+                entry
+                for entry in self.get_semantic_index()
+                if entry.research_id == data.research_id
+            ]
+            if len(matches) != 1:
+                raise ResearchNoteConflictError(
+                    "The Research ID does not identify exactly one note."
+                )
+            if matches[0].title != data.current_title:
+                raise ResearchNoteConflictError(
+                    "The Research Note title changed after the Library "
+                    "was loaded."
+                )
+
+        context = self.get_context(data.current_title)
+        if context.note_kind != "research" or "research" not in context.tags:
+            raise ResearchNoteContractError(
+                "The selected file is not a Research Note."
+            )
+        if data.research_id and context.research_id != data.research_id:
+            raise ResearchNoteConflictError(
+                "The Research Note provenance changed."
+            )
+        return context
+
+    @classmethod
+    def _rewrite_research_note_html(
+        cls,
+        content: str,
+        *,
+        new_title: str,
+        research_topic: str,
+    ) -> str:
+        soup = BeautifulSoup(content, "html.parser")
+        body = soup.body
+        if body is None:
+            raise ResearchNoteContractError(
+                "The Research Note needs an HTML body."
+            )
+
+        _, meta_tags, visible_tags = cls._html_to_text_and_meta_tags(content)
+        meta_tags = {
+            tag
+            for tag in meta_tags
+            if tag != "research" and not tag.startswith("r-")
+        }
+        visible_tags = {
+            tag
+            for tag in visible_tags
+            if tag != "research" and not tag.startswith("r-")
+        }
+        next_meta_tags = sorted(meta_tags) + ["research", research_topic]
+        next_visible_tags = sorted(visible_tags) + ["research", research_topic]
+
+        if soup.title is not None:
+            soup.title.string = new_title
+        first_heading = soup.find("h1")
+        if first_heading is not None:
+            first_heading.clear()
+            first_heading.append(new_title)
+
+        cls._set_html_meta(
+            soup,
+            TAG_META_NAMES,
+            "lamanotes-tags",
+            ",".join(next_meta_tags),
+        )
+        cls._set_html_meta(
+            soup,
+            RESEARCH_TOPIC_META_NAMES,
+            "lamanotes-research-topic",
+            research_topic,
+        )
+
+        emptied_parents = []
+        for node in soup.find_all(string=VISIBLE_RESEARCH_TAG_RE):
+            if not isinstance(node, NavigableString):
+                continue
+            parent = node.parent
+            if parent and parent.name in {"script", "style", "title"}:
+                continue
+            cleaned = VISIBLE_RESEARCH_TAG_RE.sub("", str(node))
+            node.replace_with(cleaned)
+            if parent and all(parent is not item for item in emptied_parents):
+                emptied_parents.append(parent)
+        for parent in emptied_parents:
+            if (
+                parent.name in {"p", "footer"}
+                and not parent.get_text(strip=True)
+                and not parent.find(True)
+            ):
+                parent.decompose()
+
+        tag_line = soup.new_tag("p")
+        tag_line["class"] = ["lamanotes-research-tags"]
+        tag_line.string = " ".join(f"#{tag}" for tag in next_visible_tags)
+        body.append(tag_line)
+        return str(soup)
+
+    @staticmethod
+    def _set_html_meta(
+        soup: BeautifulSoup,
+        names: Set[str],
+        name: str,
+        value: str,
+    ) -> None:
+        matches = [
+            tag
+            for tag in soup.find_all("meta")
+            if str(tag.get("name", "")).casefold() in names
+        ]
+        if matches:
+            matches[0]["name"] = name
+            matches[0]["content"] = value
+            for duplicate in matches[1:]:
+                duplicate.decompose()
+            return
+        head = soup.head
+        if head is None:
+            head = soup.new_tag("head")
+            if soup.html is not None:
+                soup.html.insert(0, head)
+            else:
+                soup.insert(0, head)
+        meta = soup.new_tag("meta")
+        meta["name"] = name
+        meta["content"] = value
+        head.append(meta)
+
+    @classmethod
+    def _validate_research_note_html(
+        cls,
+        content: str,
+        *,
+        research_topic: str,
+    ) -> None:
+        parser = NoteSemanticParser()
+        parser.feed(content)
+        parser.close()
+        _, meta_tags, visible_tags = cls._html_to_text_and_meta_tags(content)
+        meta_topics = {
+            tag for tag in meta_tags if RESEARCH_TOPIC_TAG_RE.fullmatch(tag)
+        }
+        visible_topics = {
+            tag for tag in visible_tags if RESEARCH_TOPIC_TAG_RE.fullmatch(tag)
+        }
+        visible_tokens = [
+            token.casefold().lstrip("#")
+            for token in VISIBLE_RESEARCH_TAG_RE.findall(parser.text)
+        ]
+        if (
+            parser.primary_research_topic != research_topic
+            or "research" not in meta_tags
+            or meta_topics != {research_topic}
+            or "research" not in visible_tags
+            or visible_topics != {research_topic}
+            or visible_tokens.count("research") != 1
+            or visible_tokens.count(research_topic) != 1
+        ):
+            raise ResearchNoteContractError(
+                "The Research Note tags could not be normalized safely."
+            )
 
     def _get_semantic_index_cache_lock(self):
         lock = getattr(self, "_semantic_index_cache_lock", None)

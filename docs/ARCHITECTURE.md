@@ -47,6 +47,13 @@ the note across title changes; the primary topic is the single broad retrieval
 facet used by LamaStart. These fields do not create another Library, queue or
 sync store.
 
+LamaStart uses a dedicated API token with `notes:read` and the narrow
+`research:edit` scope. The corresponding endpoint can change only the
+Research Note filename/title and its one primary `r-*` topic. It checks the
+previous modification time, normalizes metadata and the final visible tag
+line, and writes atomically. It cannot change note bodies or ordinary Library
+notes and does not grant `notes:write`.
+
 ### Edge and deployment
 
 Caddy terminates public HTTPS, serves approved note assets and proxies the

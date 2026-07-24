@@ -2,6 +2,7 @@ NOTES_READ = "notes:read"
 NOTES_WRITE = "notes:write"
 ATTACHMENTS_WRITE = "attachments:write"
 PUBLICATIONS_WRITE = "publications:write"
+RESEARCH_EDIT = "research:edit"
 
 ALL_SCOPES = frozenset(
     {
@@ -9,5 +10,6 @@ ALL_SCOPES = frozenset(
         NOTES_WRITE,
         ATTACHMENTS_WRITE,
         PUBLICATIONS_WRITE,
+        RESEARCH_EDIT,
     }
 )

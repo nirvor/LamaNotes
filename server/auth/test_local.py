@@ -11,7 +11,7 @@ from starlette.requests import Request
 
 from auth.local import LocalAuth
 from auth.models import Login
-from auth.scopes import ALL_SCOPES, NOTES_READ
+from auth.scopes import ALL_SCOPES, NOTES_READ, NOTES_WRITE, RESEARCH_EDIT
 from global_config import AuthType
 
 
@@ -110,6 +110,30 @@ class LocalAuthTests(unittest.TestCase):
 
         self.assertEqual(principal.kind, "api-token")
         self.assertEqual(principal.scopes, frozenset({NOTES_READ}))
+
+    def test_research_editor_token_does_not_gain_generic_write_scope(
+        self,
+    ) -> None:
+        raw_token = "lmn_research-token-with-enough-entropy"
+        entry = {
+            "name": "research-library",
+            "sha256": hashlib.sha256(raw_token.encode()).hexdigest(),
+            "scopes": [NOTES_READ, RESEARCH_EDIT],
+        }
+        environment = {
+            **self.environment,
+            "NIRVNOTES_API_TOKEN_HASHES": json.dumps([entry]),
+        }
+        with patch.dict(os.environ, environment, clear=False):
+            auth = LocalAuth(config())
+
+        principal = auth.authenticate(request_for(), raw_token)
+
+        self.assertEqual(
+            principal.scopes,
+            frozenset({NOTES_READ, RESEARCH_EDIT}),
+        )
+        self.assertNotIn(NOTES_WRITE, principal.scopes)
 
     def test_cross_site_cookie_mutation_is_rejected(self) -> None:
         with patch.dict(os.environ, self.environment, clear=False):

@@ -3,7 +3,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from notes.errors import ResearchNoteConflictError
 from notes.file_system.file_system import FileSystemNotes
+from notes.models import ResearchNoteUpdate
 
 
 class HtmlTagExtractionTests(unittest.TestCase):
@@ -98,7 +100,9 @@ class LiveTagTests(unittest.TestCase):
         notes = object.__new__(FileSystemNotes)
         notes._existing_path_from_title = lambda _: "deleted.html"
         sync_calls = []
-        notes._sync_index_with_retry = lambda **kwargs: sync_calls.append(kwargs)
+        notes._sync_index_with_retry = lambda **kwargs: sync_calls.append(
+            kwargs
+        )
 
         with patch("notes.file_system.file_system.os.remove") as remove:
             notes.delete("deleted")
@@ -236,6 +240,154 @@ class ResearchTopicFacetTests(unittest.TestCase):
                 index_entry.tags,
                 ["r-agent-tools", "research-note"],
             )
+
+
+class ResearchNoteUpdateTests(unittest.TestCase):
+    def test_title_and_topic_update_is_atomic_and_contract_safe(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory, "Old title.html")
+            source.write_text(
+                """<!doctype html>
+<html>
+  <head>
+    <title>Old title</title>
+    <meta name="lamanotes-tags"
+          content="private,research,r-old-topic,r-extra-topic">
+    <meta name="lamanotes-research-topic" content="r-old-topic">
+    <meta name="lamanotes-research-id"
+          content="lr-0123456789abcdef0123456789abcdef">
+    <meta name="lamanotes-research-origin" content="lamastart">
+    <meta name="lamanotes-public-slug" content="stable-publication">
+  </head>
+  <body>
+    <article>
+      <h1><span>Old title</span></h1>
+      <p>Evidence remains untouched.</p>
+      <p>#research #r-old-topic #r-extra-topic #research</p>
+    </article>
+  </body>
+</html>""",
+                encoding="utf-8",
+            )
+            notes = object.__new__(FileSystemNotes)
+            notes.storage_path = directory
+
+            updated = notes.update_research_note(
+                ResearchNoteUpdate(
+                    currentTitle="Old title",
+                    newTitle="New title",
+                    primaryResearchTopic="r-new-topic",
+                    expectedLastModified=source.stat().st_mtime,
+                    researchId="lr-0123456789abcdef0123456789abcdef",
+                )
+            )
+
+            target = Path(directory, "New title.html")
+            content = target.read_text(encoding="utf-8")
+            self.assertFalse(source.exists())
+            self.assertTrue(target.exists())
+            self.assertEqual(updated.title, "New title")
+            self.assertEqual(updated.research_topics, ["r-new-topic"])
+            self.assertEqual(updated.primary_research_topic, "r-new-topic")
+            self.assertIn("<title>New title</title>", content)
+            self.assertIn("<h1>New title</h1>", content)
+            self.assertIn("Evidence remains untouched.", content)
+            self.assertRegex(
+                content,
+                r'<meta content="stable-publication" '
+                r'name="lamanotes-public-slug"\s*/>',
+            )
+            self.assertEqual(content.count("#research"), 1)
+            self.assertEqual(content.count("#r-new-topic"), 1)
+            self.assertNotIn("#r-old-topic", content)
+            self.assertNotIn("#r-extra-topic", content)
+            self.assertRegex(
+                content,
+                r'<p class="lamanotes-research-tags">'
+                r"#research #r-new-topic</p>\s*</body>",
+            )
+
+    def test_legacy_note_without_research_id_can_be_updated_by_version(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory, "Legacy.html")
+            source.write_text(
+                """<html><head>
+<meta name="lamanotes-tags" content="research,r-old">
+<meta name="lamanotes-research-topic" content="r-old">
+</head><body><h1>Legacy</h1><p>#research #r-old</p></body></html>""",
+                encoding="utf-8",
+            )
+            notes = object.__new__(FileSystemNotes)
+            notes.storage_path = directory
+
+            updated = notes.update_research_note(
+                ResearchNoteUpdate(
+                    currentTitle="Legacy",
+                    newTitle="Legacy",
+                    primaryResearchTopic="r-current",
+                    expectedLastModified=source.stat().st_mtime,
+                )
+            )
+
+            self.assertEqual(updated.primary_research_topic, "r-current")
+            self.assertIsNone(updated.research_id)
+
+    def test_unsorted_research_note_can_receive_its_first_topic(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory, "Unsorted.html")
+            source.write_text(
+                """<html><head>
+<meta name="lamanotes-tags" content="research">
+</head><body><h1>Unsorted</h1><p>#research</p></body></html>""",
+                encoding="utf-8",
+            )
+            notes = object.__new__(FileSystemNotes)
+            notes.storage_path = directory
+
+            updated = notes.update_research_note(
+                ResearchNoteUpdate(
+                    currentTitle="Unsorted",
+                    newTitle="Categorised",
+                    primaryResearchTopic="r-current",
+                    expectedLastModified=source.stat().st_mtime,
+                )
+            )
+
+            content = Path(directory, "Categorised.html").read_text(
+                encoding="utf-8"
+            )
+            self.assertEqual(updated.primary_research_topic, "r-current")
+            self.assertEqual(updated.research_topics, ["r-current"])
+            self.assertEqual(content.count("#research"), 1)
+            self.assertEqual(content.count("#r-current"), 1)
+
+    def test_stale_version_is_rejected_without_modifying_the_note(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory, "Stable.html")
+            original = (
+                '<html><head><meta name="lamanotes-tags" '
+                'content="research,r-stable"></head>'
+                "<body><h1>Stable</h1><p>#research #r-stable</p></body></html>"
+            )
+            source.write_text(original, encoding="utf-8")
+            notes = object.__new__(FileSystemNotes)
+            notes.storage_path = directory
+
+            with self.assertRaisesRegex(
+                ResearchNoteConflictError,
+                "changed",
+            ):
+                notes.update_research_note(
+                    ResearchNoteUpdate(
+                        currentTitle="Stable",
+                        newTitle="Changed",
+                        primaryResearchTopic="r-changed",
+                        expectedLastModified=source.stat().st_mtime - 10,
+                    )
+                )
+
+            self.assertEqual(source.read_text(encoding="utf-8"), original)
+            self.assertFalse(Path(directory, "Changed.html").exists())
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
+import re
 from typing import List, Literal, Optional
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic.functional_validators import AfterValidator
 from typing_extensions import Annotated
 
@@ -39,6 +40,42 @@ class NoteUpdate(CustomBaseModel):
     ] = Field(None)
     new_content: Optional[str] = Field(None)
     new_format: Optional[NoteFormat] = Field(None)
+
+
+def normalize_research_topic(value: str) -> str:
+    topic = str(value or "").strip().casefold().lstrip("#")
+    if not re.fullmatch(r"r-[a-z0-9]+(?:-[a-z0-9]+)*", topic):
+        raise ValueError("primary research topic must be a valid r-* tag")
+    return topic
+
+
+class ResearchNoteUpdate(CustomBaseModel):
+    current_title: Annotated[
+        str,
+        AfterValidator(strip_whitespace),
+        AfterValidator(is_valid_filename),
+    ] = Field(min_length=1, max_length=180)
+    new_title: Annotated[
+        str,
+        AfterValidator(strip_whitespace),
+        AfterValidator(is_valid_filename),
+    ] = Field(min_length=1, max_length=180)
+    primary_research_topic: Annotated[
+        str,
+        AfterValidator(normalize_research_topic),
+    ] = Field(min_length=3, max_length=48)
+    expected_last_modified: float = Field(gt=0)
+    research_id: Optional[str] = Field(None, max_length=35)
+
+    @model_validator(mode="after")
+    def validate_research_id(self):
+        if self.research_id is None:
+            return self
+        research_id = self.research_id.strip().casefold()
+        if not re.fullmatch(r"lr-[a-f0-9]{32}", research_id):
+            raise ValueError("research ID is invalid")
+        self.research_id = research_id
+        return self
 
 
 class SearchResult(CustomBaseModel):

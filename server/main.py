@@ -30,16 +30,19 @@ from auth.scopes import (
     NOTES_READ,
     NOTES_WRITE,
     PUBLICATIONS_WRITE,
+    RESEARCH_EDIT,
 )
 from global_config import AuthType, GlobalConfig, GlobalConfigResponseModel
 from helpers import replace_base_href
 from notes.base import BaseNotes
+from notes.errors import ResearchNoteConflictError, ResearchNoteContractError
 from notes.models import (
     Note,
     NoteContext,
     NoteCreate,
     NoteIndexEntry,
     NoteUpdate,
+    ResearchNoteUpdate,
     SearchResult,
 )
 from publications.errors import PublicationError
@@ -72,6 +75,7 @@ read_auth_deps = auth_dependencies(NOTES_READ)
 write_auth_deps = auth_dependencies(NOTES_WRITE)
 attachment_write_auth_deps = auth_dependencies(ATTACHMENTS_WRITE)
 publication_write_auth_deps = auth_dependencies(PUBLICATIONS_WRITE)
+research_edit_auth_deps = auth_dependencies(RESEARCH_EDIT)
 login_rate_limiter = LoginRateLimiter(
     attempts=global_config.login_rate_limit_attempts,
     window_seconds=global_config.login_rate_limit_window_seconds,
@@ -435,6 +439,24 @@ if global_config.auth_type != AuthType.READ_ONLY:
                 status_code=400,
                 detail=api_messages.invalid_note_title,
             )
+        except FileExistsError:
+            raise HTTPException(status_code=409, detail=api_messages.note_exists)
+        except FileNotFoundError:
+            raise HTTPException(404, api_messages.note_not_found)
+
+    @router.patch(
+        "/api/research-notes",
+        dependencies=research_edit_auth_deps,
+        response_model=NoteIndexEntry,
+    )
+    def patch_research_note(data: ResearchNoteUpdate):
+        """Update only the title and primary topic of a Research Note."""
+        try:
+            return note_storage.update_research_note(data)
+        except ResearchNoteContractError as error:
+            raise HTTPException(status_code=422, detail=str(error))
+        except ResearchNoteConflictError as error:
+            raise HTTPException(status_code=409, detail=str(error))
         except FileExistsError:
             raise HTTPException(status_code=409, detail=api_messages.note_exists)
         except FileNotFoundError:
