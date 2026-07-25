@@ -81,6 +81,12 @@ Research Notes may use the deck as an unlabeled introduction. Do not spend a
 line on `Introduction` when placement and composition already make that role
 clear.
 
+Substantial Research Notes group kicker, literal title, and deck in
+`lamanote-research-header`. The header is an editorial entry point, not a hero:
+no giant title, empty banner space, decorative gradient, or generic metadata.
+Synthetic references may use `lamanote-reference-status` for a compact factual
+disclaimer. Normal notes should not manufacture status chips.
+
 ### Summary
 
 `lamanote-summary` is for a real short answer, decision, or compact set of
@@ -91,12 +97,34 @@ Research Brief V2 does not require this component. A type-specific result near
 the end may instead use normal prose, a recommendation, route result, action
 list, risk view, or assessment without a generic `Summary` heading.
 
+### Type-specific result
+
+Use `lamanote-result` near the end when the note needs one compact answer the
+reader can act on. Set `data-result-kind` to a plain semantic value such as
+`assessment`, `route`, `recommendation`, `risk`, or `action`. These values do
+not create six visual themes. They keep the result legible to humans and tools
+inside one quiet LamaNotes component. `risk` may use the warning token when the
+risk itself is the result.
+
+The result contains:
+
+- a short label which fits the Note Type;
+- one direct main sentence;
+- one condition, reservation, or next action which can change the answer.
+
+Do not repeat the opening or add a generic conclusion paragraph after it.
+
 ### Major section
 
 Use `lamanote-section` for one major topic. Put its `h2` outside the optional
 `lamanote-section-card`. Related `h3` subsections, prose, lists, tables, and
 normal media stay together inside the card. A wide visual may follow the card
 as a section sibling when it needs the article width.
+
+`lamanote-section-eyebrow` is an optional short role label such as `Evidence`,
+`Mechanism`, `Route`, or `Model limit`. It helps a long note scan without
+turning the heading into a numbered encyclopedia outline. Omit it when it would
+only repeat the `h2`.
 
 Optional tones are:
 
@@ -113,6 +141,8 @@ are not status badges and are never a required sequence. The old
 ### Metrics, panels, and callouts
 
 - Use `lamanote-metrics` only for several real comparable quantities.
+- At the top level of a Research Note, two or three metrics render as a quiet
+  fact strip rather than a dashboard card grid.
 - Use `lamanote-panel` for a grouped instruction, decision, or reference.
 - Use `lamanote-callout` for a genuine caveat or action.
 - A normal paragraph does not need a card.
@@ -155,6 +185,18 @@ keeps sources compact and preserves normal link blue.
 Code and tables may pan inside their own boundary. On a narrow screen, do not
 compress an eight-column table or diagram until labels become unreadable.
 Bottom tags stay the last metadata line and are enhanced by the shared viewer.
+
+Use `lamanote-comparison` for a decision table whose rows are genuinely
+comparable. Give it a caption with date, basis, and decision context. Use units
+and denominators in the cells, `scope` on row and column headers, and
+`data-preferred="true"` only when the prose has justified a preferred row.
+The component uses horizontal row rules and one quiet preferred-row fill rather
+than a classic full-grid spreadsheet treatment. Avoid checkmark matrices which
+hide trade-offs.
+
+Use `lamanote-steps` for bounded practical work. Each step states the action,
+the expected observation, and a stop or failure branch where relevant. The
+last step verifies the result independently. It is not a decorative timeline.
 
 ## Editor contract
 

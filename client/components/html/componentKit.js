@@ -41,29 +41,30 @@ export const htmlComponentSnippets = [
     label: "Research article",
     body: (selection) => `
 <article class="lamanote lamanote-article lamanote-research" data-lamanotes-component="article">
-  <p class="lamanote-kicker">Research Note</p>
-  <h1>Descriptive research title</h1>
-  <p class="lamanote-deck">${selectedOrFallback(
-    selection,
-    "State the question, scope, and date in one compact orientation line.",
-  )}</p>
-
-  <section class="lamanote-summary" data-lamanotes-component="summary">
-    <ul>
-      <li>Main result or practical answer.</li>
-      <li>Most important constraint or uncertainty.</li>
-      <li>Concrete implication or next action.</li>
-    </ul>
-  </section>
+  <header class="lamanote-research-header" data-lamanotes-component="research-header">
+    <p class="lamanote-kicker">Research Note</p>
+    <h1>Descriptive research title</h1>
+    <p class="lamanote-deck">${selectedOrFallback(
+      selection,
+      "State the question, scope, and central answer in one compact orientation paragraph.",
+    )}</p>
+  </header>
 
   <section class="lamanote-section lamanote-section--evidence" data-lamanotes-component="section">
+    <p class="lamanote-section-eyebrow">Evidence</p>
     <h2>Evidence and interpretation</h2>
     <div class="lamanote-section-card">
       <p>Replace this scaffold with sourced evidence. Keep measurement, interpretation, and uncertainty visibly separate.</p>
     </div>
   </section>
 
-  <p>#research #r-topic</p>
+  <section class="lamanote-result" data-lamanotes-component="result" data-result-kind="assessment">
+    <p class="lamanote-result-label">Assessment</p>
+    <p class="lamanote-result-main">State the type-appropriate result in one direct sentence.</p>
+    <p class="lamanote-result-note">Name the condition, reservation, or next action which changes this result.</p>
+  </section>
+
+  <p class="lamanote-tags">#research #r-topic</p>
 </article>
 `,
   },
@@ -96,6 +97,20 @@ export const htmlComponentSnippets = [
 `,
   },
   {
+    id: "result",
+    label: "Result / recommendation",
+    body: (selection) => `
+<section class="lamanote-result" data-lamanotes-component="result" data-result-kind="assessment">
+  <p class="lamanote-result-label">Assessment</p>
+  <p class="lamanote-result-main">${selectedOrFallback(
+    selection,
+    "State the type-appropriate result in one direct sentence.",
+  )}</p>
+  <p class="lamanote-result-note">Name the condition, reservation, or next action which changes this result.</p>
+</section>
+`,
+  },
+  {
     id: "hero",
     label: "Hero",
     body: () => `
@@ -121,6 +136,34 @@ export const htmlComponentSnippets = [
     <div class="lamanote-metric-note">Short context.</div>
   </div>
 </section>
+`,
+  },
+  {
+    id: "comparison-table",
+    label: "Comparison table",
+    body: () => `
+<table class="lamanote-comparison" data-lamanotes-component="comparison">
+  <caption>State what is compared, the date, and the decision context.</caption>
+  <thead>
+    <tr>
+      <th scope="col">Option</th>
+      <th scope="col">Comparable measure</th>
+      <th scope="col">Important reservation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th scope="row">Option A</th>
+      <td>Value with unit and basis</td>
+      <td>Condition which limits the comparison</td>
+    </tr>
+    <tr data-preferred="true">
+      <th scope="row">Option B</th>
+      <td>Value with the same unit and basis</td>
+      <td>Why this is preferred, and for whom</td>
+    </tr>
+  </tbody>
+</table>
 `,
   },
   {
@@ -215,6 +258,32 @@ export const htmlComponentSnippets = [
 `,
   },
   {
+    id: "steps",
+    label: "Practical steps",
+    body: () => `
+<ol class="lamanote-steps" data-lamanotes-component="steps">
+  <li>
+    <div>
+      <strong>Check the starting state.</strong>
+      <p>Name the observable condition and the stop criterion before changing anything.</p>
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Perform one bounded action.</strong>
+      <p>Give the command or manual step, the expected result, and the failure branch.</p>
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Verify the result.</strong>
+      <p>Use an independent check and state what must remain unchanged.</p>
+    </div>
+  </li>
+</ol>
+`,
+  },
+  {
     id: "link-list",
     label: "Link list",
     body: () => `
@@ -258,7 +327,7 @@ const htmlPlaceholderChecks = [
     id: "scaffold-copy",
     label: "component scaffold text",
     pattern:
-      /(Descriptive (?:note|research|section) title|Replace this scaffold|Main result or practical answer|Important caveat or uncertainty|Concrete next action|Short descriptive alt text|Important practical caveat or interpretation|Use a panel for a real decision|<div class="lamanote-metric-(?:label|value)">(?:Metric|Value)<\/div>|Takeaway: (?:state|explain)|First useful event or action|Second useful event or action)/i,
+      /(Descriptive (?:note|research|section) title|Replace this scaffold|Main result or practical answer|Important caveat or uncertainty|Concrete next action|Short descriptive alt text|Important practical caveat or interpretation|Use a panel for a real decision|State the type-appropriate result|Comparable measure|Check the starting state|<div class="lamanote-metric-(?:label|value)">(?:Metric|Value)<\/div>|Takeaway: (?:state|explain)|First useful event or action|Second useful event or action)/i,
   },
 ];
 

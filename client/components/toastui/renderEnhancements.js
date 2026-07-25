@@ -928,6 +928,60 @@ export function enhanceWideVisualPanning(rootElement) {
   });
 }
 
+export function enhanceComparisonTablePanning(rootElement) {
+  if (!rootElement) {
+    return;
+  }
+
+  const contentRoot = rootElement.querySelector(".toastui-editor-contents");
+  if (!contentRoot) {
+    return;
+  }
+
+  contentRoot.querySelectorAll(".lamanote-comparison").forEach((table) => {
+    if (table.dataset.lamanotesComparisonEnhanced === "true") {
+      return;
+    }
+
+    table.dataset.lamanotesComparisonEnhanced = "true";
+    table.tabIndex = 0;
+    table.setAttribute(
+      "aria-roledescription",
+      "horizontally scrollable comparison table",
+    );
+    table.setAttribute("aria-keyshortcuts", "ArrowLeft ArrowRight Home End");
+
+    const hint = document.createElement("span");
+    wideVisualCounter += 1;
+    hint.id = `lamanotes-comparison-hint-${wideVisualCounter}`;
+    hint.className = "lamanotes-visually-hidden";
+    hint.textContent =
+      "Scrollable comparison table. Use Left and Right Arrow, Home, and End to pan.";
+    table.after(hint);
+    table.setAttribute("aria-describedby", hint.id);
+
+    table.addEventListener("keydown", (event) => {
+      if (
+        event.target !== table ||
+        !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      const panDistance = Math.max(48, table.clientWidth * 0.8);
+      if (event.key === "Home") {
+        table.scrollLeft = 0;
+      } else if (event.key === "End") {
+        table.scrollLeft = table.scrollWidth;
+      } else {
+        table.scrollLeft +=
+          event.key === "ArrowRight" ? panDistance : -panDistance;
+      }
+    });
+  });
+}
+
 function normalizeLeadText(text) {
   return text.replace(/\s+/g, " ").trim().toLowerCase();
 }
@@ -1838,6 +1892,7 @@ export async function enhanceRenderedMarkdown(rootElement, options = {}) {
   enhanceCodeBlocks(rootElement);
   enhanceMediaImages(rootElement);
   enhanceWideVisualPanning(rootElement);
+  enhanceComparisonTablePanning(rootElement);
   if (options.noteLead !== false) {
     enhanceNoteLead(rootElement, options);
   }
@@ -1850,4 +1905,5 @@ export async function enhanceRenderedMarkdown(rootElement, options = {}) {
   ]);
   enhanceMediaImages(rootElement);
   enhanceWideVisualPanning(rootElement);
+  enhanceComparisonTablePanning(rootElement);
 }

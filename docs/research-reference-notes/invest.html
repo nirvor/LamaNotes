@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="lamanotes-tags" content="research,r-fixture,design-reference" />
+    <meta
+      name="lamanotes-research-id"
+      content="lr-44444444444444444444444444444444"
+    />
+    <meta name="lamanotes-research-topic" content="r-fixture" />
+    <meta name="lamanotes-research-type" content="invest" />
+    <meta name="lamanotes-research-freshness" content="timeless" />
+    <meta name="lamanotes-research-origin" content="codex" />
+    <title>Liquiditätsreserve zwischen Tagesgeld und Anleiheleiter</title>
+  </head>
+  <body>
+    <article
+      class="lamanote lamanote-article lamanote-research"
+      data-lamanotes-component="article"
+      data-lamanotes-research-type="invest"
+    >
+      <header
+        class="lamanote-research-header"
+        data-lamanotes-component="research-header"
+      >
+        <p class="lamanote-kicker">Anlageentscheidung</p>
+        <h1>Liquiditätsreserve zwischen Tagesgeld und Anleiheleiter</h1>
+        <div class="lamanote-deck" data-lamanotes-component="introduction">
+          <p>
+            Bei möglichem Bedarf innerhalb von drei Jahren zählt nicht die
+            höchste Modellrendite, sondern welcher Betrag zu welchem Zeitpunkt
+            sicher verfügbar sein muss. Eine kurze Anleiheleiter kann den Ertrag
+            stabilisieren, darf die echte Notfallreserve aber nicht ersetzen.
+          </p>
+        </div>
+        <p class="lamanote-reference-status">
+          <span>Synthetische Designreferenz</span>
+          <span>Keine Anlageempfehlung</span>
+        </p>
+      </header>
+
+      <section class="lamanote-metrics" data-lamanotes-component="metrics">
+        <div class="lamanote-metric">
+          <div class="lamanote-metric-label">Reserve</div>
+          <div class="lamanote-metric-value">30.000 EUR</div>
+          <div class="lamanote-metric-note">synthetischer Ausgangsbetrag</div>
+        </div>
+        <div class="lamanote-metric">
+          <div class="lamanote-metric-label">Täglich verfügbar</div>
+          <div class="lamanote-metric-value">10.000 EUR</div>
+          <div class="lamanote-metric-note">ohne Kursrisiko</div>
+        </div>
+        <div class="lamanote-metric">
+          <div class="lamanote-metric-label">Planungshorizont</div>
+          <div class="lamanote-metric-value">bis 3 Jahre</div>
+          <div class="lamanote-metric-note">kein sicherer Endtermin</div>
+        </div>
+      </section>
+
+      <section
+        class="lamanote-research-section lamanote-research-section--key"
+        data-lamanotes-component="section"
+      >
+        <p class="lamanote-section-eyebrow">Liquidität</p>
+        <h2>Der Horizont besteht aus drei verschiedenen Aufgaben</h2>
+        <div class="lamanote-section-card">
+          <ul>
+            <li>
+              10.000 EUR müssen täglich verfügbar bleiben und dürfen kein
+              Kursrisiko tragen.
+            </li>
+            <li>10.000 EUR werden frühestens nach zwölf Monaten benötigt.</li>
+            <li>
+              10.000 EUR haben einen zwei- bis dreijährigen Planungshorizont,
+              aber keinen sicheren Endtermin.
+            </li>
+          </ul>
+          <p>
+            Eine einzige Durchschnittslaufzeit würde diese Aufgaben vermischen.
+            Die sinnvolle Einheit ist daher nicht "das Portfolio", sondern jeder
+            zeitlich gebundene Liquiditätsblock.
+          </p>
+        </div>
+      </section>
+
+      <section
+        class="lamanote-research-section lamanote-research-section--evidence"
+        data-lamanotes-component="section"
+      >
+        <p class="lamanote-section-eyebrow">Szenarien</p>
+        <h2>Der kleine Mehrertrag kauft ein anderes Risiko</h2>
+        <div class="lamanote-section-card">
+          <p>
+            Die Modellrechnung vergleicht den Wert nach zwölf Monaten, wenn
+            Marktzinsen unverändert bleiben, um einen Prozentpunkt steigen oder
+            um einen Prozentpunkt fallen. Tagesgeld wird ohne Kursbewegung
+            modelliert, eine Leiter aus kurz laufenden Einzelanleihen bis zur
+            Fälligkeit, und ein länger laufender Fonds zum Marktwert.
+          </p>
+
+          <figure
+            class="lamanote-plot lamanote-visual-frame lamanote-visual-wide"
+            data-lamanotes-component="plot"
+          >
+            <p class="lamanote-visual-question">
+              <strong>Frage:</strong> Wie stark schwankt der Wert von 10.000 EUR
+              nach zwölf Monaten unter drei Zinsszenarien?
+            </p>
+            <svg
+              viewBox="0 0 860 470"
+              role="img"
+              aria-labelledby="invest-plot-title invest-plot-desc"
+            >
+              <title id="invest-plot-title">
+                Synthetische Werte nach zwölf Monaten
+              </title>
+              <desc id="invest-plot-desc">
+                Tagesgeld liegt in allen Szenarien bei 10.250 Euro. Die kurze
+                Anleiheleiter liegt zwischen 10.180 und 10.310 Euro. Der länger
+                laufende Fonds liegt zwischen 9.840 und 10.690 Euro.
+              </desc>
+              <rect
+                x="0"
+                y="0"
+                width="860"
+                height="470"
+                rx="8"
+                fill="rgb(var(--theme-background))"
+              />
+              <text
+                x="54"
+                y="38"
+                fill="rgb(var(--theme-text))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="22"
+                font-weight="600"
+              >
+                Wert nach zwölf Monaten
+              </text>
+              <text
+                x="54"
+                y="63"
+                fill="rgb(var(--theme-text-muted))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="14"
+              >
+                Ausgangswert 10.000 EUR, erfundene Renditen und
+                Zinssensitivitäten
+              </text>
+              <g stroke="rgb(var(--theme-border))" stroke-width="1">
+                <line x1="128" y1="110" x2="790" y2="110" />
+                <line x1="128" y1="190" x2="790" y2="190" />
+                <line x1="128" y1="270" x2="790" y2="270" />
+                <line x1="128" y1="350" x2="790" y2="350" />
+              </g>
+              <line
+                x1="128"
+                y1="350"
+                x2="790"
+                y2="350"
+                stroke="rgb(var(--theme-border))"
+                stroke-width="2"
+              />
+              <g
+                fill="rgb(var(--theme-text-muted))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="13"
+              >
+                <text x="58" y="115">10.800</text>
+                <text x="58" y="195">10.400</text>
+                <text x="58" y="275">10.000</text>
+                <text x="66" y="355">9.600</text>
+                <text x="190" y="382">Zins +1 pp</text>
+                <text x="405" y="382">unverändert</text>
+                <text x="650" y="382">Zins -1 pp</text>
+              </g>
+              <g fill="rgb(var(--theme-brand))">
+                <rect x="185" y="220" width="36" height="130" rx="3" />
+                <rect x="415" y="220" width="36" height="130" rx="3" />
+                <rect x="645" y="220" width="36" height="130" rx="3" />
+              </g>
+              <g fill="rgb(var(--theme-heading) / 0.55)">
+                <rect x="229" y="234" width="36" height="116" rx="3" />
+                <rect x="459" y="212" width="36" height="138" rx="3" />
+                <rect x="689" y="194" width="36" height="156" rx="3" />
+              </g>
+              <g fill="rgb(var(--theme-warning) / 0.78)">
+                <rect x="273" y="302" width="36" height="48" rx="3" />
+                <rect x="503" y="182" width="36" height="168" rx="3" />
+                <rect x="733" y="132" width="36" height="218" rx="3" />
+              </g>
+              <g
+                fill="rgb(var(--theme-text))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="12"
+                font-weight="600"
+                text-anchor="middle"
+              >
+                <text x="203" y="212">10.250</text>
+                <text x="247" y="226">10.180</text>
+                <text x="291" y="294">9.840</text>
+                <text x="433" y="212">10.250</text>
+                <text x="477" y="204">10.290</text>
+                <text x="521" y="174">10.440</text>
+                <text x="663" y="212">10.250</text>
+                <text x="707" y="186">10.310</text>
+                <text x="751" y="124">10.690</text>
+              </g>
+              <g font-family="Poppins, Arial, sans-serif" font-size="13">
+                <rect
+                  x="150"
+                  y="420"
+                  width="18"
+                  height="12"
+                  rx="2"
+                  fill="rgb(var(--theme-brand))"
+                />
+                <text x="176" y="431" fill="rgb(var(--theme-text))">
+                  Tagesgeld
+                </text>
+                <rect
+                  x="340"
+                  y="420"
+                  width="18"
+                  height="12"
+                  rx="2"
+                  fill="rgb(var(--theme-heading) / 0.55)"
+                />
+                <text x="366" y="431" fill="rgb(var(--theme-text))">
+                  kurze Leiter
+                </text>
+                <rect
+                  x="560"
+                  y="420"
+                  width="18"
+                  height="12"
+                  rx="2"
+                  fill="rgb(var(--theme-warning) / 0.78)"
+                />
+                <text x="586" y="431" fill="rgb(var(--theme-text))">
+                  längerer Fonds
+                </text>
+              </g>
+            </svg>
+            <p class="lamanote-visual-takeaway">
+              Der länger laufende Fonds bietet im günstigen Szenario mehr, kann
+              aber genau zum geplanten Entnahmezeitpunkt unter dem Startwert
+              liegen.
+            </p>
+            <figcaption>
+              <strong>Abbildung 1.</strong> Rein synthetische
+              Zwölfmonats-Szenarien, keine Prognose und keine Anlageempfehlung.
+              Steuern, Gebühren, Bonitätsausfälle und veränderte Tagesgeldsätze
+              sind bewusst nicht modelliert.
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section
+        class="lamanote-research-section lamanote-research-section--limits"
+        data-lamanotes-component="section"
+      >
+        <p class="lamanote-section-eyebrow">Modellgrenze</p>
+        <h2>Die Modellgrenze ist wichtiger als die zweite Dezimalstelle</h2>
+        <div class="lamanote-section-card">
+          <p>
+            Die Leiter reduziert das Kursrisiko nur, wenn die einzelnen Papiere
+            bis zur geplanten Fälligkeit gehalten werden können und Bonität
+            sowie Währung zum Bedarf passen. Der Fonds hat keinen festen
+            Rückzahlungszeitpunkt. Ein Verkauf nach zwölf Monaten realisiert
+            daher den dann gültigen Marktpreis.
+          </p>
+          <p>
+            Die Gegenprobe ist ein früher Liquiditätsbedarf. Wenn bereits nach
+            sechs Monaten 20.000 EUR gebraucht werden, war die Aufteilung zu
+            aggressiv, auch wenn ihr erwarteter Ertrag höher war. Das
+            Liquiditätsereignis, nicht der Durchschnittsertrag, invalidiert die
+            Strategie.
+          </p>
+        </div>
+      </section>
+
+      <section
+        class="lamanote-result"
+        data-lamanotes-component="result"
+        data-result-kind="risk"
+      >
+        <p class="lamanote-result-label">Risikobild</p>
+        <p class="lamanote-result-main">
+          Den täglich benötigten Block liquide halten und nur den zeitlich
+          belastbaren Teil in eine kurze, auf Fälligkeiten abgestimmte Leiter
+          geben.
+        </p>
+        <p class="lamanote-result-note">
+          Vor jeder Umsetzung den frühestmöglichen Entnahmebedarf, Bonität,
+          Kosten und die tatsächlichen aktuellen Konditionen neu prüfen. Ein
+          längerer Fonds gehört nicht in den festen Zwölfmonatsbedarf.
+        </p>
+      </section>
+
+      <section class="lamanote-source-list" data-lamanotes-component="sources">
+        <h2>Designhinweis</h2>
+        <p>
+          Diese synthetische Note prüft Szenario-Darstellung, Modellgrenzen und
+          ein zurückhaltendes Risikourteil. Sämtliche Renditen und Beträge
+          dienen nur der Layout-QA.
+        </p>
+      </section>
+
+      <p class="lamanote-tags">#research #r-fixture #design-reference</p>
+    </article>
+  </body>
+</html>

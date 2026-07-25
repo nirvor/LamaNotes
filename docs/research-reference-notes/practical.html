@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="lamanotes-tags" content="research,r-fixture,design-reference" />
+    <meta
+      name="lamanotes-research-id"
+      content="lr-55555555555555555555555555555555"
+    />
+    <meta name="lamanotes-research-topic" content="r-fixture" />
+    <meta name="lamanotes-research-type" content="practical" />
+    <meta name="lamanotes-research-freshness" content="timeless" />
+    <meta name="lamanotes-research-origin" content="codex" />
+    <title>Eine beschädigte lokale Sicherung sauber prüfen</title>
+  </head>
+  <body>
+    <article
+      class="lamanote lamanote-article lamanote-research"
+      data-lamanotes-component="article"
+      data-lamanotes-research-type="practical"
+    >
+      <header
+        class="lamanote-research-header"
+        data-lamanotes-component="research-header"
+      >
+        <p class="lamanote-kicker">Praktischer Leitfaden</p>
+        <h1>Eine beschädigte lokale Sicherung sauber prüfen</h1>
+        <div class="lamanote-deck" data-lamanotes-component="introduction">
+          <p>
+            Die sichere Reihenfolge ist: Original nicht verändern, Arbeitskopie
+            bilden, Integrität und Inhalt getrennt prüfen und erst dann in ein
+            leeres Ziel testweise wiederherstellen. Jede Änderung bleibt von der
+            einzigen vorhandenen Quelle fern.
+          </p>
+        </div>
+        <p class="lamanote-reference-status">
+          <span>Synthetische Designreferenz</span>
+          <span>Pfade und Prüfsummen erfunden</span>
+        </p>
+      </header>
+
+      <section class="lamanote-metrics" data-lamanotes-component="metrics">
+        <div class="lamanote-metric">
+          <div class="lamanote-metric-label">Original</div>
+          <div class="lamanote-metric-value">unverändert</div>
+          <div class="lamanote-metric-note">nur Metadaten und Hash lesen</div>
+        </div>
+        <div class="lamanote-metric">
+          <div class="lamanote-metric-label">Arbeitskopie</div>
+          <div class="lamanote-metric-value">hashgleich</div>
+          <div class="lamanote-metric-note">alle Werkzeuge nur hier</div>
+        </div>
+        <div class="lamanote-metric">
+          <div class="lamanote-metric-label">Testziel</div>
+          <div class="lamanote-metric-value">leer</div>
+          <div class="lamanote-metric-note">keine produktiven Daten</div>
+        </div>
+      </section>
+
+      <section
+        class="lamanote-research-section lamanote-research-section--key"
+        data-lamanotes-component="section"
+      >
+        <p class="lamanote-section-eyebrow">Sicherung</p>
+        <h2>Vor dem ersten Reparaturversuch den Ausgangszustand einfrieren</h2>
+        <div class="lamanote-section-card">
+          <p>
+            Die Datei <code>D:\Backup\archive-2026-07.bin</code> lässt sich im
+            Beispiel nicht öffnen. Sie wird nicht überschrieben, verschoben oder
+            durch ein Reparaturtool "in place" verändert. Zuerst werden Größe,
+            Zeitstempel und SHA-256 dokumentiert. Danach entsteht auf einem
+            anderen Datenträger eine Arbeitskopie.
+          </p>
+          <aside class="lamanote-callout" data-lamanotes-component="callout">
+            <strong>Stop:</strong> Wenn das Quelllaufwerk ungewöhnliche
+            Geräusche, I/O-Fehler oder SMART-Warnungen zeigt, keine weiteren
+            Vollscans starten. Dann ist Datenträgerabbildung oder professionelle
+            Recovery die eigene Aufgabe.
+          </aside>
+        </div>
+      </section>
+
+      <section
+        class="lamanote-research-section lamanote-research-section--method"
+        data-lamanotes-component="section"
+      >
+        <p class="lamanote-section-eyebrow">Ablauf</p>
+        <h2>Jeder Schritt hat eine Beobachtung und eine Abbruchkante</h2>
+        <div class="lamanote-section-card">
+          <ol class="lamanote-steps" data-lamanotes-component="steps">
+            <li>
+              <div>
+                <strong>Metadaten und Hash der Quelle erfassen.</strong>
+                <p>
+                  Erwartet werden eine lesbare Dateigröße und ein vollständiger
+                  Hashlauf. Bei I/O-Fehlern stoppen. Der Hash ist die Referenz,
+                  nicht der Beweis für inhaltliche Gültigkeit.
+                </p>
+              </div>
+            </li>
+            <li>
+              <div>
+                <strong>Eine bytegleiche Arbeitskopie erzeugen.</strong>
+                <p>
+                  Quelle und Kopie müssen dieselbe Größe und denselben Hash
+                  haben. Erst auf der Kopie werden Parser, Entpacker oder
+                  Reparaturoptionen ausgeführt.
+                </p>
+              </div>
+            </li>
+            <li>
+              <div>
+                <strong>Containerstruktur ohne Restore prüfen.</strong>
+                <p>
+                  Das Formattool soll nur lesen und einen Katalog ausgeben.
+                  Fehlende Endmarken, unerwartete Dateizahlen oder
+                  Dekompressionsfehler werden separat protokolliert.
+                </p>
+              </div>
+            </li>
+            <li>
+              <div>
+                <strong>In ein leeres Testziel wiederherstellen.</strong>
+                <p>
+                  Niemals über den produktiven Datenbestand schreiben.
+                  Stichproben öffnen, Dateizahlen vergleichen und wichtige
+                  Dateien gegen bekannte Hashes oder unabhängige Quellen prüfen.
+                </p>
+              </div>
+            </li>
+            <li>
+              <div>
+                <strong>Ergebnis und Lücke benennen.</strong>
+                <p>
+                  "Restore lief durch" reicht nicht. Dokumentiert werden
+                  wiederhergestellte Dateien, fehlende Objekte, beschädigte
+                  Inhalte und der unveränderte Hash der Originaldatei.
+                </p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section
+        class="lamanote-research-section lamanote-research-section--analysis"
+        data-lamanotes-component="section"
+      >
+        <p class="lamanote-section-eyebrow">Entscheidungsweg</p>
+        <h2>Der Prüfpfad trennt Medium, Container und Inhalt</h2>
+        <div class="lamanote-section-card">
+          <figure
+            class="lamanote-diagram lamanote-visual-frame lamanote-visual-wide"
+            data-lamanotes-component="diagram"
+          >
+            <p class="lamanote-visual-question">
+              <strong>Frage:</strong> An welcher Stelle entscheidet sich, ob
+              weiter geprüft oder abgebrochen wird?
+            </p>
+            <svg
+              viewBox="0 0 900 430"
+              role="img"
+              aria-labelledby="practical-flow-title practical-flow-desc"
+            >
+              <title id="practical-flow-title">
+                Prüfpfad für eine beschädigte Sicherung
+              </title>
+              <desc id="practical-flow-desc">
+                Der Hauptpfad führt von der unveränderten Quelle über
+                Arbeitskopie und Containerprüfung zum isolierten Restore.
+                I/O-Fehler führen zum Stop, Inhaltsfehler zu einer
+                Teilwiederherstellung mit dokumentierter Lücke.
+              </desc>
+              <defs>
+                <marker
+                  id="practical-arrow"
+                  markerWidth="10"
+                  markerHeight="10"
+                  refX="8"
+                  refY="3"
+                  orient="auto"
+                  markerUnits="strokeWidth"
+                >
+                  <path d="M0,0 L0,6 L9,3 z" fill="rgb(var(--theme-heading))" />
+                </marker>
+                <marker
+                  id="practical-stop-arrow"
+                  markerWidth="10"
+                  markerHeight="10"
+                  refX="8"
+                  refY="3"
+                  orient="auto"
+                  markerUnits="strokeWidth"
+                >
+                  <path d="M0,0 L0,6 L9,3 z" fill="rgb(var(--theme-warning))" />
+                </marker>
+              </defs>
+              <rect
+                x="0"
+                y="0"
+                width="900"
+                height="430"
+                rx="8"
+                fill="rgb(var(--theme-background))"
+              />
+              <text
+                x="48"
+                y="38"
+                fill="rgb(var(--theme-text))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="22"
+                font-weight="600"
+              >
+                Erst lesen, dann isoliert wiederherstellen
+              </text>
+              <text
+                x="48"
+                y="62"
+                fill="rgb(var(--theme-text-muted))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="14"
+              >
+                Hauptpfad blau, Abbruch oder Teilbefund amber
+              </text>
+              <g
+                fill="rgb(var(--theme-heading) / 0.065)"
+                stroke="rgb(var(--theme-heading) / 0.42)"
+                stroke-width="2"
+              >
+                <rect x="48" y="120" width="170" height="84" rx="8" />
+                <rect x="278" y="120" width="170" height="84" rx="8" />
+                <rect x="508" y="120" width="170" height="84" rx="8" />
+                <rect x="730" y="120" width="130" height="84" rx="8" />
+              </g>
+              <g
+                fill="rgb(var(--theme-text))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="15"
+                text-anchor="middle"
+              >
+                <text x="133" y="153" font-weight="600">Quelle einfrieren</text>
+                <text x="133" y="178">Metadaten + Hash</text>
+                <text x="363" y="153" font-weight="600">Arbeitskopie</text>
+                <text x="363" y="178">Bytegleich prüfen</text>
+                <text x="593" y="153" font-weight="600">Container lesen</text>
+                <text x="593" y="178">Katalog + Fehler</text>
+                <text x="795" y="153" font-weight="600">Test-Restore</text>
+                <text x="795" y="178">Leeres Ziel</text>
+              </g>
+              <g
+                fill="none"
+                stroke="rgb(var(--theme-heading))"
+                stroke-width="3"
+                marker-end="url(#practical-arrow)"
+              >
+                <line x1="218" y1="162" x2="268" y2="162" />
+                <line x1="448" y1="162" x2="498" y2="162" />
+                <line x1="678" y1="162" x2="720" y2="162" />
+              </g>
+              <g
+                fill="rgb(var(--theme-warning) / 0.08)"
+                stroke="rgb(var(--theme-warning) / 0.62)"
+                stroke-width="2"
+              >
+                <rect x="92" y="292" width="210" height="78" rx="8" />
+                <rect x="498" y="292" width="250" height="78" rx="8" />
+              </g>
+              <g
+                fill="rgb(var(--theme-text))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="14"
+                text-anchor="middle"
+              >
+                <text x="197" y="323" font-weight="600">
+                  I/O-Fehler oder Mediumwarnung
+                </text>
+                <text x="197" y="347">Stop, Datenträger-Lane</text>
+                <text x="623" y="323" font-weight="600">
+                  Lesbar, aber Inhalte fehlen
+                </text>
+                <text x="623" y="347">Teilrestore + Lücke dokumentieren</text>
+              </g>
+              <g
+                fill="none"
+                stroke="rgb(var(--theme-warning))"
+                stroke-width="3"
+                marker-end="url(#practical-stop-arrow)"
+              >
+                <path d="M133 204 V260 H197 V282" />
+                <path d="M593 204 V260 H623 V282" />
+              </g>
+            </svg>
+            <p class="lamanote-visual-takeaway">
+              Ein beschädigtes Backup ist kein einzelner Fehlerzustand. Medium,
+              Container und wiederhergestellter Inhalt brauchen getrennte
+              Nachweise.
+            </p>
+            <figcaption>
+              <strong>Abbildung 1.</strong> Illustrativer Prüfpfad. Die
+              konkreten Werkzeuge hängen vom echten Datenträger und
+              Sicherungsformat ab. Amber markiert keine automatische Reparatur,
+              sondern eine eigene Stop- oder Teilbefund-Lane.
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section
+        class="lamanote-result"
+        data-lamanotes-component="result"
+        data-result-kind="action"
+      >
+        <p class="lamanote-result-label">Ergebnis</p>
+        <p class="lamanote-result-main">
+          Die Originaldatei bleibt unverändert. Nur eine hashgleiche Kopie wird
+          gelesen und in ein leeres Ziel testweise wiederhergestellt.
+        </p>
+        <p class="lamanote-result-note">
+          Fertig ist die Arbeit erst, wenn Stichproben und Dateizahlen stimmen,
+          jede Lücke benannt ist und der ursprüngliche Hash erneut unverändert
+          geprüft wurde.
+        </p>
+      </section>
+
+      <section class="lamanote-source-list" data-lamanotes-component="sources">
+        <h2>Designhinweis</h2>
+        <p>
+          Diese synthetische Note prüft ausführbare Schritte, Stop-Kriterien und
+          einen visuellen Fehlerpfad. Sie ersetzt keine format- oder
+          datenträgerspezifische Recovery-Anleitung.
+        </p>
+      </section>
+
+      <p class="lamanote-tags">#research #r-fixture #design-reference</p>
+    </article>
+  </body>
+</html>

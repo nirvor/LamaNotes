@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/LamaNotes/client/dist/favicon.ico" />
+    <title>LamaNotes Research reference preview</title>
+    <style>
+      html {
+        background: rgb(var(--theme-background, 255 255 255));
+      }
+
+      body {
+        margin: 0;
+        background: rgb(var(--theme-background, 255 255 255));
+      }
+
+      main {
+        box-sizing: border-box;
+        width: min(100%, var(--ln-content-max, 68rem));
+        margin: 0 auto;
+        padding: 1rem clamp(0.75rem, 3vw, 1.5rem) 3rem;
+      }
+
+      #preview-error {
+        color: #9b2c2c;
+        font:
+          14px/1.5 system-ui,
+          sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p id="preview-error" hidden></p>
+      <div
+        id="preview"
+        class="toastui-editor-contents lamanotes-html-contents"
+        aria-live="polite"
+      ></div>
+    </main>
+    <script type="module">
+      const allowedNotes = new Set([
+        "research",
+        "travel",
+        "shopping",
+        "invest",
+        "practical",
+        "aluhut",
+      ]);
+      const parameters = new URLSearchParams(window.location.search);
+      const note = allowedNotes.has(parameters.get("note"))
+        ? parameters.get("note")
+        : "research";
+      if (parameters.get("theme") === "dark") {
+        document.body.classList.add("dark");
+      }
+
+      const error = document.querySelector("#preview-error");
+      const preview = document.querySelector("#preview");
+
+      try {
+        const distDocument = await fetch(
+          "/LamaNotes/client/dist/index.html",
+        ).then((response) => {
+          if (!response.ok) {
+            throw new Error("Build LamaNotes before opening the preview.");
+          }
+          return response.text();
+        });
+        const dist = new DOMParser().parseFromString(distDocument, "text/html");
+        const stylesheet = dist.querySelector('link[rel="stylesheet"]');
+        if (!stylesheet) {
+          throw new Error("The current LamaNotes build has no stylesheet.");
+        }
+        const href = stylesheet.getAttribute("href");
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = href.startsWith("/")
+          ? `/LamaNotes/client/dist${href}`
+          : `/LamaNotes/client/dist/${href}`;
+        document.head.append(link);
+
+        const assetListing = await fetch("/LamaNotes/client/dist/assets/").then(
+          (response) => {
+            if (!response.ok) {
+              throw new Error("Could not inspect the local build assets.");
+            }
+            return response.text();
+          },
+        );
+        const assets = new DOMParser().parseFromString(
+          assetListing,
+          "text/html",
+        );
+        const viewerStylesheet = [...assets.querySelectorAll("a")].find(
+          (candidate) =>
+            /^HtmlViewer-[A-Za-z0-9_-]+\.css$/.test(
+              candidate.textContent.trim(),
+            ),
+        );
+        if (!viewerStylesheet) {
+          throw new Error("The current build has no HtmlViewer stylesheet.");
+        }
+        const viewerLink = document.createElement("link");
+        viewerLink.rel = "stylesheet";
+        viewerLink.href = `/LamaNotes/client/dist/assets/${viewerStylesheet.textContent.trim()}`;
+        document.head.append(viewerLink);
+
+        const noteDocument = await fetch(`./${note}.html`).then((response) => {
+          if (!response.ok) {
+            throw new Error(`Could not load ${note}.html.`);
+          }
+          return response.text();
+        });
+        const parsed = new DOMParser().parseFromString(
+          noteDocument,
+          "text/html",
+        );
+        const article = parsed.querySelector("article.lamanote");
+        if (!article) {
+          throw new Error(`${note}.html has no LamaNotes article.`);
+        }
+        preview.replaceChildren(article);
+        document.title = `${parsed.title} - reference preview`;
+      } catch (caught) {
+        error.hidden = false;
+        error.textContent = caught.message;
+      }
+    </script>
+  </body>
+</html>

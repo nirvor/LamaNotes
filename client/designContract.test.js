@@ -67,6 +67,12 @@ test("V2 tokens and legacy aliases stay in one design contract", () => {
   );
   assert.match(viewerCss, /\.lamanote blockquote \{\s*\n  border: var/);
   assert.match(viewerCss, /min-width: var\(--ln-wide-min\)/);
+  assert.match(viewerCss, /\.lamanote-research-header \{/);
+  assert.match(viewerCss, /\.lamanote-section-eyebrow \{/);
+  assert.match(viewerCss, /\.lamanote-result \{/);
+  assert.match(viewerCss, /\.lamanote-comparison \{/);
+  assert.match(viewerCss, /\.lamanote-steps \{/);
+  assert.match(viewerCss, /\.lamanote-tags \{/);
 });
 
 test("media preview is a modal keyboard boundary", () => {
@@ -90,6 +96,21 @@ test("wide visuals expose bounded keyboard panning", () => {
   assert.match(renderSource, /"ArrowLeft ArrowRight Home End"/);
   assert.match(renderSource, /visual\.scrollLeft = visual\.scrollWidth/);
   assert.match(viewerCss, /\.lamanote-visual-wide:focus-visible/);
+});
+
+test("comparison tables expose bounded keyboard panning", () => {
+  assert.match(renderSource, /enhanceComparisonTablePanning/);
+  assert.match(
+    renderSource,
+    /"aria-roledescription",\s*"horizontally scrollable comparison table"/,
+  );
+  assert.match(
+    renderSource,
+    /Scrollable comparison table\. Use Left and Right Arrow, Home, and End to pan\./,
+  );
+  assert.match(renderSource, /table\.scrollLeft = table\.scrollWidth/);
+  assert.match(viewerCss, /\.lamanote-comparison:focus-visible/);
+  assert.match(viewerCss, /overscroll-behavior-inline: contain/);
 });
 
 test("shared application modals trap and restore keyboard focus", () => {

@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="lamanotes-tags" content="research,r-fixture,design-reference" />
+    <meta
+      name="lamanotes-research-id"
+      content="lr-22222222222222222222222222222222"
+    />
+    <meta name="lamanotes-research-topic" content="r-fixture" />
+    <meta name="lamanotes-research-type" content="travel" />
+    <meta name="lamanotes-research-freshness" content="timeless" />
+    <meta name="lamanotes-research-origin" content="codex" />
+    <title>Eine robuste Bahnroute mit engem Fähranschluss</title>
+  </head>
+  <body>
+    <article
+      class="lamanote lamanote-article lamanote-research"
+      data-lamanotes-component="article"
+      data-lamanotes-research-type="travel"
+    >
+      <header
+        class="lamanote-research-header"
+        data-lamanotes-component="research-header"
+      >
+        <p class="lamanote-kicker">Reiseplanung</p>
+        <h1>Eine robuste Bahnroute mit engem Fähranschluss</h1>
+        <div class="lamanote-deck" data-lamanotes-component="introduction">
+          <p>
+            Entscheidend ist nicht die schnellste Zugverbindung, sondern der
+            letzte verlässliche Fähranschluss. Die robuste Route startet 45
+            Minuten früher, hält den Betreiberwechsel einfach und besitzt einen
+            klaren Rückfall auf die Abendfähre.
+          </p>
+        </div>
+        <p class="lamanote-reference-status">
+          <span>Synthetische Designreferenz</span>
+          <span>Fahrplan und Orte erfunden</span>
+        </p>
+      </header>
+
+      <section class="lamanote-metrics" data-lamanotes-component="metrics">
+        <div class="lamanote-metric">
+          <div class="lamanote-metric-label">Geplanter Anschluss</div>
+          <div class="lamanote-metric-value">15:40</div>
+          <div class="lamanote-metric-note">Fähre ab Küstenstadt</div>
+        </div>
+        <div class="lamanote-metric">
+          <div class="lamanote-metric-label">Robuste Reserve</div>
+          <div class="lamanote-metric-value">52 min</div>
+          <div class="lamanote-metric-note">inklusive Terminalweg</div>
+        </div>
+        <div class="lamanote-metric">
+          <div class="lamanote-metric-label">Rückfall</div>
+          <div class="lamanote-metric-value">18:55</div>
+          <div class="lamanote-metric-note">Abendfähre</div>
+        </div>
+      </section>
+
+      <section
+        class="lamanote-research-section lamanote-research-section--key"
+        data-lamanotes-component="section"
+      >
+        <p class="lamanote-section-eyebrow">Engpass</p>
+        <h2>Der fragile Punkt liegt nach der langen Zugfahrt</h2>
+        <div class="lamanote-section-card">
+          <p>
+            Beide Zugvarianten erreichen Küstenstadt planmäßig vor 15 Uhr. Nur
+            die frühere Verbindung lässt jedoch 52 Minuten für Bahnsteigwechsel,
+            Weg zum Fährterminal und Ticketkontrolle. Die nominell schnellere
+            Route hat dafür 17 Minuten. Schon eine kleine Verspätung verschiebt
+            die Ankunft auf der Insel um mehr als drei Stunden.
+          </p>
+          <aside class="lamanote-callout" data-lamanotes-component="callout">
+            <strong>Vor Veröffentlichung:</strong> Eine echte Travel Note muss
+            Fahrplan, Betriebstage, Terminalweg und Buchungsbedingungen am
+            Reisetag live gegen Betreiberquellen prüfen.
+          </aside>
+        </div>
+      </section>
+
+      <section
+        class="lamanote-research-section lamanote-research-section--method"
+        data-lamanotes-component="section"
+      >
+        <p class="lamanote-section-eyebrow">Routenlogik</p>
+        <h2>Die Route wird vom Anschluss rückwärts geplant</h2>
+        <div class="lamanote-section-card">
+          <p>
+            Zuerst wird die gewünschte Fähre fixiert. Davon gehen Terminalweg,
+            Sicherheitsreserve und der späteste sinnvolle Zug ab. Diese
+            rückwärts gerichtete Planung verhindert, dass eine rechnerisch kurze
+            Gesamtzeit den einzigen riskanten Übergang verdeckt.
+          </p>
+
+          <figure
+            class="lamanote-map lamanote-visual-frame lamanote-visual-wide"
+            data-lamanotes-component="map"
+          >
+            <p class="lamanote-visual-question">
+              <strong>Frage:</strong> Wo braucht die Route Reserve, und welche
+              Verbindung bleibt als Rückfall?
+            </p>
+            <svg
+              viewBox="0 0 840 360"
+              role="img"
+              aria-labelledby="travel-map-title travel-map-desc"
+            >
+              <title id="travel-map-title">
+                Schematische Bahn- und Fährroute
+              </title>
+              <desc id="travel-map-desc">
+                Die empfohlene Route führt von Bergstadt über Talbahnhof nach
+                Küstenstadt und weiter mit der 15 Uhr 40 Fähre. Eine
+                gestrichelte Linie zeigt die Abendfähre als Rückfall.
+              </desc>
+              <rect
+                x="0"
+                y="0"
+                width="840"
+                height="360"
+                rx="8"
+                fill="rgb(var(--theme-background))"
+              />
+              <text
+                x="52"
+                y="38"
+                fill="rgb(var(--theme-text))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="22"
+                font-weight="600"
+              >
+                Anschluss zuerst planen
+              </text>
+              <text
+                x="52"
+                y="62"
+                fill="rgb(var(--theme-text-muted))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="14"
+              >
+                Schematische Fixture, nicht geografisch maßstäblich
+              </text>
+              <line
+                x1="118"
+                y1="170"
+                x2="610"
+                y2="170"
+                stroke="rgb(var(--theme-brand))"
+                stroke-width="6"
+                stroke-linecap="round"
+              />
+              <line
+                x1="610"
+                y1="170"
+                x2="750"
+                y2="108"
+                stroke="rgb(var(--theme-brand))"
+                stroke-width="6"
+                stroke-linecap="round"
+              />
+              <line
+                x1="610"
+                y1="196"
+                x2="750"
+                y2="258"
+                stroke="rgb(var(--theme-text-muted))"
+                stroke-width="4"
+                stroke-dasharray="10 8"
+              />
+              <g
+                fill="rgb(var(--theme-background))"
+                stroke="rgb(var(--theme-brand))"
+                stroke-width="4"
+              >
+                <circle cx="118" cy="170" r="13" />
+                <circle cx="350" cy="170" r="13" />
+                <circle cx="610" cy="170" r="13" />
+                <circle cx="750" cy="108" r="13" />
+              </g>
+              <circle
+                cx="750"
+                cy="258"
+                r="12"
+                fill="rgb(var(--theme-background))"
+                stroke="rgb(var(--theme-text-muted))"
+                stroke-width="4"
+              />
+              <g
+                fill="rgb(var(--theme-text))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="16"
+                font-weight="600"
+              >
+                <text x="74" y="208">Bergstadt</text>
+                <text x="305" y="208">Talbahnhof</text>
+                <text x="552" y="208">Küstenstadt</text>
+                <text x="704" y="84">Inselhafen</text>
+              </g>
+              <g
+                fill="rgb(var(--theme-text-muted))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="14"
+              >
+                <text x="74" y="232">Abfahrt 09:10</text>
+                <text x="305" y="232">Umstieg 10:42</text>
+                <text x="552" y="232">Ankunft 14:48</text>
+                <text x="650" y="286">Rückfall 18:55</text>
+              </g>
+              <rect
+                x="485"
+                y="70"
+                width="190"
+                height="70"
+                rx="7"
+                fill="rgb(var(--theme-heading) / 0.08)"
+                stroke="rgb(var(--theme-heading) / 0.35)"
+              />
+              <text
+                x="502"
+                y="93"
+                fill="rgb(var(--theme-heading))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="14"
+                font-weight="600"
+              >
+                Kritische Reserve: 52 min
+              </text>
+              <text
+                x="502"
+                y="113"
+                fill="rgb(var(--theme-text-muted))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="13"
+              >
+                inklusive Terminalweg
+              </text>
+              <text
+                x="502"
+                y="133"
+                fill="rgb(var(--theme-text-muted))"
+                font-family="Poppins, Arial, sans-serif"
+                font-size="13"
+              >
+                geplante Fähre 15:40
+              </text>
+            </svg>
+            <p class="lamanote-visual-takeaway">
+              Die Reserve gehört an den Übergang zwischen zwei Betreibern, nicht
+              gleichmäßig über die Reise verteilt.
+            </p>
+            <figcaption>
+              <strong>Abbildung 1.</strong> Erfundene Verbindung zur Prüfung von
+              Routenlogik und mobiler Darstellung. Eine publizierte Note würde
+              hier einen echten Karten- oder Betreiberbeleg mit Datum verwenden.
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section
+        class="lamanote-research-section lamanote-research-section--evidence"
+        data-lamanotes-component="section"
+      >
+        <p class="lamanote-section-eyebrow">Vergleich</p>
+        <h2>Zwei plausible Verbindungen, aber nur eine robuste</h2>
+        <div class="lamanote-section-card">
+          <table
+            class="lamanote-comparison"
+            data-lamanotes-component="comparison"
+          >
+            <caption>
+              Synthetischer Fahrplan. Alle Zeiten und Preise sind erfunden;
+              verglichen wird derselbe Reisetag mit Handgepäck.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Route</th>
+                <th scope="col">Abfahrt</th>
+                <th scope="col">Fährreserve</th>
+                <th scope="col">Inselankunft</th>
+                <th scope="col">Hauptnachteil</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-preferred="true">
+                <th scope="row">Früher Zug</th>
+                <td>09:10</td>
+                <td>52 min</td>
+                <td>16:25</td>
+                <td>45 min früherer Start</td>
+              </tr>
+              <tr>
+                <th scope="row">Schneller Zug</th>
+                <td>09:55</td>
+                <td>17 min</td>
+                <td>16:25 oder 19:40</td>
+                <td>kleine Verspätung kostet 3 h 15 min</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            Die schnelle Route ist nur sinnvoll, wenn der Reisende die spätere
+            Fähre ohne Folgekosten akzeptiert. Für einen festen Termin auf der
+            Insel ist sie keine echte Zeitersparnis, sondern eine Wette auf
+            einen knappen Betreiberwechsel.
+          </p>
+        </div>
+      </section>
+
+      <section
+        class="lamanote-result"
+        data-lamanotes-component="result"
+        data-result-kind="route"
+      >
+        <p class="lamanote-result-label">Routenergebnis</p>
+        <p class="lamanote-result-main">
+          Den Zug um 09:10 nehmen, in Küstenstadt direkt zum Terminal gehen und
+          die Fähre um 15:40 als geplanten Anschluss behandeln.
+        </p>
+        <p class="lamanote-result-note">
+          Fällt die Reserve vor Abfahrt unter 35 Minuten, nicht sprinten oder
+          improvisieren, sondern auf die Abendfähre wechseln und die Unterkunft
+          informieren.
+        </p>
+      </section>
+
+      <section class="lamanote-source-list" data-lamanotes-component="sources">
+        <h2>Designhinweis</h2>
+        <p>
+          Diese synthetische Note prüft Routenlogik, breite Verbindungsschemata
+          und mobile Vergleichstabellen. Vor einer realen Reise wären
+          Betreiberquellen und Bedingungen live zu prüfen.
+        </p>
+      </section>
+
+      <p class="lamanote-tags">#research #r-fixture #design-reference</p>
+    </article>
+  </body>
+</html>
