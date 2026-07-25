@@ -42,7 +42,7 @@
     --theme-background-elevated: 244 247 250;
     --theme-heading: 30 92 145;
     --theme-link: 72 102 145;
-    --theme-text: 44 49 57;
+    --theme-text: 0 0 0;
     --theme-text-muted: 91 103 119;
     --theme-text-very-muted: 104 116 132;
     --theme-shadow: 215 224 232;
@@ -105,7 +105,7 @@
 
   body.dark {
     --theme-brand: 142 203 255;
-    --theme-background: 34 38 44;
+    --theme-background: 33 37 43;
     --theme-background-elevated: 44 49 57;
     --theme-heading: 142 203 255;
     --theme-link: 164 187 224;
