@@ -9,6 +9,22 @@ from helpers import CustomBaseModel, is_valid_filename, strip_whitespace
 
 NoteFormat = Literal["html", "markdown"]
 NoteKind = Literal["research", "work", "legacy-markdown"]
+ResearchType = Literal[
+    "research",
+    "travel",
+    "shopping",
+    "invest",
+    "practical",
+    "aluhut",
+]
+ResearchFreshness = Literal[
+    "timeless",
+    "3-years",
+    "1-year",
+    "1-month",
+    "1-week",
+    "24-hours",
+]
 
 
 class NoteBase(CustomBaseModel):
@@ -122,6 +138,8 @@ class NoteContext(CustomBaseModel):
     primary_research_topic: Optional[str] = Field(None)
     research_id: Optional[str] = Field(None)
     research_origin: Optional[Literal["lamastart", "codex"]] = Field(None)
+    research_type: Optional[ResearchType] = Field(None)
+    research_freshness: Optional[ResearchFreshness] = Field(None)
     parent_research_id: Optional[str] = Field(None)
     summary: Optional[str] = Field(None)
     headings: List[NoteHeading] = Field(default_factory=list)
@@ -144,6 +162,8 @@ class NoteIndexEntry(CustomBaseModel):
     primary_research_topic: Optional[str] = Field(None)
     research_id: Optional[str] = Field(None)
     research_origin: Optional[Literal["lamastart", "codex"]] = Field(None)
+    research_type: Optional[ResearchType] = Field(None)
+    research_freshness: Optional[ResearchFreshness] = Field(None)
     parent_research_id: Optional[str] = Field(None)
     summary: Optional[str] = Field(None)
     heading_count: int = 0

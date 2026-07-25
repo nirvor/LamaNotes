@@ -133,6 +133,8 @@ class ResearchTopicFacetTests(unittest.TestCase):
     <meta name="lamanotes-research-id"
           content="lr-0123456789abcdef0123456789abcdef">
     <meta name="lamanotes-research-origin" content="lamastart">
+    <meta name="lamanotes-research-type" content="travel">
+    <meta name="lamanotes-research-freshness" content="1-week">
     <meta name="lamanotes-research-parent"
           content="lr-fedcba9876543210fedcba9876543210">
   </head>
@@ -155,6 +157,8 @@ class ResearchTopicFacetTests(unittest.TestCase):
                 "lr-0123456789abcdef0123456789abcdef",
             )
             self.assertEqual(entry.research_origin, "lamastart")
+            self.assertEqual(entry.research_type, "travel")
+            self.assertEqual(entry.research_freshness, "1-week")
             self.assertEqual(
                 entry.parent_research_id,
                 "lr-fedcba9876543210fedcba9876543210",
@@ -168,6 +172,8 @@ class ResearchTopicFacetTests(unittest.TestCase):
                 payload["researchId"],
                 "lr-0123456789abcdef0123456789abcdef",
             )
+            self.assertEqual(payload["researchType"], "travel")
+            self.assertEqual(payload["researchFreshness"], "1-week")
 
     def test_context_and_index_derive_strict_research_topics(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -224,7 +230,13 @@ class ResearchTopicFacetTests(unittest.TestCase):
     def test_research_topics_require_exact_research_tag(self):
         with tempfile.TemporaryDirectory() as directory:
             Path(directory, "not-research.html").write_text(
-                "<article><p>#research-note #r-agent-tools</p></article>",
+                """<html>
+  <head>
+    <meta name="lamanotes-research-type" content="travel">
+    <meta name="lamanotes-research-freshness" content="24-hours">
+  </head>
+  <body><article><p>#research-note #r-agent-tools</p></article></body>
+</html>""",
                 encoding="utf-8",
             )
             notes = object.__new__(FileSystemNotes)
@@ -236,10 +248,38 @@ class ResearchTopicFacetTests(unittest.TestCase):
             self.assertEqual(context.research_topics, [])
             self.assertEqual(index_entry.research_topics, [])
             self.assertIsNone(context.research_id)
+            self.assertIsNone(context.research_type)
+            self.assertIsNone(context.research_freshness)
+            self.assertIsNone(index_entry.research_type)
+            self.assertIsNone(index_entry.research_freshness)
             self.assertEqual(
                 index_entry.tags,
                 ["r-agent-tools", "research-note"],
             )
+
+    def test_invalid_research_type_and_freshness_are_not_exposed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            Path(directory, "invalid-provenance.html").write_text(
+                """<html>
+  <head>
+    <meta name="lamanotes-tags" content="research,r-methods">
+    <meta name="lamanotes-research-type" content="private">
+    <meta name="lamanotes-research-freshness" content="current">
+  </head>
+  <body><article><p>#research #r-methods</p></article></body>
+</html>""",
+                encoding="utf-8",
+            )
+            notes = object.__new__(FileSystemNotes)
+            notes.storage_path = directory
+
+            context = notes.get_context("invalid-provenance")
+            entry = notes.get_semantic_index()[0]
+
+            self.assertIsNone(context.research_type)
+            self.assertIsNone(context.research_freshness)
+            self.assertIsNone(entry.research_type)
+            self.assertIsNone(entry.research_freshness)
 
 
 class ResearchNoteUpdateTests(unittest.TestCase):

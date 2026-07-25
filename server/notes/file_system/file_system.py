@@ -76,7 +76,31 @@ RESEARCH_TOPIC_META_NAMES = {
     "lamanotes-research-topic",
     "flatnotes-research-topic",
 }
+RESEARCH_TYPE_META_NAMES = {
+    "lamanotes-research-type",
+    "flatnotes-research-type",
+}
+RESEARCH_FRESHNESS_META_NAMES = {
+    "lamanotes-research-freshness",
+    "flatnotes-research-freshness",
+}
 RESEARCH_ORIGINS = {"lamastart", "codex"}
+RESEARCH_TYPES = {
+    "research",
+    "travel",
+    "shopping",
+    "invest",
+    "practical",
+    "aluhut",
+}
+RESEARCH_FRESHNESS_VALUES = {
+    "timeless",
+    "3-years",
+    "1-year",
+    "1-month",
+    "1-week",
+    "24-hours",
+}
 VISIBLE_RESEARCH_TAG_RE = re.compile(
     r"(?<![A-Za-z0-9_-])#(?:research|r-[a-z0-9]+(?:-[a-z0-9]+)*)"
     r"(?![A-Za-z0-9_-])",
@@ -292,6 +316,8 @@ class NoteSemanticParser(HTMLParser):
         self.primary_research_topic: str | None = None
         self.research_id: str | None = None
         self.research_origin: str | None = None
+        self.research_type: str | None = None
+        self.research_freshness: str | None = None
         self.parent_research_id: str | None = None
         self.note_kind: NoteKind = "research"
         self.skip_depth = 0
@@ -508,6 +534,14 @@ class NoteSemanticParser(HTMLParser):
             origin = attrs_dict.get("content", "").strip().casefold()
             if origin in RESEARCH_ORIGINS:
                 self.research_origin = origin
+        elif name in RESEARCH_TYPE_META_NAMES:
+            research_type = attrs_dict.get("content", "").strip().casefold()
+            if research_type in RESEARCH_TYPES:
+                self.research_type = research_type
+        elif name in RESEARCH_FRESHNESS_META_NAMES:
+            freshness = attrs_dict.get("content", "").strip().casefold()
+            if freshness in RESEARCH_FRESHNESS_VALUES:
+                self.research_freshness = freshness
         elif name in RESEARCH_PARENT_META_NAMES:
             parent_id = attrs_dict.get("content", "").strip().casefold()
             if RESEARCH_ID_RE.fullmatch(parent_id):
@@ -802,6 +836,8 @@ class FileSystemNotes(BaseNotes):
             primary_research_topic=context.primary_research_topic,
             research_id=context.research_id,
             research_origin=context.research_origin,
+            research_type=context.research_type,
+            research_freshness=context.research_freshness,
             parent_research_id=context.parent_research_id,
             summary=context.summary,
             heading_count=len(context.headings),
@@ -1165,6 +1201,8 @@ class FileSystemNotes(BaseNotes):
                 primary_research_topic=parser.primary_research_topic,
                 research_id=parser.research_id,
                 research_origin=parser.research_origin,
+                research_type=parser.research_type,
+                research_freshness=parser.research_freshness,
                 parent_research_id=parser.parent_research_id,
                 summary=summary,
                 headings=parser.headings,
@@ -1192,6 +1230,12 @@ class FileSystemNotes(BaseNotes):
                 "research_id": context.research_id if is_research else None,
                 "research_origin": (
                     context.research_origin if is_research else None
+                ),
+                "research_type": (
+                    context.research_type if is_research else None
+                ),
+                "research_freshness": (
+                    context.research_freshness if is_research else None
                 ),
                 "parent_research_id": (
                     context.parent_research_id if is_research else None
@@ -1258,6 +1302,10 @@ class FileSystemNotes(BaseNotes):
             lines.append(
                 f"Primary Research Topic: #{context.primary_research_topic}"
             )
+        if context.research_type:
+            lines.append(f"Research Type: {context.research_type}")
+        if context.research_freshness:
+            lines.append(f"Research Freshness: {context.research_freshness}")
         if context.parent_research_id:
             lines.append(f"Parent Research ID: {context.parent_research_id}")
         if context.summary:

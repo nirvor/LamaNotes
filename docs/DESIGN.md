@@ -77,12 +77,19 @@ class remain supported.
 `lamanote-kicker` is a short document type or date line.
 `lamanote-deck` is one compact orientation sentence. Both are optional. Do not
 manufacture a slogan or "overview" line for a note that does not need one.
+Research Notes may use the deck as an unlabeled introduction. Do not spend a
+line on `Introduction` when placement and composition already make that role
+clear.
 
 ### Summary
 
 `lamanote-summary` is for a real short answer, decision, or compact set of
 findings. It uses a quiet full frame. It is not a mandatory abstract and must
 not repeat the article.
+
+Research Brief V2 does not require this component. A type-specific result near
+the end may instead use normal prose, a recommendation, route result, action
+list, risk view, or assessment without a generic `Summary` heading.
 
 ### Major section
 
