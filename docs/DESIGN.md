@@ -117,9 +117,19 @@ Do not repeat the opening or add a generic conclusion paragraph after it.
 ### Major section
 
 Use `lamanote-section` for one major topic. Put its `h2` outside the optional
-`lamanote-section-card`. Related `h3` subsections, prose, lists, tables, and
-normal media stay together inside the card. A wide visual may follow the card
-as a section sibling when it needs the article width.
+`lamanote-section-card`. A section owns at most one visible surface:
+
+- use the section card for related prose, `h3` subsections, and lists when a
+  grouped surface improves the hierarchy;
+- when the main component is a visual, comparison table, callout, panel, or
+  result, keep that component as a direct section child and leave the
+  surrounding prose open;
+- never place a surfaced component inside a section card. The shared viewer
+  flattens this old pattern for compatibility, but new HTML must not produce it.
+
+This is the surface-ownership rule. A fine border around the meaningful object
+is enough. The reader should never see card, inner card, and a third SVG canvas
+for one idea.
 
 `lamanote-section-eyebrow` is an optional short role label such as `Evidence`,
 `Mechanism`, `Route`, or `Model limit`. It helps a long note scan without
@@ -157,6 +167,9 @@ are not status badges and are never a required sequence. The old
   explanatory images.
 - Use `lamanote-plot`, `lamanote-diagram`, `lamanote-map`, or
   `lamanote-schematic` with `lamanote-visual-frame`.
+- Add `lamanote-flow` to process and decision diagrams. It uses the compact
+  flow canvas and fine connector contract. Do not repeat the section heading as
+  a large title inside the SVG or draw a full-canvas background rectangle.
 - Add `lamanote-visual-wide` only when labels or panels need an intrinsic wide
   canvas. The medium then pans horizontally inside its frame. Caption and
   takeaway stay at article width. Its media focus target supports Left/Right,
@@ -172,9 +185,11 @@ for protocol breaks or important exceptions. Do not draw a continuous trend
 through incompatible measurements.
 
 Diagrams have a clear reading direction, named roles, consistent nodes and
-connectors, and visible gates or feedback where relevant. Colour and line style
-need a small legend only when they encode meaning. Illustration and measured
-evidence must stay distinguishable.
+connectors, and visible gates or feedback where relevant. Use short node labels,
+one optional secondary line, fine non-scaling strokes, and a compact layout
+grid. Most flow diagrams should fit in a roughly 52rem frame without using the
+full article height. Colour and line style need a small legend only when they
+encode meaning. Illustration and measured evidence must stay distinguishable.
 
 ### Links, sources, code, tables, and tags
 
@@ -190,9 +205,10 @@ Use `lamanote-comparison` for a decision table whose rows are genuinely
 comparable. Give it a caption with date, basis, and decision context. Use units
 and denominators in the cells, `scope` on row and column headers, and
 `data-preferred="true"` only when the prose has justified a preferred row.
-The component uses horizontal row rules and one quiet preferred-row fill rather
-than a classic full-grid spreadsheet treatment. Avoid checkmark matrices which
-hide trade-offs.
+The component uses one transparent table surface, horizontal row rules, and
+text weight or border emphasis for the preferred row. Header, first column, and
+preferred row must not create three different filled bands. Avoid checkmark
+matrices which hide trade-offs.
 
 Use `lamanote-steps` for bounded practical work. Each step states the action,
 the expected observation, and a stop or failure branch where relevant. The
@@ -255,6 +271,11 @@ Do not add:
 - giant hero titles or empty landing-page space;
 - filler KPIs, slogans, stock media, or decorative "insights";
 - one card per paragraph;
+- nested card, visual-frame, table, callout, panel, or result surfaces;
+- full-canvas SVG background rectangles and diagram titles which duplicate the
+  section heading;
+- tables which use a separate fill for the caption, header, first column, and
+  highlighted row;
 - permanent sidebars or folder trees;
 - coloured left or right callout brackets;
 - inline layout styles in generated notes;

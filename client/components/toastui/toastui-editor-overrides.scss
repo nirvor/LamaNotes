@@ -551,41 +551,48 @@
   padding: 1.12rem 1.22rem;
   border: 1px solid rgb(var(--theme-border) / 0.84);
   border-radius: var(--ln-radius-card);
-  background-color: rgb(var(--theme-background-elevated) / 0.46);
-  box-shadow: 0 0.28rem 1rem rgb(17 36 57 / 0.055);
+  background-color: rgb(var(--theme-background-elevated) / 0.38);
+  box-shadow: none;
 }
 
 .toastui-editor-contents
-  :is(.lamanote-section--key, .lamanote-research-section--key)
+  :is(
+    .lamanote-section--key,
+    .lamanote-research-section--key,
+    .lamanote-section--evidence,
+    .lamanote-research-section--evidence,
+    .lamanote-section--analysis,
+    .lamanote-research-section--analysis,
+    .lamanote-section--method,
+    .lamanote-research-section--method,
+    .lamanote-section--limits,
+    .lamanote-research-section--limits
+  )
   > .lamanote-section-card {
   border-color: rgb(var(--theme-border) / 0.88);
-  background-color: rgb(var(--theme-heading) / 0.035);
+  background-color: rgb(var(--theme-background-elevated) / 0.38);
 }
 
+// A section card is the surface, or its child component is the surface.
+// Never render both layers. The :has() fallback also flattens older notes
+// which still wrap a visual, table, callout, panel, or result.
 .toastui-editor-contents
-  :is(.lamanote-section--evidence, .lamanote-research-section--evidence)
-  > .lamanote-section-card {
-  background-color: rgb(var(--theme-background-elevated) / 0.34);
-}
-
-.toastui-editor-contents
-  :is(.lamanote-section--analysis, .lamanote-research-section--analysis)
-  > .lamanote-section-card {
-  border-color: rgb(var(--theme-border) / 0.88);
-  background-color: rgb(var(--theme-background-elevated) / 0.56);
-}
-
-.toastui-editor-contents
-  :is(.lamanote-section--method, .lamanote-research-section--method)
-  > .lamanote-section-card {
-  background-color: rgb(var(--theme-background-elevated) / 0.4);
-}
-
-.toastui-editor-contents
-  :is(.lamanote-section--limits, .lamanote-research-section--limits)
-  > .lamanote-section-card {
-  border-color: rgb(var(--theme-border) / 0.94);
-  background-color: rgb(var(--theme-background-elevated) / 0.64);
+  .lamanote-section-card:has(
+    > :is(
+      .lamanote-visual-frame,
+      .lamanote-comparison,
+      .lamanote-callout,
+      .lamanote-panel,
+      .lamanote-result,
+      .lamanote-summary,
+      .lamanote-link-card
+    )
+  ) {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .toastui-editor-contents .lamanote-section-card > :first-child {
@@ -849,21 +856,65 @@
   box-sizing: border-box;
   width: min(100%, var(--ln-visual-max));
   margin: 1.15rem auto;
-  padding: 0.72rem;
+  padding: 0.62rem 0.68rem;
   overflow-x: hidden;
   border: var(--ln-border-subtle);
   border-radius: var(--ln-radius-card);
-  background-color: rgb(var(--theme-background-elevated) / 0.38);
-  box-shadow: var(--ln-shadow-card);
+  background-color: rgb(var(--theme-background-elevated) / 0.24);
+  box-shadow: none;
 }
 
 .toastui-editor-contents .lamanote-section-card > .lamanote-visual-frame {
   width: 100%;
-  margin: 1.15rem 0 0.15rem;
-  padding: 0.84rem;
-  border: 0;
-  background-color: rgb(var(--theme-background) / 0.66);
-  box-shadow: inset 0 0 0 1px rgb(var(--theme-border) / 0.8);
+  margin: 1rem 0 0.15rem;
+}
+
+.toastui-editor-contents .lamanote-diagram.lamanote-flow {
+  width: min(100%, 52rem);
+  padding: 0.56rem 0.62rem;
+}
+
+.toastui-editor-contents .lamanote-flow svg {
+  max-height: 25rem;
+  shape-rendering: geometricPrecision;
+}
+
+.toastui-editor-contents .lamanote-flow .lamanote-flow-node {
+  fill: rgb(var(--theme-heading) / 0.045);
+  stroke: rgb(var(--theme-heading) / 0.45);
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.toastui-editor-contents .lamanote-flow .lamanote-flow-node--neutral {
+  fill: transparent;
+  stroke: rgb(var(--theme-border));
+}
+
+.toastui-editor-contents .lamanote-flow .lamanote-flow-node--alert {
+  fill: rgb(var(--theme-warning) / 0.055);
+  stroke: rgb(var(--theme-warning) / 0.68);
+}
+
+.toastui-editor-contents .lamanote-flow .lamanote-flow-link {
+  fill: none;
+  stroke: rgb(var(--theme-heading) / 0.82);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.toastui-editor-contents .lamanote-flow .lamanote-flow-link--alert {
+  stroke: rgb(var(--theme-warning) / 0.88);
+}
+
+.toastui-editor-contents .lamanote-flow .lamanote-flow-labels {
+  fill: rgb(var(--theme-text));
+  font-family: Poppins, Arial, sans-serif;
+  text-anchor: middle;
+}
+
+.toastui-editor-contents .lamanote-flow .lamanote-flow-detail {
+  fill: rgb(var(--ln-secondary-text));
 }
 
 .toastui-editor-contents .lamanote-visual-wide {
@@ -1009,7 +1060,7 @@
   border-collapse: separate;
   border-radius: var(--ln-radius-card);
   border-spacing: 0;
-  background-color: rgb(var(--theme-background) / 0.42);
+  background: transparent;
   scrollbar-width: thin;
 }
 
@@ -1029,7 +1080,8 @@
 
 .toastui-editor-contents .lamanote-comparison thead th {
   color: rgb(var(--theme-heading));
-  background-color: rgb(var(--theme-heading) / 0.065);
+  border-bottom-color: rgb(var(--theme-heading) / 0.28);
+  background: transparent;
 }
 
 .toastui-editor-contents .lamanote-comparison :is(th, td) {
@@ -1043,6 +1095,7 @@
 
 .toastui-editor-contents .lamanote-comparison tbody th {
   color: rgb(var(--theme-text));
+  background: transparent;
   font-weight: 600;
   text-align: left;
 }
@@ -1052,7 +1105,16 @@
   tbody
   tr[data-preferred="true"]
   > * {
-  background-color: rgb(var(--theme-heading) / 0.07);
+  border-bottom-color: rgb(var(--theme-heading) / 0.26);
+  background: transparent;
+}
+
+.toastui-editor-contents
+  .lamanote-comparison
+  tbody
+  tr[data-preferred="true"]
+  > th {
+  color: rgb(var(--theme-heading));
 }
 
 .toastui-editor-contents .lamanote-tags {

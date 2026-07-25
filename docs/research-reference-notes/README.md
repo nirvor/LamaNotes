@@ -10,9 +10,11 @@ The useful contract is the composition:
 - one shared LamaNotes visual language;
 - a different reasoning and result structure for each Note Type;
 - an editorial note header and, where useful, a compact fact strip;
-- quiet section eyebrows and restrained filled surfaces rather than a stack of
-  equal blue boxes;
+- quiet section eyebrows and at most one restrained surface for a content
+  group; a visual, table, callout, or result is never nested in another card;
 - modern comparison tables without spreadsheet-like vertical grids;
+- compact flow diagrams with short labels, fine connectors, and no redundant
+  diagram title inside an already titled section;
 - media which answers a named question;
 - a final type-specific result with the condition which changes it;
 - a canonical final tag line.

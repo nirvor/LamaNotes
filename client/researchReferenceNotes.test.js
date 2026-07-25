@@ -7,6 +7,68 @@ const referenceRoot = new URL(
   import.meta.url,
 );
 
+const surfacedComponents = new Set([
+  "lamanote-callout",
+  "lamanote-comparison",
+  "lamanote-link-card",
+  "lamanote-panel",
+  "lamanote-result",
+  "lamanote-summary",
+  "lamanote-visual-frame",
+]);
+
+function assertNoNestedSurfaces(html, type) {
+  const stack = [];
+  const voidElements = new Set([
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
+  ]);
+  const tagPattern = /<\/?([a-z][a-z0-9-]*)\b[^>]*>/gi;
+
+  for (const match of html.matchAll(tagPattern)) {
+    const source = match[0];
+    const tag = match[1].toLowerCase();
+    if (source.startsWith("</")) {
+      const index = stack.findLastIndex((entry) => entry.tag === tag);
+      if (index >= 0) {
+        stack.length = index;
+      }
+      continue;
+    }
+
+    const classes =
+      source
+        .match(/\bclass="([^"]*)"/)?.[1]
+        .split(/\s+/)
+        .filter(Boolean) || [];
+    if (
+      classes.some((className) => surfacedComponents.has(className)) &&
+      stack.some((entry) => entry.isSectionCard)
+    ) {
+      assert.fail(`${type} nests a surfaced component inside a section card`);
+    }
+
+    if (!source.endsWith("/>") && !voidElements.has(tag)) {
+      stack.push({
+        tag,
+        isSectionCard: classes.includes("lamanote-section-card"),
+      });
+    }
+  }
+}
+
 const fixtures = {
   research: {
     id: "lr-11111111111111111111111111111111",
@@ -66,8 +128,16 @@ for (const [type, contract] of Object.entries(fixtures)) {
     );
     assert.doesNotMatch(html, /\sstyle="/i);
     assert.doesNotMatch(html, /example\.com|attachments\/example/i);
+    assertNoNestedSurfaces(html, type);
     for (const component of contract.components) {
       assert.match(html, new RegExp(`\\b${component}\\b`));
+    }
+    if (type === "practical" || type === "aluhut") {
+      assert.match(html, /\blamanote-flow\b/);
+      assert.doesNotMatch(
+        html,
+        /<svg[\s\S]*?<rect[^>]+width="(?:820|900)"[^>]+height="(?:320|430|470)"/,
+      );
     }
   });
 }

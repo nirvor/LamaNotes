@@ -73,6 +73,13 @@ test("V2 tokens and legacy aliases stay in one design contract", () => {
   assert.match(viewerCss, /\.lamanote-comparison \{/);
   assert.match(viewerCss, /\.lamanote-steps \{/);
   assert.match(viewerCss, /\.lamanote-tags \{/);
+  assert.match(viewerCss, /\.lamanote-section-card:has\(\s*> :is\(/);
+  assert.match(viewerCss, /\.lamanote-diagram\.lamanote-flow \{/);
+  assert.match(viewerCss, /\.lamanote-flow \.lamanote-flow-node \{/);
+  assert.match(
+    viewerCss,
+    /\.lamanote-comparison tbody th \{[\s\S]*?background: transparent;/,
+  );
 });
 
 test("media preview is a modal keyboard boundary", () => {

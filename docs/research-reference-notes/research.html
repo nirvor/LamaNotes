@@ -90,181 +90,170 @@
       >
         <p class="lamanote-section-eyebrow">Evidenz</p>
         <h2>Der Mehrheitsgewinn ist real, aber bedingt</h2>
-        <div class="lamanote-section-card">
-          <p>
-            Die blaue Reihe folgt der Binomialrechnung für ungerade
-            Sensorzahlen. Die graue Reihe zeigt einen gemeinsamen Fehler, der
-            alle Kanäle gleichzeitig betrifft. Der Vergleich hält
-            Einzelkanal-Fehlerrate, Entscheidungsschwelle und Anzahl der
-            Messungen konstant.
-          </p>
+        <p>
+          Die blaue Reihe folgt der Binomialrechnung für ungerade Sensorzahlen.
+          Die graue Reihe zeigt einen gemeinsamen Fehler, der alle Kanäle
+          gleichzeitig betrifft. Der Vergleich hält Einzelkanal-Fehlerrate,
+          Entscheidungsschwelle und Anzahl der Messungen konstant.
+        </p>
 
-          <figure
-            class="lamanote-plot lamanote-visual-frame lamanote-visual-wide"
-            data-lamanotes-component="plot"
+        <figure
+          class="lamanote-plot lamanote-visual-frame lamanote-visual-wide"
+          data-lamanotes-component="plot"
+        >
+          <p class="lamanote-visual-question">
+            <strong>Frage:</strong> Wie verändert sich der Mehrheitsfehler mit
+            der Sensorzahl, wenn Fehler unabhängig oder gemeinsam sind?
+          </p>
+          <svg
+            viewBox="0 0 820 430"
+            role="img"
+            aria-labelledby="research-plot-title research-plot-desc"
           >
-            <p class="lamanote-visual-question">
-              <strong>Frage:</strong> Wie verändert sich der Mehrheitsfehler mit
-              der Sensorzahl, wenn Fehler unabhängig oder gemeinsam sind?
-            </p>
-            <svg
-              viewBox="0 0 820 430"
-              role="img"
-              aria-labelledby="research-plot-title research-plot-desc"
+            <title id="research-plot-title">
+              Mehrheitsfehler für einen, drei und fünf Sensoren
+            </title>
+            <desc id="research-plot-desc">
+              Die blaue Reihe fällt von 10 Prozent über 2,8 Prozent auf 0,86
+              Prozent. Die graue Reihe bleibt bei einem gemeinsamen Fehler auf
+              10 Prozent.
+            </desc>
+            <text
+              x="58"
+              y="38"
+              fill="rgb(var(--theme-text))"
+              font-family="Poppins, Arial, sans-serif"
+              font-size="22"
+              font-weight="600"
             >
-              <title id="research-plot-title">
-                Mehrheitsfehler für einen, drei und fünf Sensoren
-              </title>
-              <desc id="research-plot-desc">
-                Die blaue Reihe fällt von 10 Prozent über 2,8 Prozent auf 0,86
-                Prozent. Die graue Reihe bleibt bei einem gemeinsamen Fehler auf
-                10 Prozent.
-              </desc>
-              <rect
-                x="0"
-                y="0"
-                width="820"
-                height="430"
-                rx="8"
-                fill="rgb(var(--theme-background))"
-              />
-              <text
-                x="58"
-                y="38"
-                fill="rgb(var(--theme-text))"
-                font-family="Poppins, Arial, sans-serif"
-                font-size="22"
-                font-weight="600"
-              >
-                Mehrheitsfehler bei 10% Einzelkanalfehler
-              </text>
-              <text
-                x="58"
-                y="64"
-                fill="rgb(var(--theme-text-muted))"
-                font-family="Poppins, Arial, sans-serif"
-                font-size="15"
-              >
-                Synthetisches Modell, gleiche Schwelle und gleiche Messbasis
-              </text>
+              Mehrheitsfehler bei 10% Einzelkanalfehler
+            </text>
+            <text
+              x="58"
+              y="64"
+              fill="rgb(var(--theme-text-muted))"
+              font-family="Poppins, Arial, sans-serif"
+              font-size="15"
+            >
+              Synthetisches Modell, gleiche Schwelle und gleiche Messbasis
+            </text>
+            <line
+              x1="92"
+              y1="330"
+              x2="762"
+              y2="330"
+              stroke="rgb(var(--theme-border))"
+              stroke-width="2"
+            />
+            <line
+              x1="92"
+              y1="98"
+              x2="92"
+              y2="330"
+              stroke="rgb(var(--theme-border))"
+              stroke-width="2"
+            />
+            <g
+              fill="rgb(var(--theme-text-muted))"
+              font-family="Poppins, Arial, sans-serif"
+              font-size="14"
+            >
+              <text x="54" y="335">0%</text>
+              <text x="48" y="224">5%</text>
+              <text x="42" y="112">10%</text>
+              <text x="184" y="360">1 Sensor</text>
+              <text x="398" y="360">3 Sensoren</text>
+              <text x="620" y="360">5 Sensoren</text>
+            </g>
+            <g stroke="rgb(var(--theme-border))" stroke-width="1">
+              <line x1="92" y1="218" x2="762" y2="218" />
+              <line x1="92" y1="106" x2="762" y2="106" />
+            </g>
+            <polyline
+              points="220,106 440,267 660,311"
+              fill="none"
+              stroke="rgb(var(--theme-brand))"
+              stroke-width="5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <polyline
+              points="220,106 440,106 660,106"
+              fill="none"
+              stroke="rgb(var(--theme-text-muted))"
+              stroke-width="4"
+              stroke-dasharray="10 8"
+            />
+            <g fill="rgb(var(--theme-brand))">
+              <circle cx="220" cy="106" r="7" />
+              <circle cx="440" cy="267" r="7" />
+              <circle cx="660" cy="311" r="7" />
+            </g>
+            <g
+              fill="rgb(var(--theme-text))"
+              font-family="Poppins, Arial, sans-serif"
+              font-size="15"
+              font-weight="600"
+            >
+              <text x="202" y="90">10,0%</text>
+              <text x="422" y="250">2,8%</text>
+              <text x="640" y="294">0,86%</text>
+              <text x="530" y="94">gemeinsamer Fehler: 10,0%</text>
+            </g>
+            <line
+              x1="440"
+              y1="267"
+              x2="510"
+              y2="225"
+              stroke="rgb(var(--theme-heading))"
+              stroke-width="2"
+            />
+            <text
+              x="516"
+              y="218"
+              fill="rgb(var(--theme-heading))"
+              font-family="Poppins, Arial, sans-serif"
+              font-size="14"
+            >
+              Gewinn setzt Unabhängigkeit voraus
+            </text>
+            <g font-family="Poppins, Arial, sans-serif" font-size="14">
               <line
-                x1="92"
-                y1="330"
-                x2="762"
-                y2="330"
-                stroke="rgb(var(--theme-border))"
-                stroke-width="2"
-              />
-              <line
-                x1="92"
-                y1="98"
-                x2="92"
-                y2="330"
-                stroke="rgb(var(--theme-border))"
-                stroke-width="2"
-              />
-              <g
-                fill="rgb(var(--theme-text-muted))"
-                font-family="Poppins, Arial, sans-serif"
-                font-size="14"
-              >
-                <text x="54" y="335">0%</text>
-                <text x="48" y="224">5%</text>
-                <text x="42" y="112">10%</text>
-                <text x="184" y="360">1 Sensor</text>
-                <text x="398" y="360">3 Sensoren</text>
-                <text x="620" y="360">5 Sensoren</text>
-              </g>
-              <g stroke="rgb(var(--theme-border))" stroke-width="1">
-                <line x1="92" y1="218" x2="762" y2="218" />
-                <line x1="92" y1="106" x2="762" y2="106" />
-              </g>
-              <polyline
-                points="220,106 440,267 660,311"
-                fill="none"
+                x1="116"
+                y1="395"
+                x2="156"
+                y2="395"
                 stroke="rgb(var(--theme-brand))"
                 stroke-width="5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
               />
-              <polyline
-                points="220,106 440,106 660,106"
-                fill="none"
+              <text x="166" y="400" fill="rgb(var(--theme-text))">
+                unabhängige Fehler
+              </text>
+              <line
+                x1="396"
+                y1="395"
+                x2="436"
+                y2="395"
                 stroke="rgb(var(--theme-text-muted))"
                 stroke-width="4"
                 stroke-dasharray="10 8"
               />
-              <g fill="rgb(var(--theme-brand))">
-                <circle cx="220" cy="106" r="7" />
-                <circle cx="440" cy="267" r="7" />
-                <circle cx="660" cy="311" r="7" />
-              </g>
-              <g
-                fill="rgb(var(--theme-text))"
-                font-family="Poppins, Arial, sans-serif"
-                font-size="15"
-                font-weight="600"
-              >
-                <text x="202" y="90">10,0%</text>
-                <text x="422" y="250">2,8%</text>
-                <text x="640" y="294">0,86%</text>
-                <text x="530" y="94">gemeinsamer Fehler: 10,0%</text>
-              </g>
-              <line
-                x1="440"
-                y1="267"
-                x2="510"
-                y2="225"
-                stroke="rgb(var(--theme-heading))"
-                stroke-width="2"
-              />
-              <text
-                x="516"
-                y="218"
-                fill="rgb(var(--theme-heading))"
-                font-family="Poppins, Arial, sans-serif"
-                font-size="14"
-              >
-                Gewinn setzt Unabhängigkeit voraus
+              <text x="446" y="400" fill="rgb(var(--theme-text))">
+                gemeinsamer Fehler
               </text>
-              <g font-family="Poppins, Arial, sans-serif" font-size="14">
-                <line
-                  x1="116"
-                  y1="395"
-                  x2="156"
-                  y2="395"
-                  stroke="rgb(var(--theme-brand))"
-                  stroke-width="5"
-                />
-                <text x="166" y="400" fill="rgb(var(--theme-text))">
-                  unabhängige Fehler
-                </text>
-                <line
-                  x1="396"
-                  y1="395"
-                  x2="436"
-                  y2="395"
-                  stroke="rgb(var(--theme-text-muted))"
-                  stroke-width="4"
-                  stroke-dasharray="10 8"
-                />
-                <text x="446" y="400" fill="rgb(var(--theme-text))">
-                  gemeinsamer Fehler
-                </text>
-              </g>
-            </svg>
-            <p class="lamanote-visual-takeaway">
-              Der zusätzliche Kanal hilft gegen unabhängiges Rauschen. Er hilft
-              nicht gegen den gemeinsamen blinden Fleck.
-            </p>
-            <figcaption>
-              <strong>Abbildung 1.</strong> Synthetische Binomialrechnung für p
-              = 0,10 und ungerade Sensorzahlen. Die gestrichelte Reihe ist ein
-              bewusst harter Gegenfall vollständig korrelierter Fehler, kein
-              Messdatensatz.
-            </figcaption>
-          </figure>
-        </div>
+            </g>
+          </svg>
+          <p class="lamanote-visual-takeaway">
+            Der zusätzliche Kanal hilft gegen unabhängiges Rauschen. Er hilft
+            nicht gegen den gemeinsamen blinden Fleck.
+          </p>
+          <figcaption>
+            <strong>Abbildung 1.</strong> Synthetische Binomialrechnung für p =
+            0,10 und ungerade Sensorzahlen. Die gestrichelte Reihe ist ein
+            bewusst harter Gegenfall vollständig korrelierter Fehler, kein
+            Messdatensatz.
+          </figcaption>
+        </figure>
       </section>
 
       <section
