@@ -1740,7 +1740,7 @@ function getMermaidThemeVariables() {
   const text = getThemeColor("--theme-text", "#2c3139");
   const muted = getThemeColor("--theme-text-muted", "#8891a1");
   const border = getThemeColor("--theme-border", "#eceef0");
-  const brand = getThemeColor("--theme-brand", "#f8a66b");
+  const heading = getThemeColor("--theme-heading", "#2f6fb6");
 
   return {
     background,
@@ -1756,7 +1756,8 @@ function getMermaidThemeVariables() {
     primaryColor: "transparent",
     primaryTextColor: text,
     secondaryColor: "transparent",
-    tertiaryColor: brand,
+    tertiaryColor: "transparent",
+    tertiaryTextColor: heading,
     textColor: text,
   };
 }
@@ -1847,7 +1848,9 @@ function tightenMermaidFlowViewport(diagram) {
 
     if (
       !bounds ||
-      ![bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) ||
+      ![bounds.x, bounds.y, bounds.width, bounds.height].every(
+        Number.isFinite,
+      ) ||
       bounds.width <= 0 ||
       bounds.height <= 0
     ) {
@@ -1859,12 +1862,7 @@ function tightenMermaidFlowViewport(diagram) {
     const height = bounds.height + padding * 2;
     svgElement.setAttribute(
       "viewBox",
-      [
-        bounds.x - padding,
-        bounds.y - padding,
-        width,
-        height,
-      ].join(" "),
+      [bounds.x - padding, bounds.y - padding, width, height].join(" "),
     );
     svgElement.style.maxWidth = `${Math.ceil(width)}px`;
   };

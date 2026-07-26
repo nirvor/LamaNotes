@@ -81,6 +81,11 @@ test("V2 tokens and legacy aliases stay in one design contract", () => {
   assert.match(viewerCss, /\.lamanotes-mermaid-flow \.node rect \{/);
   assert.match(
     viewerCss,
+    /\.lamanotes-mermaid-flow \.cluster-label text \{[\s\S]*?fill: rgb\(var\(--theme-heading\)\) !important;[\s\S]*?font-size: 12px !important;/,
+  );
+  assert.match(renderSource, /tertiaryTextColor: heading/);
+  assert.match(
+    viewerCss,
     /\.lamanote-plot\.lamanote-visual-wide[\s\S]*?\.lamanote-plot-pair[\s\S]*?min-width: var\(--ln-wide-min\)/,
   );
   assert.match(
@@ -88,10 +93,7 @@ test("V2 tokens and legacy aliases stay in one design contract", () => {
     /\.lamanote-flow\.lamanote-visual-wide[\s\S]*?\.lamanotes-mermaid-wrapper[\s\S]*?min-width: var\(--ln-wide-min\)/,
   );
   assert.match(renderSource, /graphRoot\.getBBox\(\)/);
-  assert.match(
-    renderSource,
-    /svgElement\.setAttribute\(\s*"viewBox"/,
-  );
+  assert.match(renderSource, /svgElement\.setAttribute\(\s*"viewBox"/);
   assert.match(renderSource, /defaultRenderer: "dagre-wrapper"/);
   assert.match(renderSource, /wrappingWidth: 160/);
   assert.match(renderSource, /rectangle\.setAttribute\("rx", "0"\)/);

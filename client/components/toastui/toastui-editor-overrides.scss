@@ -922,9 +922,7 @@
   fill: rgb(var(--ln-secondary-text));
 }
 
-.toastui-editor-contents
-  .lamanote-research
-  figure.lamanote-visual-wide {
+.toastui-editor-contents .lamanote-research figure.lamanote-visual-wide {
   grid-template-columns: minmax(0, 1fr);
   justify-items: start;
   overflow-x: auto;
@@ -1984,6 +1982,20 @@ body.lamanotes-media-lightbox-open {
   fill: transparent !important;
   rx: 0 !important;
   ry: 0 !important;
+}
+
+.toastui-editor-contents .lamanotes-mermaid-flow .cluster-label text {
+  fill: rgb(var(--theme-heading)) !important;
+  font-size: 12px !important;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.toastui-editor-contents .lamanotes-mermaid-flow .cluster-label span {
+  color: rgb(var(--theme-heading)) !important;
+  font-size: 12px !important;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .toastui-editor-contents .lamanotes-mermaid-flow .nodeLabel {
