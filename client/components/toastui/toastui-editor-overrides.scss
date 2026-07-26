@@ -860,7 +860,7 @@
   overflow-x: hidden;
   border: var(--ln-border-subtle);
   border-radius: var(--ln-radius-card);
-  background-color: rgb(var(--theme-background-elevated) / 0.24);
+  background-color: transparent;
   box-shadow: none;
 }
 
@@ -880,10 +880,15 @@
 }
 
 .toastui-editor-contents .lamanote-flow .lamanote-flow-node {
-  fill: rgb(var(--theme-heading) / 0.045);
+  fill: transparent;
   stroke: rgb(var(--theme-heading) / 0.45);
   stroke-width: 1.25;
   vector-effect: non-scaling-stroke;
+}
+
+.toastui-editor-contents .lamanote-flow .lamanote-flow-node--emphasis {
+  fill: rgb(var(--theme-heading) / 0.075);
+  stroke: rgb(var(--theme-heading) / 0.68);
 }
 
 .toastui-editor-contents .lamanote-flow .lamanote-flow-node--neutral {
@@ -917,7 +922,9 @@
   fill: rgb(var(--ln-secondary-text));
 }
 
-.toastui-editor-contents .lamanote-visual-wide {
+.toastui-editor-contents
+  .lamanote-research
+  figure.lamanote-visual-wide {
   grid-template-columns: minmax(0, 1fr);
   justify-items: start;
   overflow-x: auto;
@@ -925,7 +932,9 @@
   scrollbar-width: thin;
 }
 
-.toastui-editor-contents .lamanote-visual-wide:focus-visible {
+.toastui-editor-contents
+  .lamanote-research
+  figure.lamanote-visual-wide:focus-visible {
   outline: 2px solid rgb(var(--theme-brand));
   outline-offset: 2px;
 }
@@ -979,6 +988,60 @@
   width: 100%;
   max-height: none;
   object-fit: contain;
+}
+
+.toastui-editor-contents .lamanote-plot-pair {
+  display: grid;
+  width: 100%;
+}
+
+.toastui-editor-contents .lamanote-plot-pair > .lamanote-plot-image {
+  grid-area: 1 / 1;
+  width: 100%;
+  max-width: 100%;
+}
+
+.toastui-editor-contents .lamanote-plot-image--dark {
+  display: none !important;
+}
+
+body.dark
+  .toastui-editor-contents
+  .lamanote-plot-pair
+  > .lamanote-plot-image--light {
+  display: none !important;
+}
+
+body.dark
+  .toastui-editor-contents
+  .lamanote-plot-pair
+  > .lamanote-plot-image--dark {
+  display: block !important;
+}
+
+// Research Note surfaces use one square, quiet geometry. Controls elsewhere
+// keep their compact product radius.
+.toastui-editor-contents
+  .lamanote-research
+  :is(
+    .lamanote-section-card,
+    .lamanote-visual-frame,
+    .lamanote-summary,
+    .lamanote-result,
+    .lamanote-panel,
+    .lamanote-callout,
+    .lamanote-link-card,
+    .lamanote-comparison
+  ) {
+  border-radius: 0;
+}
+
+.toastui-editor-contents
+  .lamanote-research
+  :is(.lamanote-flow, .lamanote-plot)
+  rect {
+  rx: 0 !important;
+  ry: 0 !important;
 }
 
 .toastui-editor-contents .lamanote-visual-frame figcaption {
@@ -1339,8 +1402,20 @@
   }
 
   .toastui-editor-contents .lamanote-visual-wide > svg,
-  .toastui-editor-contents .lamanote-visual-wide > img {
+  .toastui-editor-contents .lamanote-visual-wide > img,
+  .toastui-editor-contents
+    .lamanote-plot.lamanote-visual-wide
+    > .lamanote-plot-pair,
+  .toastui-editor-contents
+    .lamanote-flow.lamanote-visual-wide
+    .lamanotes-mermaid-wrapper {
     min-width: var(--ln-wide-min);
+  }
+
+  .toastui-editor-contents
+    .lamanote-research
+    :is(.lamanote-section-card, .lamanote-visual-frame) {
+    border-radius: 0;
   }
 
   .toastui-editor-contents .lamanote-hero img,
@@ -1872,6 +1947,7 @@ body.lamanotes-media-lightbox-open {
 
 // Mermaid diagrams
 .toastui-editor-contents .lamanotes-mermaid-wrapper {
+  width: 100%;
   margin: 1rem 0;
   padding: 0.65rem 0;
   max-width: 100%;
@@ -1883,6 +1959,7 @@ body.lamanotes-media-lightbox-open {
 }
 
 .toastui-editor-contents .lamanotes-mermaid-diagram {
+  width: 100%;
   min-width: min-content;
 }
 
@@ -1895,6 +1972,28 @@ body.lamanotes-media-lightbox-open {
 
 .toastui-editor-contents .lamanotes-mermaid-diagram text {
   font-family: "Poppins", sans-serif !important;
+}
+
+.toastui-editor-contents .lamanotes-mermaid-flow .node rect {
+  fill: transparent !important;
+  rx: 0 !important;
+  ry: 0 !important;
+}
+
+.toastui-editor-contents .lamanotes-mermaid-flow .cluster rect {
+  fill: transparent !important;
+  rx: 0 !important;
+  ry: 0 !important;
+}
+
+.toastui-editor-contents .lamanotes-mermaid-flow .nodeLabel {
+  font-size: 14px !important;
+  line-height: 1.25;
+}
+
+.toastui-editor-contents .lamanotes-mermaid-flow .edgeLabel {
+  color: rgb(var(--ln-secondary-text));
+  font-size: 12px !important;
 }
 
 // Bottom tag assistant

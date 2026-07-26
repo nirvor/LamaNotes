@@ -48,10 +48,17 @@ test("plot and diagram scaffolds carry the visual quality contract", () => {
   const wideDiagram = getHtmlSnippet("wide-diagram");
 
   assert.match(plot, /lamanote-plot lamanote-visual-frame/);
+  assert.match(plot, /data-lamanotes-plot-engine="plotly"/);
+  assert.match(plot, /example-plot-light\.svg/);
+  assert.match(plot, /example-plot-dark\.svg/);
+  assert.match(plot, /legend, axis titles, ticks, scale rationale/);
   assert.match(plot, /lamanote-visual-question/);
   assert.match(plot, /lamanote-visual-takeaway/);
   assert.match(plot, /quantities and units/);
   assert.match(diagram, /lamanote-diagram lamanote-flow lamanote-visual-frame/);
+  assert.match(diagram, /class="language-mermaid"/);
+  assert.match(diagram, /A\["Input"\]/);
+  assert.match(diagram, /rectangular unfilled nodes/);
   assert.match(diagram, /flow direction/);
   assert.doesNotMatch(diagram, /lamanote-visual-wide/);
   assert.match(

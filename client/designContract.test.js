@@ -76,6 +76,25 @@ test("V2 tokens and legacy aliases stay in one design contract", () => {
   assert.match(viewerCss, /\.lamanote-section-card:has\(\s*> :is\(/);
   assert.match(viewerCss, /\.lamanote-diagram\.lamanote-flow \{/);
   assert.match(viewerCss, /\.lamanote-flow \.lamanote-flow-node \{/);
+  assert.match(viewerCss, /\.lamanote-research[\s\S]*?border-radius: 0;/);
+  assert.match(viewerCss, /\.lamanote-plot-pair \{/);
+  assert.match(viewerCss, /\.lamanotes-mermaid-flow \.node rect \{/);
+  assert.match(
+    viewerCss,
+    /\.lamanote-plot\.lamanote-visual-wide[\s\S]*?\.lamanote-plot-pair[\s\S]*?min-width: var\(--ln-wide-min\)/,
+  );
+  assert.match(
+    viewerCss,
+    /\.lamanote-flow\.lamanote-visual-wide[\s\S]*?\.lamanotes-mermaid-wrapper[\s\S]*?min-width: var\(--ln-wide-min\)/,
+  );
+  assert.match(renderSource, /graphRoot\.getBBox\(\)/);
+  assert.match(
+    renderSource,
+    /svgElement\.setAttribute\(\s*"viewBox"/,
+  );
+  assert.match(renderSource, /defaultRenderer: "dagre-wrapper"/);
+  assert.match(renderSource, /wrappingWidth: 160/);
+  assert.match(renderSource, /rectangle\.setAttribute\("rx", "0"\)/);
   assert.match(
     viewerCss,
     /\.lamanote-comparison tbody th \{[\s\S]*?background: transparent;/,
@@ -102,7 +121,7 @@ test("wide visuals expose bounded keyboard panning", () => {
   );
   assert.match(renderSource, /"ArrowLeft ArrowRight Home End"/);
   assert.match(renderSource, /visual\.scrollLeft = visual\.scrollWidth/);
-  assert.match(viewerCss, /\.lamanote-visual-wide:focus-visible/);
+  assert.match(viewerCss, /figure\.lamanote-visual-wide:focus-visible/);
 });
 
 test("comparison tables expose bounded keyboard panning", () => {

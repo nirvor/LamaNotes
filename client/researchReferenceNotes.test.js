@@ -134,10 +134,19 @@ for (const [type, contract] of Object.entries(fixtures)) {
     }
     if (type === "practical" || type === "aluhut") {
       assert.match(html, /\blamanote-flow\b/);
+      assert.match(html, /class="language-mermaid"/);
+      assert.doesNotMatch(html, /<figure[^>]+lamanote-flow[\s\S]*?<svg/);
       assert.doesNotMatch(
         html,
         /<svg[\s\S]*?<rect[^>]+width="(?:820|900)"[^>]+height="(?:320|430|470)"/,
       );
     }
+    if (contract.components.includes("lamanote-plot")) {
+      assert.match(html, /data-lamanotes-plot-engine="plotly"/);
+      assert.match(html, /lamanote-plot-image--light/);
+      assert.match(html, /lamanote-plot-image--dark/);
+      assert.doesNotMatch(html, /<figure[^>]+lamanote-plot[\s\S]*?<svg/);
+    }
+    assert.doesNotMatch(html, /\brx="[1-9]/);
   });
 }

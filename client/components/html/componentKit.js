@@ -213,9 +213,12 @@ export const htmlComponentSnippets = [
     body: () => `
 <figure class="lamanote-plot lamanote-visual-frame" data-lamanotes-component="plot">
   <p class="lamanote-visual-question"><strong>Question:</strong> State the quantitative comparison this plot answers.</p>
-  <img src="attachments/example-plot.png" alt="Describe the variables, comparison, direction, and important exception" loading="lazy" decoding="async">
+  <div class="lamanote-plot-pair" data-lamanotes-plot-engine="plotly">
+    <img class="lamanote-plot-image lamanote-plot-image--light" src="attachments/example-plot-light.svg" alt="Describe the variables, comparison, direction, scale, and important exception" loading="lazy" decoding="async">
+    <img class="lamanote-plot-image lamanote-plot-image--dark" src="attachments/example-plot-dark.svg" alt="Describe the variables, comparison, direction, scale, and important exception" loading="lazy" decoding="async">
+  </div>
   <p class="lamanote-visual-takeaway">Takeaway: state the one relationship the reader should retain.</p>
-  <figcaption><strong>Figure 1.</strong> Define quantities and units, date the evidence, state important assumptions or uncertainty, and link the direct source.</figcaption>
+  <figcaption><strong>Figure 1.</strong> Export the inspected Plotly figure through the shared Research toolkit. Keep the legend, axis titles, ticks, scale rationale, quantities and units, evidence date, assumptions or uncertainty, and a direct source.</figcaption>
 </figure>
 `,
   },
@@ -224,9 +227,13 @@ export const htmlComponentSnippets = [
     label: "Diagram",
     body: () => `
 <figure class="lamanote-diagram lamanote-flow lamanote-visual-frame" data-lamanotes-component="diagram">
-  <img src="attachments/example-diagram.png" alt="Describe the actors, flow direction, decision points, and final outcomes" loading="lazy" decoding="async">
+  <pre><code class="language-mermaid">flowchart LR
+    A["Input"] --> B["Process"]
+    B --> C["Verification"]
+    C --> D["Decision"]
+    D --> E["Outcome"]</code></pre>
   <p class="lamanote-visual-takeaway">Takeaway: explain what the architecture or mechanism changes.</p>
-  <figcaption><strong>Figure 2.</strong> Name the flow direction, define color meaning, and distinguish measured structure from illustration.</figcaption>
+  <figcaption><strong>Figure 2.</strong> Use the shared Mermaid renderer, short labels, rectangular unfilled nodes, clean connectors, one flow direction, and color only when it encodes meaning. Distinguish evidence-derived structure from illustration.</figcaption>
 </figure>
 `,
   },
@@ -235,9 +242,10 @@ export const htmlComponentSnippets = [
     label: "Wide diagram",
     body: () => `
 <figure class="lamanote-diagram lamanote-flow lamanote-visual-frame lamanote-visual-wide" data-lamanotes-component="diagram">
-  <img src="attachments/example-wide-diagram.png" alt="Describe each lane, the left-to-right flow, decision points, feedback, and final outcomes" loading="lazy" decoding="async">
+  <pre><code class="language-mermaid">flowchart LR
+    A["Input"] --> B["Process"] --> C["Verification"] --> D["Decision"] --> E["Outcome"]</code></pre>
   <p class="lamanote-visual-takeaway">Takeaway: explain what the architecture or mechanism changes.</p>
-  <figcaption><strong>Figure 2.</strong> Use this wide variant only when readable labels require local horizontal panning.</figcaption>
+  <figcaption><strong>Figure 2.</strong> Keep the same rectangular Mermaid grammar. Use this wide variant only when readable labels require local horizontal panning.</figcaption>
 </figure>
 `,
   },

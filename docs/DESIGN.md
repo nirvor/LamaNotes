@@ -184,12 +184,30 @@ rows, units, readable labels, exact values for small datasets, and annotations
 for protocol breaks or important exceptions. Do not draw a continuous trend
 through incompatible measurements.
 
+Research plots use the shared Python Plotly/Kaleido construction toolkit. The
+toolkit is a quality floor rather than one chart template: plot form, facets,
+uncertainty and annotations still follow the evidence. Every final Research
+plot has a visible titled legend, descriptive axis titles, outside ticks,
+restrained grid lines, a deliberate scale, and a documented source/date basis.
+Ordinary magnitude bars start at zero. A truncated or non-zero axis is allowed
+only when the scientific question requires it and the caption says why. Export
+matching light and dark SVGs from the same figure and use the shared
+`lamanote-plot-pair` wrapper.
+
 Diagrams have a clear reading direction, named roles, consistent nodes and
 connectors, and visible gates or feedback where relevant. Use short node labels,
 one optional secondary line, fine non-scaling strokes, and a compact layout
 grid. Most flow diagrams should fit in a roughly 52rem frame without using the
 full article height. Colour and line style need a small legend only when they
 encode meaning. Illustration and measured evidence must stay distinguishable.
+
+Research flow and decision diagrams use the shared Mermaid renderer by default.
+It provides a common Dagre layout, 14px node type, linear connectors, compact
+node/rank spacing, bounded wrapping, transparent clusters, and rectangular
+nodes. Nodes are unfilled unless a fill encodes a necessary gate, warning,
+state, or comparison. Hand-written SVG remains appropriate for a genuine
+scientific schematic or geometry which Mermaid cannot express, but it must
+follow the same square-node, label and surface rules.
 
 ### Links, sources, code, tables, and tags
 
@@ -283,6 +301,11 @@ Do not add:
 - note-specific global CSS for one new article;
 - body-level horizontal scrolling;
 - multiple icon sets or emoji product icons.
+
+Inside Research Note visuals, do not add rounded node rectangles, rounded bars,
+or a second plot/diagram canvas. Research Note cards and visual frames use
+square geometry; compact product controls elsewhere may keep their normal
+radius.
 
 Large legacy note-specific styles remain scoped for compatibility. They are not
 templates for new work.

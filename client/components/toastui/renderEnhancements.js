@@ -1737,7 +1737,6 @@ function getThemeColor(name, fallback) {
 
 function getMermaidThemeVariables() {
   const background = getThemeColor("--theme-background", "#ffffff");
-  const elevated = getThemeColor("--theme-background-elevated", "#f3f4f5");
   const text = getThemeColor("--theme-text", "#2c3139");
   const muted = getThemeColor("--theme-text-muted", "#8891a1");
   const border = getThemeColor("--theme-border", "#eceef0");
@@ -1745,17 +1744,18 @@ function getMermaidThemeVariables() {
 
   return {
     background,
-    clusterBkg: background,
+    clusterBkg: "transparent",
     clusterBorder: border,
     fontFamily: "Poppins, sans-serif",
+    fontSize: "14px",
     lineColor: muted,
-    mainBkg: elevated,
-    noteBkg: elevated,
+    mainBkg: "transparent",
+    noteBkg: "transparent",
     noteTextColor: text,
     primaryBorderColor: border,
-    primaryColor: elevated,
+    primaryColor: "transparent",
     primaryTextColor: text,
-    secondaryColor: background,
+    secondaryColor: "transparent",
     tertiaryColor: brand,
     textColor: text,
   };
@@ -1769,8 +1769,15 @@ async function getMermaidInstance() {
 
   mermaidInstance.initialize({
     flowchart: {
+      curve: "linear",
+      defaultRenderer: "dagre-wrapper",
+      diagramPadding: 8,
       htmlLabels: false,
+      nodeSpacing: 28,
+      padding: 10,
+      rankSpacing: 42,
       useMaxWidth: true,
+      wrappingWidth: 160,
     },
     securityLevel: "strict",
     sequence: {
@@ -1823,6 +1830,50 @@ function getMermaidSource(preElement) {
   ).trim();
 }
 
+function tightenMermaidFlowViewport(diagram) {
+  const svgElement = diagram.querySelector("svg");
+  const graphRoot = svgElement?.querySelector("g.root");
+  if (!svgElement || !graphRoot || typeof graphRoot.getBBox !== "function") {
+    return;
+  }
+
+  const measure = () => {
+    let bounds;
+    try {
+      bounds = graphRoot.getBBox();
+    } catch {
+      return;
+    }
+
+    if (
+      !bounds ||
+      ![bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) ||
+      bounds.width <= 0 ||
+      bounds.height <= 0
+    ) {
+      return;
+    }
+
+    const padding = 14;
+    const width = bounds.width + padding * 2;
+    const height = bounds.height + padding * 2;
+    svgElement.setAttribute(
+      "viewBox",
+      [
+        bounds.x - padding,
+        bounds.y - padding,
+        width,
+        height,
+      ].join(" "),
+    );
+    svgElement.style.maxWidth = `${Math.ceil(width)}px`;
+  };
+
+  const scheduleMeasurement = () => window.requestAnimationFrame(measure);
+  scheduleMeasurement();
+  document.fonts?.ready.then(scheduleMeasurement).catch(() => {});
+}
+
 async function renderMermaidBlock(preElement, mermaid) {
   const mermaidSource = getMermaidSource(preElement);
   if (!mermaidSource) {
@@ -1852,9 +1903,19 @@ async function renderMermaidBlock(preElement, mermaid) {
   diagram.className = mermaidDiagramClass;
   diagram.setAttribute("data-mermaid-source", mermaidSource);
   diagram.innerHTML = svg;
+  if (/^\s*(?:flowchart|graph)\b/i.test(mermaidSource)) {
+    diagram.classList.add("lamanotes-mermaid-flow");
+    diagram.querySelectorAll("rect").forEach((rectangle) => {
+      rectangle.setAttribute("rx", "0");
+      rectangle.setAttribute("ry", "0");
+    });
+  }
 
   wrapper.append(diagram);
   preElement.replaceWith(wrapper);
+  if (diagram.classList.contains("lamanotes-mermaid-flow")) {
+    tightenMermaidFlowViewport(diagram);
+  }
   renderedDiagram.bindFunctions?.(diagram);
 }
 

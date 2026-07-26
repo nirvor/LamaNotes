@@ -104,139 +104,16 @@
             <strong>Frage:</strong> Welche Beobachtung würde zwischen Router-
             und Licht-Erklärung unterscheiden?
           </p>
-          <svg
-            viewBox="0 0 820 320"
-            role="img"
-            aria-labelledby="aluhut-flow-title aluhut-flow-desc"
-          >
-            <title id="aluhut-flow-title">
-              Kreuztest für Router- und Licht-Erklärung
-            </title>
-            <desc id="aluhut-flow-desc">
-              Nach einer Baseline werden Router und Attrappe seitenweise
-              getauscht, während Licht und Pflanze unverändert bleiben. Wachstum
-              zum Router stützt die Funkhypothese, Wachstum zum Fenster die
-              Lichthypothese. Uneinheitliche Ergebnisse bleiben offen.
-            </desc>
-            <defs>
-              <marker
-                id="aluhut-arrow"
-                markerWidth="7"
-                markerHeight="7"
-                refX="6"
-                refY="3"
-                orient="auto"
-                markerUnits="strokeWidth"
-              >
-                <path d="M0,0 L0,6 L7,3 z" fill="rgb(var(--theme-heading))" />
-              </marker>
-            </defs>
-
-            <g>
-              <rect
-                class="lamanote-flow-node"
-                x="24"
-                y="32"
-                width="190"
-                height="58"
-                rx="6"
-              />
-              <rect
-                class="lamanote-flow-node"
-                x="315"
-                y="32"
-                width="190"
-                height="58"
-                rx="6"
-              />
-              <rect
-                class="lamanote-flow-node"
-                x="606"
-                y="32"
-                width="190"
-                height="58"
-                rx="6"
-              />
-              <rect
-                class="lamanote-flow-node"
-                x="34"
-                y="214"
-                width="220"
-                height="68"
-                rx="6"
-              />
-              <rect
-                class="lamanote-flow-node lamanote-flow-node--neutral"
-                x="300"
-                y="214"
-                width="220"
-                height="68"
-                rx="6"
-              />
-              <rect
-                class="lamanote-flow-node lamanote-flow-node--neutral"
-                x="566"
-                y="214"
-                width="220"
-                height="68"
-                rx="6"
-              />
-            </g>
-
-            <g marker-end="url(#aluhut-arrow)">
-              <line
-                class="lamanote-flow-link"
-                x1="214"
-                y1="61"
-                x2="305"
-                y2="61"
-              />
-              <line
-                class="lamanote-flow-link"
-                x1="505"
-                y1="61"
-                x2="596"
-                y2="61"
-              />
-              <path class="lamanote-flow-link" d="M701 90 V158 H144 V204" />
-              <path class="lamanote-flow-link" d="M701 158 H410 V204" />
-              <path class="lamanote-flow-link" d="M701 158 H676 V204" />
-            </g>
-
-            <g class="lamanote-flow-labels" font-size="13">
-              <text x="119" y="56" font-weight="600">Baseline</text>
-              <text class="lamanote-flow-detail" x="119" y="75" font-size="11">
-                Winkel, Licht, Wärme
-              </text>
-              <text x="410" y="56" font-weight="600">Verdeckter Tausch</text>
-              <text class="lamanote-flow-detail" x="410" y="75" font-size="11">
-                Router links/rechts, Attrappe
-              </text>
-              <text x="701" y="56" font-weight="600">Neue Triebe messen</text>
-              <text class="lamanote-flow-detail" x="701" y="75" font-size="11">
-                vorab definierter Winkel
-              </text>
-
-              <text x="144" y="238" font-size="12" font-weight="600">
-                Trieb folgt Router
-              </text>
-              <text class="lamanote-flow-detail" x="144" y="257" font-size="11">
-                Funkhypothese gewinnt an Gewicht
-              </text>
-              <text x="410" y="238" font-size="12" font-weight="600">
-                Trieb folgt Fenster
-              </text>
-              <text class="lamanote-flow-detail" x="410" y="257" font-size="11">
-                Licht erklärt das Muster besser
-              </text>
-              <text x="676" y="238" font-size="12" font-weight="600">
-                Kein stabiles Muster
-              </text>
-              <text class="lamanote-flow-detail" x="676" y="257" font-size="11">
-                Test bleibt offen oder zu schwach
-              </text>
-            </g>
-          </svg>
+          <pre><code class="language-mermaid">flowchart LR
+    B["Baseline messen"] --> T["Router und Attrappe tauschen"]
+    T --> M["Neue Triebe messen"]
+    M --> R["Trieb folgt Router"]
+    M --> L["Trieb folgt Fenster"]
+    M --> U["Kein stabiles Muster"]
+    classDef method fill:transparent,stroke:#2f6fb6,stroke-width:2px;
+    classDef open fill:transparent,stroke:#a96d17,stroke-width:2px;
+    class B,T,M method;
+    class R,L,U open;</code></pre>
           <p class="lamanote-visual-takeaway">
             Der faire Test verschiebt nur den behaupteten Auslöser. Die
             konkurrierende Lichtquelle bleibt als Referenz stehen.
