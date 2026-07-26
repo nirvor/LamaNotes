@@ -13,7 +13,7 @@ import {
   supportsNativeFileBridge,
 } from "./externalFiles.js";
 import {
-  loadDesktopFileSession,
+  loadHostDesktopFileSession,
   loadDesktopRouteSession,
   saveDesktopRouteSession,
 } from "./desktopSession.js";
@@ -74,7 +74,7 @@ async function restoreNativeFileSession() {
   ) {
     return false;
   }
-  const session = loadDesktopFileSession();
+  const session = await loadHostDesktopFileSession();
   if (!session?.paths?.length) {
     return false;
   }

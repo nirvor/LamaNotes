@@ -41,6 +41,8 @@ LEGACY_APP_NAME = "NirvNotes"
 WEBVIEW_PROFILE = "WebView2"
 DEFAULT_PROXY_PORT = 31992
 WINDOW_STATE_FILE = "window-state.json"
+DESKTOP_FILE_SESSION_FILE = "desktop-file-session.json"
+DESKTOP_FILE_SESSION_MAX_PATHS = 16
 LOG_FILE = "lamanotes-client.log"
 INSTANCE_DIR = "instances"
 HANDOFF_TIMEOUT_SECONDS = 0.35
@@ -752,6 +754,19 @@ class LamaNotesApi:
     def restore_native_files(self, paths: list[str]) -> list[dict[str, Any]]:
         return self._file_store.payloads_for_paths(paths)
 
+    def load_desktop_file_session(self) -> dict[str, Any] | None:
+        return read_desktop_file_session()
+
+    def save_desktop_file_session(
+        self,
+        session: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        return write_desktop_file_session(session)
+
+    def clear_desktop_file_session(self) -> dict[str, bool]:
+        remove_desktop_file_session()
+        return {"cleared": True}
+
     def poll_native_file_changes(self) -> list[dict[str, Any]]:
         return self._file_store.poll_changes()
 
@@ -1017,6 +1032,110 @@ def atomic_write(path: Path, raw: bytes) -> None:
     finally:
         with contextlib.suppress(OSError):
             temporary_path.unlink()
+
+
+def desktop_file_session_path() -> Path:
+    return local_app_root() / DESKTOP_FILE_SESSION_FILE
+
+
+def normalize_desktop_file_session(
+    session: Any,
+) -> dict[str, Any] | None:
+    if not isinstance(session, dict):
+        return None
+
+    paths: list[str] = []
+    seen: set[str] = set()
+    raw_paths = session.get("paths")
+    if not isinstance(raw_paths, list):
+        return None
+    for raw_path in raw_paths:
+        if not isinstance(raw_path, str):
+            continue
+        path = raw_path.strip()
+        if not path:
+            continue
+        key = normalized_path_key(Path(path))
+        if key in seen:
+            continue
+        seen.add(key)
+        paths.append(path)
+        if len(paths) >= DESKTOP_FILE_SESSION_MAX_PATHS:
+            break
+    if not paths:
+        return None
+
+    raw_active_path = session.get("activePath")
+    active_key = (
+        normalized_path_key(Path(raw_active_path.strip()))
+        if isinstance(raw_active_path, str) and raw_active_path.strip()
+        else ""
+    )
+    active_path = next(
+        (
+            path
+            for path in paths
+            if active_key and normalized_path_key(Path(path)) == active_key
+        ),
+        paths[0],
+    )
+
+    raw_saved_at = session.get("savedAt")
+    try:
+        saved_at = max(0, int(raw_saved_at))
+    except (TypeError, ValueError, OverflowError):
+        saved_at = int(time.time() * 1000)
+
+    return {
+        "paths": paths,
+        "activePath": active_path,
+        "editMode": bool(session.get("editMode")),
+        "savedAt": saved_at,
+    }
+
+
+def read_desktop_file_session() -> dict[str, Any] | None:
+    path = desktop_file_session_path()
+    try:
+        session = json.loads(path.read_text(encoding="utf-8-sig"))
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        with contextlib.suppress(OSError):
+            path.unlink()
+        return None
+
+    normalized = normalize_desktop_file_session(session)
+    if normalized is None:
+        with contextlib.suppress(OSError):
+            path.unlink()
+    return normalized
+
+
+def write_desktop_file_session(
+    session: Any,
+) -> dict[str, Any] | None:
+    normalized = normalize_desktop_file_session(session)
+    if normalized is None:
+        remove_desktop_file_session()
+        return None
+
+    current = read_desktop_file_session()
+    if current and current["savedAt"] > normalized["savedAt"]:
+        return current
+
+    raw = json.dumps(
+        normalized,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    atomic_write(desktop_file_session_path(), raw)
+    return normalized
+
+
+def remove_desktop_file_session() -> None:
+    with contextlib.suppress(OSError):
+        desktop_file_session_path().unlink()
 
 
 def resource_path(relative_path: str) -> str:

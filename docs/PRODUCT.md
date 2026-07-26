@@ -57,6 +57,8 @@ responsive rules and anti-patterns for every host and note type.
 - LamaNotes has one active note per application window. An explicit app launch
   without a file may create another independent window, including on another
   Windows virtual desktop; it does not create tabs or another sync layer.
+- A normal app launch reopens the last Workspace file recorded on that PC,
+  independent of which local proxy port or LamaNotes window opened it.
 - Opening another local file or Library note in a window replaces it after
   Save, Discard or Cancel when the current note has unsaved changes. A Windows
   file launch hands one path to the most recently active LamaNotes window.

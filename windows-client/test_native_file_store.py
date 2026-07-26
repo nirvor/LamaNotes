@@ -30,11 +30,14 @@ from lamanotes_client import (
     migrate_legacy_local_state,
     paths_from_native_drop_event,
     register_native_file_drop,
+    read_desktop_file_session,
+    remove_desktop_file_session,
     resolve_update_url,
     start_local_proxy,
     updater_process_creation_flags,
     validate_update_response_url,
     validate_windows_update_archive,
+    write_desktop_file_session,
 )
 from update_manifest import (
     UPDATE_SIGNATURE_ALGORITHM,
@@ -395,6 +398,83 @@ class LamaNotesApiTests(unittest.TestCase):
 
 
 class NativeShellIntegrationTests(unittest.TestCase):
+    def test_desktop_file_session_round_trips_atomically(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "desktop-file-session.json"
+            session = {
+                "paths": [
+                    "C:/work/latest.md",
+                    "C:/work/latest.md",
+                    "",
+                ],
+                "activePath": "C:/work/latest.md",
+                "editMode": True,
+                "savedAt": 200,
+            }
+            with patch(
+                "lamanotes_client.desktop_file_session_path",
+                return_value=path,
+            ):
+                saved = write_desktop_file_session(session)
+                loaded = read_desktop_file_session()
+
+            self.assertEqual(saved, loaded)
+            self.assertEqual(loaded["paths"], ["C:/work/latest.md"])
+            self.assertTrue(loaded["editMode"])
+            self.assertFalse(list(Path(directory).glob(f".{path.name}.*.tmp")))
+
+    def test_older_desktop_file_session_cannot_replace_newer_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "desktop-file-session.json"
+            with patch(
+                "lamanotes_client.desktop_file_session_path",
+                return_value=path,
+            ):
+                write_desktop_file_session(
+                    {
+                        "paths": ["C:/work/newest.md"],
+                        "activePath": "C:/work/newest.md",
+                        "savedAt": 200,
+                    }
+                )
+                saved = write_desktop_file_session(
+                    {
+                        "paths": ["C:/work/older.md"],
+                        "activePath": "C:/work/older.md",
+                        "savedAt": 100,
+                    }
+                )
+
+            self.assertEqual(saved["activePath"], "C:/work/newest.md")
+            self.assertEqual(
+                json.loads(path.read_text(encoding="utf-8"))["activePath"],
+                "C:/work/newest.md",
+            )
+
+    def test_corrupt_desktop_file_session_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "desktop-file-session.json"
+            path.write_text("{not json", encoding="utf-8")
+            with patch(
+                "lamanotes_client.desktop_file_session_path",
+                return_value=path,
+            ):
+                self.assertIsNone(read_desktop_file_session())
+
+            self.assertFalse(path.exists())
+
+    def test_desktop_file_session_can_be_cleared(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "desktop-file-session.json"
+            path.write_text("{}", encoding="utf-8")
+            with patch(
+                "lamanotes_client.desktop_file_session_path",
+                return_value=path,
+            ):
+                remove_desktop_file_session()
+
+            self.assertFalse(path.exists())
+
     def test_windows_update_archive_requires_all_webview_runtimes(self) -> None:
         required = (
             "app/LamaNotes.exe",

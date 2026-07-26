@@ -27,6 +27,12 @@ file activates the most recently active registered instance and hands at most
 one path to it; the client then applies the shared Save/Discard/Cancel
 replacement guard.
 
+The last Workspace file session is stored once in the native local application
+state under `%LOCALAPPDATA%\LamaNotes`. Independent windows may use different
+loopback ports, so origin-bound browser storage is only a compatibility cache
+and never the authoritative restore pointer. A normal launch therefore reopens
+the last recorded Workspace file across all LamaNotes windows on that PC.
+
 ### Library server
 
 The FastAPI server owns authentication, HTML note storage, search metadata,
@@ -90,14 +96,15 @@ Library content and deployment state remain outside the source repository.
 
 ## Storage boundaries
 
-| Surface | Source of truth | Persistence |
-| --- | --- | --- |
-| Workspace | Original Windows file | Original path |
-| Unsaved local edit | Desktop draft store | Local and disposable after save |
-| Library | Hosted HTML file | One server-side folder |
-| Library warm cache | Desktop profile | Bounded, clearable read cache |
-| Media | Hosted asset file | Served through the approved asset route |
-| Session | Server plus Windows protection | Cleared on logout or invalid auth |
+| Surface             | Source of truth                | Persistence                             |
+| ------------------- | ------------------------------ | --------------------------------------- |
+| Workspace           | Original Windows file          | Original path                           |
+| Unsaved local edit  | Desktop draft store            | Local and disposable after save         |
+| Library             | Hosted HTML file               | One server-side folder                  |
+| Library warm cache  | Desktop profile                | Bounded, clearable read cache           |
+| Media               | Hosted asset file              | Served through the approved asset route |
+| Session             | Server plus Windows protection | Cleared on logout or invalid auth       |
+| Last Workspace file | Native desktop state           | Shared by all local app windows         |
 
 ## Compatibility boundary
 
