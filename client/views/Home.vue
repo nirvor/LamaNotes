@@ -18,14 +18,10 @@
         class="lamanotes-home-pinned"
         hideLoader
       >
-        <section v-if="notes.length > 0" class="lamanotes-home-pinned-section">
-          <header class="lamanotes-home-pinned-title">
-            <span>
-              <SvgIcon type="mdi" :path="mdiStar" size="0.72rem" />
-              {{ globalStore.config.quickAccessTitle }}
-            </span>
-            <small>{{ visiblePinnedLabel }}</small>
-          </header>
+        <section
+          v-if="notes.length > 0"
+          class="lamanotes-home-pinned-section bg-theme-background dark:bg-theme-background-elevated"
+        >
           <div class="lamanotes-home-pinned-list">
             <RouterLink
               v-for="note in visiblePinnedNotes"
@@ -69,7 +65,7 @@
 
 <script setup>
 import SvgIcon from "@jamescoyle/vue-icon";
-import { mdiDotsHorizontal, mdiStar } from "@mdi/js";
+import { mdiDotsHorizontal } from "@mdi/js";
 import { useToast } from "primevue/usetoast";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
@@ -95,13 +91,6 @@ const notes = ref([]);
 const toast = useToast();
 const visiblePinnedNotes = computed(() =>
   notes.value.slice(0, Number(globalStore.config.quickAccessLimit || 7)),
-);
-const visiblePinnedCount = computed(() => visiblePinnedNotes.value.length);
-const visiblePinnedLabel = computed(
-  () =>
-    `${visiblePinnedCount.value} ${
-      visiblePinnedCount.value === 1 ? "note" : "notes"
-    }`,
 );
 
 function init() {
@@ -221,9 +210,9 @@ onBeforeUnmount(() => {
 .lamanotes-home-mark {
   position: absolute;
   z-index: 0;
-  top: clamp(28rem, 56vh, 35rem);
+  top: clamp(20rem, calc(56vh - 8rem), 27rem);
   right: max(calc(50% - 22rem), 0.5rem);
-  width: clamp(12rem, 28vw, 17rem);
+  width: clamp(18rem, 42vw, 25.5rem);
   height: auto;
   pointer-events: none;
   user-select: none;
@@ -235,66 +224,35 @@ onBeforeUnmount(() => {
   display: flex;
   width: 100%;
   min-width: 0;
-  min-height: 9rem;
+  min-height: 0;
   flex-direction: column;
   align-items: stretch;
 }
 
 .lamanotes-home-pinned-section {
   overflow: hidden;
-  border: var(--ln-border-subtle);
-  border-radius: var(--ln-radius-card);
-  background: rgb(var(--theme-background-elevated) / 0.82);
-  box-shadow: var(--ln-shadow-card);
-}
-
-.lamanotes-home-pinned-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  min-height: 2.35rem;
-  margin: 0;
-  border-bottom: 1px solid rgb(var(--theme-border) / 0.7);
-  padding: 0.45rem 0.72rem;
-  color: rgb(var(--theme-text-very-muted));
-  font-size: 0.7rem;
-  font-weight: 650;
-  text-transform: uppercase;
-}
-
-.lamanotes-home-pinned-title > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.32rem;
-}
-
-.lamanotes-home-pinned-title small {
-  color: rgb(var(--theme-text-very-muted));
-  font-size: 0.64rem;
-  font-weight: 500;
-  text-transform: none;
+  border: 1px solid rgb(var(--theme-border));
+  border-radius: 0.375rem;
+  box-shadow: none;
 }
 
 .lamanotes-home-pinned-list {
   display: grid;
   width: 100%;
   min-width: 0;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 0;
-  row-gap: 0;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .lamanotes-home-pinned-link {
   display: grid;
   min-width: 0;
-  min-height: 3.1rem;
+  min-height: 2.15rem;
   overflow: hidden;
   align-content: center;
-  gap: 0.16rem;
+  gap: 0.06rem;
   border: 0;
   border-bottom: 1px solid rgb(var(--theme-border) / 0.52);
-  padding: 0.5rem 0.72rem;
+  padding: 0.22rem 0.72rem;
   color: rgb(var(--theme-text-muted));
   background: transparent;
   line-height: 1.15;
@@ -302,14 +260,15 @@ onBeforeUnmount(() => {
   text-decoration: none;
 }
 
-.lamanotes-home-pinned-link:nth-child(odd) {
-  border-right: 1px solid rgb(var(--theme-border) / 0.52);
+.lamanotes-home-pinned-link:last-child {
+  border-bottom: 0;
 }
 
 .lamanotes-home-pinned-name {
   overflow: hidden;
   color: rgb(var(--theme-text));
-  font-size: 0.9rem;
+  font-size: 0.86rem;
+  line-height: 1.08;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -317,7 +276,8 @@ onBeforeUnmount(() => {
 .lamanotes-home-pinned-meta {
   overflow: hidden;
   color: rgb(var(--theme-text-very-muted));
-  font-size: 0.66rem;
+  font-size: 0.62rem;
+  line-height: 1.08;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -343,6 +303,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: flex-end;
   gap: 0.25rem;
+  border-top: 1px solid rgb(var(--theme-border) / 0.52);
   padding: 0.35rem 0.72rem;
   color: rgb(var(--theme-text-very-muted));
   font-size: 0.68rem;
@@ -359,18 +320,10 @@ onBeforeUnmount(() => {
     padding-top: clamp(2.8rem, 8vh, 4.4rem);
   }
 
-  .lamanotes-home-pinned-list {
-    grid-template-columns: 1fr;
-  }
-
-  .lamanotes-home-pinned-link:nth-child(odd) {
-    border-right: 0;
-  }
-
   .lamanotes-home-mark {
-    top: 38rem;
+    top: 32rem;
     right: -1.6rem;
-    width: 12rem;
+    width: 18rem;
     opacity: 0.12;
   }
 }

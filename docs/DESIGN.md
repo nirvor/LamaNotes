@@ -257,10 +257,10 @@ silently rewrite content.
 ## App shell and host rules
 
 - Home, search, reader, editor, and Workspace use the same theme tokens.
-- Home uses search, a count-aware tag cloud, and one compact pinned-note group
-  as real navigation. A monochrome LamaNotes mark may sit behind this content
-  as a low-contrast watermark; it must remain non-interactive and must not
-  compete with note links.
+- Home uses search, a count-aware tag cloud, and one compact, unlabelled,
+  single-column pinned-note list as real navigation. A monochrome LamaNotes
+  mark may sit behind this content as a low-contrast watermark; it must remain
+  non-interactive and must not compete with note links.
 - Local and Library documents show one content surface at a time. Markdown and
   text-like files open as a rendered reading view. Edit or double-click
   replaces that view with the source editor; Done returns to the rendered

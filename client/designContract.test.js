@@ -117,6 +117,25 @@ test("Home uses quiet navigation surfaces instead of an empty landing page", () 
   assert.match(homeSource, /prominent-tag-cloud/);
   assert.match(homeSource, /lamanotes-home-pinned-section/);
   assert.match(homeSource, /pinnedNoteContext\(note\)/);
+  assert.doesNotMatch(homeSource, /lamanotes-home-pinned-title/);
+  assert.doesNotMatch(homeSource, /visiblePinnedLabel|mdiStar/);
+  assert.match(
+    homeSource,
+    /\.lamanotes-home-pinned-list \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/,
+  );
+  assert.match(
+    homeSource,
+    /\.lamanotes-home-pinned-link \{[\s\S]*?min-height: 2\.15rem/,
+  );
+  assert.match(homeSource, /width: clamp\(18rem, 42vw, 25\.5rem\)/);
+  assert.match(
+    homeSource,
+    /lamanotes-home-pinned-section bg-theme-background dark:bg-theme-background-elevated/,
+  );
+  assert.match(
+    homeSource,
+    /\.lamanotes-home-pinned-section \{[\s\S]*?border: 1px solid rgb\(var\(--theme-border\)\);[\s\S]*?border-radius: 0\.375rem;[\s\S]*?box-shadow: none;/,
+  );
   assert.match(searchInputSource, /prominentTagCloud: Boolean/);
   assert.match(searchInputSource, /lamanotes-tag-cloud-item-high/);
   assert.match(searchInputSource, /props\.prominentTagCloud \? 18/);
