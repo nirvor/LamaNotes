@@ -129,14 +129,14 @@
         class="toast-viewer min-w-0 max-w-full pb-4"
       />
       <WorkNoteViewer
-        v-if="!editMode && isWorkNote"
+        v-else-if="!editMode && isWorkNote"
         :initialValue="note.content"
         :note-title="note.title"
         :task-checkboxes-disabled="!canModify"
         :task-checkbox-toggle-handler="toggleTaskCheckbox"
       />
       <HtmlViewer
-        v-if="!editMode && isHtmlFormat && !isWorkNote"
+        v-else-if="!editMode && isHtmlFormat && !isWorkNote"
         :initialValue="note.content"
         :note-title="note.title"
         :task-checkboxes-disabled="!canModify"
@@ -144,7 +144,7 @@
         class="toast-viewer min-w-0 max-w-full pb-4"
       />
       <SourceEditor
-        v-if="editMode && editorFormat === 'markdown'"
+        v-else-if="editMode && editorFormat === 'markdown'"
         ref="contentEditor"
         :initialValue="getInitialEditorValue()"
         language="markdown"
@@ -159,7 +159,7 @@
         @ready="editorReadyHandler"
       />
       <WorkNoteEditor
-        v-if="editMode && editorFormat === 'html' && editorKind === 'work'"
+        v-else-if="editMode && editorFormat === 'html' && editorKind === 'work'"
         :key="editorKey"
         ref="contentEditor"
         :current-kind="editorKind"
@@ -174,7 +174,9 @@
         @set-kind="setNewNoteKind"
       />
       <HtmlEditor
-        v-if="editMode && editorFormat === 'html' && editorKind === 'article'"
+        v-else-if="
+          editMode && editorFormat === 'html' && editorKind === 'article'
+        "
         :key="editorKey"
         ref="contentEditor"
         :current-kind="editorKind"

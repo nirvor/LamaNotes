@@ -247,6 +247,22 @@ test("local metadata is one compact uniform pill row", () => {
   assert.match(openFileSource, /var\(--theme-title-accent\)/);
 });
 
+test("local and Library documents use one reading or editing surface", () => {
+  assert.match(
+    openFileSource,
+    /v-else-if="activeFile && activeFile\.largeFile"/,
+  );
+  assert.match(openFileSource, /<ToastViewer\s+v-else-if="activeFile"/);
+  assert.doesNotMatch(
+    openFileSource,
+    /activeFile && activeFile\.previewMode === 'plain'/,
+  );
+  assert.match(
+    noteSource,
+    /<ToastViewer[\s\S]*?<WorkNoteViewer\s+v-else-if="!editMode && isWorkNote"[\s\S]*?<HtmlViewer\s+v-else-if="!editMode && isHtmlFormat && !isWorkNote"[\s\S]*?<SourceEditor\s+v-else-if="editMode && editorFormat === 'markdown'"/,
+  );
+});
+
 test("task enhancement reuses and deduplicates source checkboxes", () => {
   assert.match(
     renderSource,

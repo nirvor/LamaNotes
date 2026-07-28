@@ -152,25 +152,26 @@
       />
 
       <pre
-        v-else-if="activeFile && activeFile.previewMode === 'plain'"
+        v-else-if="activeFile && activeFile.largeFile"
         class="lamanotes-open-file-plain-preview"
         >{{ activeFile.previewContent }}</pre
       >
-      <p
-        v-if="activeFile?.largeFile && activeFile.previewTruncated && !editMode"
-        class="lamanotes-large-file-note"
-      >
-        Fast preview shortened. Edit opens the complete file.
-      </p>
 
       <ToastViewer
-        v-else-if="activeFile && !editMode"
+        v-else-if="activeFile"
         :key="`${activeFile.key}:${activeFile.previewRevision}`"
         :initialValue="activeFile.previewMarkdown"
         :enhance-note-lead="false"
         :note-title="noteTitleForFile(activeFile)"
         class="toast-viewer min-w-0 max-w-full pb-4"
       />
+
+      <p
+        v-if="activeFile?.largeFile && activeFile.previewTruncated && !editMode"
+        class="lamanotes-large-file-note"
+      >
+        Fast preview shortened. Edit opens the complete file.
+      </p>
     </div>
 
     <div
