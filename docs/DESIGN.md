@@ -36,6 +36,7 @@ numbers.
 | --------------------------------------------------- | --------------------------------------------------------- |
 | `--theme-brand`                                     | LamaNotes blue for focus, active state, and selected data |
 | `--theme-heading`                                   | Heading and hierarchy blue                                |
+| `--theme-title-accent`                              | Warm document-title accent; never a status colour         |
 | `--theme-link`                                      | Links and source references                               |
 | `--theme-background`, `--theme-background-elevated` | Main and grouped surfaces                                 |
 | `--theme-text`, `--ln-secondary-text`               | Primary and accessible secondary text                     |
@@ -44,15 +45,20 @@ numbers.
 | `--ln-space-1` to `--ln-space-5`                    | Compact spacing scale                                     |
 | `--ln-radius-control`, `--ln-radius-card`           | Small control and card radii                              |
 | `--ln-shadow-card`                                  | One restrained card shadow                                |
-| `--ln-font-h1`, `--ln-font-h2`, `--ln-font-h3`      | Normal note heading hierarchy                             |
+| `--ln-font-body`, `--ln-font-h1` to `--ln-font-h3`  | Normal reading and note heading hierarchy                 |
 | `--ln-control-size`, `--ln-touch-target`            | Compact pointer controls and about 42px touch targets     |
 | `--ln-content-max`, `--ln-toolbar-max`              | Article shell and shared toolbar measure                  |
 | `--ln-reading-max`                                  | Optional prose measure                                    |
 | `--ln-visual-max`, `--ln-wide-min`                  | Normal visual width and wide-visual pan width             |
 
-Amber and red are reserved for warnings, destructive actions, failure, and
-negative states. Do not introduce gradients, glass surfaces, rainbow series,
-or a second brand accent.
+The light main surface is a very pale blue-grey rather than pure white.
+Elevated controls and real groups may use white, so hierarchy remains visible
+without glare. The warm copper title token is the one narrow exception to the
+blue hierarchy: it distinguishes a document `h1` from blue `h2` and `h3`
+headings. It does not colour tags, data series, controls, or status. Brighter
+amber and red remain reserved for warnings, destructive actions, failure, and
+negative states. Do not introduce gradients, glass surfaces, or rainbow
+series.
 
 ## Article and content primitives
 
@@ -251,6 +257,10 @@ silently rewrite content.
 ## App shell and host rules
 
 - Home, search, reader, editor, and Workspace use the same theme tokens.
+- Home uses search, a count-aware tag cloud, and one compact pinned-note group
+  as real navigation. A monochrome LamaNotes mark may sit behind this content
+  as a low-contrast watermark; it must remain non-interactive and must not
+  compete with note links.
 - Every route uses the same centered toolbar measure. Context actions grow to
   the left; Home and Menu stay in the same two positions at the right edge.
 - Creation, file opening, publishing/promotion, and view preferences belong in
@@ -265,6 +275,9 @@ silently rewrite content.
   there is no separate native Android design layer.
 - Windows hosts the same Vue application in WebView2. Native-host overrides
   may adapt chrome and density, not fork the note design.
+- Workspace path actions stay in the toolbar row. `Local`, size, encoding, and
+  line endings share one compact pill row below it, without increasing the
+  header height.
 
 ## Responsive and accessibility rules
 

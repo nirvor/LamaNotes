@@ -1747,8 +1747,8 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: rgb(var(--theme-text));
-  font-size: clamp(1.28rem, 4.4vw, 1.64rem);
+  color: rgb(var(--theme-title-accent));
+  font-size: clamp(1.38rem, 4.4vw, 1.76rem);
   line-height: 1.18;
 }
 

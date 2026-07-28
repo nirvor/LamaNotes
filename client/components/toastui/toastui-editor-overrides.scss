@@ -17,7 +17,7 @@
 .ProseMirror,
 .toastui-editor-contents {
   font-family: "Poppins", sans-serif;
-  font-size: 0.92rem;
+  font-size: var(--ln-font-body);
 }
 
 .toastui-editor-contents,
@@ -51,6 +51,7 @@
 
   h1,
   .toastui-editor-md-heading1 {
+    color: rgb(var(--theme-title-accent));
     font-size: var(--ln-font-h1);
   }
 
@@ -80,7 +81,7 @@
   }
 
   p {
-    line-height: 1.45rem;
+    line-height: 1.55rem;
     margin: 0 0 1rem 0;
     overflow-wrap: anywhere;
   }
@@ -115,6 +116,10 @@
     letter-spacing: 0;
     margin-top: 1.25rem;
     margin-bottom: 0.55rem;
+  }
+
+  h1 {
+    color: rgb(var(--theme-title-accent));
   }
 
   h1:first-child,
@@ -422,6 +427,7 @@
   }
 
   h1 {
+    color: rgb(var(--theme-title-accent));
     font-size: var(--ln-font-h1);
   }
 
@@ -491,8 +497,8 @@
 .toastui-editor-contents .lamanote-research-header > h1 {
   max-width: 29ch;
   margin: 0.52rem 0 0.72rem;
-  color: rgb(var(--theme-heading));
-  font-size: clamp(1.9rem, 4vw, 2.45rem);
+  color: rgb(var(--theme-title-accent));
+  font-size: clamp(2rem, 4vw, 2.55rem);
   font-weight: 600;
   letter-spacing: -0.028em;
   line-height: 1.12;

@@ -23,9 +23,18 @@ the system-browser authentication handoff.
 Local files are opened through this shell. They do not pass through the hosted
 Library service. A launch without a file creates an independent application
 window, which also supports separate Windows virtual desktops. A launch with a
-file activates the most recently active registered instance and hands at most
-one path to it; the client then applies the shared Save/Discard/Cancel
+file hands at most one path to an existing instance. The shell prefers the
+currently focused LamaNotes process, then an instance on the same Windows
+virtual desktop. It falls back to the most recently active instance only when
+Windows cannot resolve any desktop identity; otherwise, an empty current
+desktop gets its own window. The client applies the shared Save/Discard/Cancel
 replacement guard.
+
+Every file handoff carries a short random request ID. The target reserves that
+ID before reading the file, so a timeout retry cannot dispatch it twice. An
+ambiguous timeout against a still-running target never falls through into a
+new window. The client serializes replacements and reports whether the handoff
+completed, was cancelled, or failed after the save decision.
 
 The last Workspace file session is stored once in the native local application
 state under `%LOCALAPPDATA%\LamaNotes`. Independent windows may use different
@@ -72,12 +81,17 @@ Library content and deployment state remain outside the source repository.
 ### Open a local file
 
 1. Windows passes a path to the desktop shell.
-2. The shell activates the most recently active LamaNotes instance, reads at
-   most one file and returns content plus safe metadata to the bundled client.
-3. The editor renders immediately.
-4. Authentication and optional Library warm-up continue later in the
+2. The shell chooses the current virtual desktop's LamaNotes instance when one
+   exists and reserves one idempotent handoff. If all known windows are on
+   other desktops, it starts one window on the current desktop.
+3. The current note enters Save, Discard or Cancel when it is dirty. Save must
+   finish successfully before the replacement continues.
+4. The shell reads at most one file and returns content plus safe metadata to
+   the bundled client.
+5. The editor renders immediately.
+6. Authentication and optional Library warm-up continue later in the
    background.
-5. Save writes atomically to the original path after checking for an external
+7. Save writes atomically to the original path after checking for an external
    change.
 
 ### Open a Library note

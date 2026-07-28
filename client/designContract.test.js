@@ -7,25 +7,31 @@ const clientFile = (path) => new URL(path, import.meta.url);
 const [
   appSource,
   automationModalSource,
+  homeSource,
   htmlEditorSource,
+  indexSource,
   modalSource,
   navBarSource,
   noteSource,
   openFileSource,
   primeMenuSource,
   renderSource,
+  searchInputSource,
   styleSource,
   viewerCss,
 ] = await Promise.all([
   readFile(clientFile("App.vue"), "utf8"),
   readFile(clientFile("components/DocumentAutomationModal.vue"), "utf8"),
+  readFile(clientFile("views/Home.vue"), "utf8"),
   readFile(clientFile("components/html/HtmlEditor.vue"), "utf8"),
+  readFile(clientFile("index.js"), "utf8"),
   readFile(clientFile("components/Modal.vue"), "utf8"),
   readFile(clientFile("partials/NavBar.vue"), "utf8"),
   readFile(clientFile("views/Note.vue"), "utf8"),
   readFile(clientFile("views/OpenFile.vue"), "utf8"),
   readFile(clientFile("components/PrimeMenu.vue"), "utf8"),
   readFile(clientFile("components/toastui/renderEnhancements.js"), "utf8"),
+  readFile(clientFile("partials/SearchInput.vue"), "utf8"),
   readFile(clientFile("style.css"), "utf8"),
   readFile(
     clientFile("components/toastui/toastui-editor-overrides.scss"),
@@ -57,6 +63,9 @@ test("HTML source and preview share the production viewer", () => {
 });
 
 test("V2 tokens and legacy aliases stay in one design contract", () => {
+  assert.match(styleSource, /--theme-background: 247 248 250/);
+  assert.match(styleSource, /--theme-title-accent: 151 85 25/);
+  assert.match(styleSource, /--ln-font-body: 1rem/);
   assert.match(styleSource, /--ln-touch-target: 2\.65rem/);
   assert.match(styleSource, /--ln-content-max: 68rem/);
   assert.match(styleSource, /prefers-reduced-motion: reduce/);
@@ -101,6 +110,16 @@ test("V2 tokens and legacy aliases stay in one design contract", () => {
     viewerCss,
     /\.lamanote-comparison tbody th \{[\s\S]*?background: transparent;/,
   );
+});
+
+test("Home uses quiet navigation surfaces instead of an empty landing page", () => {
+  assert.match(homeSource, /lamanotes-icon-master\.png/);
+  assert.match(homeSource, /prominent-tag-cloud/);
+  assert.match(homeSource, /lamanotes-home-pinned-section/);
+  assert.match(homeSource, /pinnedNoteContext\(note\)/);
+  assert.match(searchInputSource, /prominentTagCloud: Boolean/);
+  assert.match(searchInputSource, /lamanotes-tag-cloud-item-high/);
+  assert.match(searchInputSource, /props\.prominentTagCloud \? 18/);
 });
 
 test("media preview is a modal keyboard boundary", () => {
@@ -212,8 +231,20 @@ test("one document replaces the current one through Save or Discard", () => {
   assert.match(openFileSource, /@confirm="saveBeforeFileDecision"/);
   assert.match(openFileSource, /@reject="discardBeforeFileDecision"/);
   assert.match(openFileSource, /onBeforeRouteLeave\(confirmFileNavigation\)/);
+  assert.match(openFileSource, /fileReplacementQueue/);
+  assert.match(openFileSource, /complete_file_handoff/);
+  assert.match(indexSource, /payloads\?\.\[0\]\?\._handoffId/);
   assert.match(noteSource, /onBeforeRouteLeave\(confirmNoteNavigation\)/);
   assert.match(noteSource, /onBeforeRouteUpdate\(confirmNoteNavigation\)/);
+});
+
+test("local metadata is one compact uniform pill row", () => {
+  assert.match(
+    openFileSource,
+    /lamanotes-open-file-meta lamanotes-open-file-local/,
+  );
+  assert.doesNotMatch(openFileSource, /class="lamanotes-open-file-kicker"/);
+  assert.match(openFileSource, /var\(--theme-title-accent\)/);
 });
 
 test("task enhancement reuses and deduplicates source checkboxes", () => {

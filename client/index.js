@@ -54,12 +54,12 @@ async function publishNativeFiles(payloads, message, options = {}) {
   if (!files.length) {
     return false;
   }
+  const handoffId = String(payloads?.[0]?._handoffId || "");
 
-  publishExternalFileLaunch(
-    files,
-    message || "Opened from LamaNotes client.",
-    options,
-  );
+  publishExternalFileLaunch(files, message || "Opened from LamaNotes client.", {
+    ...options,
+    handoffId,
+  });
   await router.push({ name: "openFile" }).catch(() => {});
   return true;
 }

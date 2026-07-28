@@ -38,16 +38,19 @@
 
   body {
     --theme-brand: 30 92 145;
-    --theme-background: 255 255 255;
-    --theme-background-elevated: 244 247 250;
+    --theme-background: 247 248 250;
+    --theme-background-elevated: 255 255 255;
     --theme-heading: 30 92 145;
+    --theme-title-accent: 151 85 25;
     --theme-link: 72 102 145;
-    --theme-text: 0 0 0;
+    --theme-text: 25 31 39;
     --theme-text-muted: 91 103 119;
     --theme-text-very-muted: 104 116 132;
     --theme-shadow: 215 224 232;
     --theme-border: 213 222 231;
     --theme-warning: 161 98 7;
+    --theme-home-mark-filter: grayscale(1) contrast(1.18);
+    --theme-home-mark-opacity: 0.22;
 
     --ln-secondary-text: var(--theme-text-muted);
     --ln-space-1: 0.25rem;
@@ -59,9 +62,10 @@
     --ln-radius-card: 0.5rem;
     --ln-border-subtle: 1px solid rgb(var(--theme-border) / 0.9);
     --ln-shadow-card: 0 0.22rem 0.85rem rgb(17 36 57 / 0.08);
-    --ln-font-h1: 1.42rem;
-    --ln-font-h2: 1.28rem;
-    --ln-font-h3: 1.15rem;
+    --ln-font-body: 1rem;
+    --ln-font-h1: 1.54rem;
+    --ln-font-h2: 1.38rem;
+    --ln-font-h3: 1.23rem;
     --ln-control-size: 1.8rem;
     --ln-touch-target: 2.65rem;
     --ln-content-max: 68rem;
@@ -108,6 +112,7 @@
     --theme-background: 33 37 43;
     --theme-background-elevated: 44 49 57;
     --theme-heading: 142 203 255;
+    --theme-title-accent: 238 174 96;
     --theme-link: 164 187 224;
     --theme-text: 255 255 255;
     --theme-text-muted: 184 193 205;
@@ -115,6 +120,8 @@
     --theme-shadow: none;
     --theme-border: 78 91 108;
     --theme-warning: 251 191 36;
+    --theme-home-mark-filter: grayscale(1) brightness(1.42) contrast(0.82);
+    --theme-home-mark-opacity: 0.2;
 
     color-scheme: dark;
   }

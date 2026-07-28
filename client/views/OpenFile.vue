@@ -47,9 +47,9 @@
     >
       <div class="min-w-0">
         <div class="lamanotes-open-file-kicker-line">
-          <span class="lamanotes-open-file-kicker">
+          <span class="lamanotes-open-file-meta lamanotes-open-file-local">
             <SvgIcon type="mdi" :path="mdiHarddisk" size="0.68rem" />
-            Local
+            <strong>Local</strong>
           </span>
           <span
             v-for="item in metadataItems"
@@ -275,6 +275,7 @@ import CsvTablePreview from "../components/CsvTablePreview.vue";
 import IconLabel from "../components/IconLabel.vue";
 import { useDocumentFind } from "../documentFind.js";
 import { useDocumentSession } from "../documents/documentSession.js";
+import { createFileReplacementQueue } from "../fileReplacementQueue.js";
 import { createLocalFileStorageAdapter } from "../documents/storageAdapters.js";
 import {
   clearDesktopFileSession,
@@ -477,6 +478,10 @@ let latestTextDropPosition = null;
 let textDropPreviewActive = false;
 let pendingFileDecision = null;
 const draftPersistence = createDebouncedWork(persistDraftState, 240);
+const requestFileReplacement = createFileReplacementQueue({
+  hasUnsavedChanges: () => Boolean(activeFile.value?.dirty),
+  requestDecision: (proceed, cancel) => requestFileDecision(proceed, cancel),
+});
 
 onBeforeRouteLeave(confirmFileNavigation);
 onBeforeRouteUpdate(confirmFileNavigation);
@@ -1368,15 +1373,6 @@ function confirmFileNavigation() {
   });
 }
 
-function requestFileReplacement(action) {
-  if (!activeFile.value?.dirty) {
-    return Promise.resolve(action());
-  }
-
-  requestFileDecision(action);
-  return Promise.resolve(false);
-}
-
 function requestFileDecision(proceed, cancel = () => {}) {
   pendingFileDecision = { proceed, cancel };
   isFileDecisionVisible.value = true;
@@ -1598,13 +1594,21 @@ async function consumeExternalLaunch(launch) {
 
   lastConsumedLaunchId.value = launch.id;
   if (launch.files?.length) {
-    await requestFileReplacement(async () => {
-      await loadFiles(
-        [launch.files[0]],
-        launch.message || "Opened from Windows.",
-      );
-      restoreLaunchSession(launch.restoreSession);
-    });
+    let outcome = "failed";
+    try {
+      const replaced = await requestFileReplacement(async () => {
+        await loadFiles(
+          [launch.files[0]],
+          launch.message || "Opened from Windows.",
+        );
+        restoreLaunchSession(launch.restoreSession);
+      });
+      outcome = replaced ? "completed" : "cancelled";
+    } catch (error) {
+      showStatus("Could not open the local file.", "error");
+      console.error(error);
+    }
+    await reportFileHandoff(launch.handoffId, outcome);
     return;
   }
 
@@ -1612,6 +1616,20 @@ async function consumeExternalLaunch(launch) {
     launch.message || "Could not open the file.",
     launch.tone || "error",
   );
+}
+
+async function reportFileHandoff(handoffId, outcome) {
+  if (
+    !handoffId ||
+    typeof window.pywebview?.api?.complete_file_handoff !== "function"
+  ) {
+    return;
+  }
+  try {
+    await window.pywebview.api.complete_file_handoff(handoffId, outcome);
+  } catch (error) {
+    console.error("Could not report the local file handoff.", error);
+  }
 }
 
 function getActiveFileCopyPayload() {
@@ -1772,18 +1790,6 @@ function showStatus(message, tone = "info") {
   margin-bottom: 0.22rem;
 }
 
-.lamanotes-open-file-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.18rem;
-  color: rgb(var(--theme-text-very-muted));
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
 .lamanotes-open-file-title {
   display: block;
   width: 100%;
@@ -1827,6 +1833,18 @@ function showStatus(message, tone = "info") {
   border-radius: 999px;
   padding: 0 0.38rem;
   line-height: 1;
+}
+
+.lamanotes-open-file-local {
+  gap: 0.2rem;
+}
+
+.lamanotes-open-file-local :deep(svg) {
+  color: rgb(var(--theme-text-very-muted));
+}
+
+.lamanotes-open-file-local strong {
+  text-transform: uppercase;
 }
 
 .lamanotes-open-file-status {
@@ -1924,17 +1942,18 @@ function showStatus(message, tone = "info") {
 
 .lamanotes-open-file
   :deep(.toastui-editor-contents:not(.lamanotes-html-contents) h1) {
-  font-size: 1.42rem;
+  color: rgb(var(--theme-title-accent));
+  font-size: var(--ln-font-h1);
 }
 
 .lamanotes-open-file
   :deep(.toastui-editor-contents:not(.lamanotes-html-contents) h2) {
-  font-size: 1.22rem;
+  font-size: var(--ln-font-h2);
 }
 
 .lamanotes-open-file
   :deep(.toastui-editor-contents:not(.lamanotes-html-contents) h3) {
-  font-size: 1.08rem;
+  font-size: var(--ln-font-h3);
 }
 
 .lamanotes-file-compare-backdrop {

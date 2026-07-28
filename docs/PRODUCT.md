@@ -60,8 +60,13 @@ responsive rules and anti-patterns for every host and note type.
 - A normal app launch reopens the last Workspace file recorded on that PC,
   independent of which local proxy port or LamaNotes window opened it.
 - Opening another local file or Library note in a window replaces it after
-  Save, Discard or Cancel when the current note has unsaved changes. A Windows
-  file launch hands one path to the most recently active LamaNotes window.
+  Save, Discard or Cancel when the current note has unsaved changes. Save must
+  succeed before replacement. A Windows file launch prefers the LamaNotes
+  window on the current virtual desktop. If Windows confirms that all existing
+  LamaNotes windows belong to other desktops, the launch creates one window on
+  the current desktop instead of moving the file to another workspace. A
+  confirmed target is reserved by request ID before asynchronous delivery, so
+  a slow response cannot create a duplicate window.
 - Common commands use compact familiar icons with labels available as
   tooltips and accessible names.
 - Reading and editing use one main vertical scroll surface.

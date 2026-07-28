@@ -30,9 +30,11 @@ from lamanotes_client import (
     migrate_legacy_local_state,
     paths_from_native_drop_event,
     register_native_file_drop,
+    rank_instance_records,
     read_desktop_file_session,
     remove_desktop_file_session,
     resolve_update_url,
+    select_instance_records,
     start_local_proxy,
     updater_process_creation_flags,
     validate_update_response_url,
@@ -396,6 +398,44 @@ class LamaNotesApiTests(unittest.TestCase):
         finally:
             store.close()
 
+    def test_external_handoff_is_reserved_once_and_reports_completion(self) -> None:
+        store = Mock()
+        store.has_openable_path.return_value = True
+        api = LamaNotesApi(
+            store,
+            [],
+            "https://notes.example",
+            "https://notes.example",
+        )
+
+        with patch("lamanotes_client.threading.Thread") as thread:
+            first = api.accept_external_paths(
+                ["C:/work/first.md"],
+                "http://127.0.0.1:31992",
+                "same-request",
+            )
+            second = api.accept_external_paths(
+                ["C:/work/first.md"],
+                "http://127.0.0.1:31992",
+                "same-request",
+            )
+
+        self.assertEqual(first, 1)
+        self.assertEqual(second, 1)
+        self.assertEqual(thread.call_count, 1)
+        self.assertEqual(
+            api.file_handoff_status("same-request"),
+            {"known": True, "status": "accepted"},
+        )
+        self.assertEqual(
+            api.complete_file_handoff("same-request", "completed"),
+            {"updated": True, "status": "completed"},
+        )
+        self.assertEqual(
+            api.file_handoff_status("same-request"),
+            {"known": True, "status": "completed"},
+        )
+
 
 class NativeShellIntegrationTests(unittest.TestCase):
     def test_desktop_file_session_round_trips_atomically(self) -> None:
@@ -619,6 +659,10 @@ class SingleInstanceHandoffTests(unittest.TestCase):
         response.__enter__.return_value = response
         with (
             patch(
+                "lamanotes_client.foreground_window_context",
+                return_value={"pid": 0, "desktopId": ""},
+            ),
+            patch(
                 "lamanotes_client.load_instance_records",
                 return_value=[{"pid": 42, "port": 31992}],
             ),
@@ -637,9 +681,132 @@ class SingleInstanceHandoffTests(unittest.TestCase):
             "http://127.0.0.1:31992/open-files",
         )
         self.assertEqual(
-            json.loads(sent_request.data),
-            {"files": ["C:/work/first.md"]},
+            json.loads(sent_request.data)["files"],
+            ["C:/work/first.md"],
         )
+        self.assertTrue(json.loads(sent_request.data)["requestId"])
+
+    def test_file_handoff_prefers_the_current_virtual_desktop(self) -> None:
+        response = MagicMock()
+        response.status = 200
+        response.__enter__.return_value = response
+        records = [
+            {
+                "pid": 41,
+                "port": 31992,
+                "desktopId": "desktop-other",
+                "lastActive": 200,
+            },
+            {
+                "pid": 42,
+                "port": 31993,
+                "desktopId": "desktop-current",
+                "lastActive": 100,
+            },
+        ]
+        with (
+            patch(
+                "lamanotes_client.foreground_window_context",
+                return_value={"pid": 700, "desktopId": "desktop-current"},
+            ),
+            patch(
+                "lamanotes_client.load_instance_records",
+                return_value=records,
+            ),
+            patch(
+                "lamanotes_client.request.urlopen",
+                return_value=response,
+            ) as open_url,
+        ):
+            reused = handoff_to_existing_instance(["C:/work/current.md"])
+
+        self.assertTrue(reused)
+        self.assertEqual(
+            open_url.call_args.args[0].full_url,
+            "http://127.0.0.1:31993/open-files",
+        )
+
+    def test_ambiguous_handoff_timeout_does_not_spawn_duplicate_window(
+        self,
+    ) -> None:
+        record = {"pid": 42, "port": 31992}
+        with (
+            patch(
+                "lamanotes_client.foreground_window_context",
+                return_value={"pid": 700, "desktopId": ""},
+            ),
+            patch(
+                "lamanotes_client.load_instance_records",
+                return_value=[record],
+            ),
+            patch(
+                "lamanotes_client.request.urlopen",
+                side_effect=TimeoutError("timed out"),
+            ) as open_url,
+            patch(
+                "lamanotes_client.is_process_running",
+                return_value=True,
+            ),
+        ):
+            reused = handoff_to_existing_instance(["C:/work/current.md"])
+
+        self.assertTrue(reused)
+        self.assertEqual(open_url.call_count, 2)
+
+    def test_instance_ranking_prefers_foreground_then_same_desktop(self) -> None:
+        records = [
+            {
+                "pid": 41,
+                "desktopId": "desktop-other",
+                "lastActive": 300,
+            },
+            {
+                "pid": 42,
+                "desktopId": "desktop-current",
+                "lastActive": 100,
+            },
+            {
+                "pid": 43,
+                "desktopId": "desktop-current",
+                "lastActive": 200,
+            },
+        ]
+
+        ranked = rank_instance_records(
+            records,
+            preferred_pid=42,
+            preferred_desktop_id="desktop-current",
+        )
+
+        self.assertEqual([record["pid"] for record in ranked], [42, 43, 41])
+
+    def test_another_desktop_does_not_receive_the_new_file(self) -> None:
+        records = [
+            {
+                "pid": 41,
+                "desktopId": "desktop-other",
+                "lastActive": 300,
+            }
+        ]
+
+        selected = select_instance_records(
+            records,
+            preferred_pid=700,
+            preferred_desktop_id="desktop-current",
+        )
+
+        self.assertEqual(selected, [])
+
+    def test_unknown_desktop_identity_keeps_compatible_fallback(self) -> None:
+        records = [{"pid": 41, "lastActive": 300}]
+
+        selected = select_instance_records(
+            records,
+            preferred_pid=700,
+            preferred_desktop_id="desktop-current",
+        )
+
+        self.assertEqual(selected, records)
 
     def test_instance_records_prefer_most_recently_active_window(self) -> None:
         now = time.time()

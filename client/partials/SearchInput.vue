@@ -1,5 +1,11 @@
 <template>
-  <div class="relative w-full">
+  <div
+    class="lamanotes-search relative w-full"
+    :class="{
+      'lamanotes-search-large': large,
+      'lamanotes-search-prominent-tags': prominentTagCloud,
+    }"
+  >
     <!-- Input -->
     <div
       class="flex w-full rounded-md border border-theme-border bg-theme-background dark:bg-theme-background-elevated"
@@ -83,6 +89,7 @@
           :key="tag.name"
           type="button"
           class="lamanotes-tag-cloud-item"
+          :class="`lamanotes-tag-cloud-item-${tag.prominence}`"
           :title="`${tag.count} ${tag.count === 1 ? 'note' : 'notes'}`"
           @click="tagCloudChosen(tag.name)"
           @mousedown.prevent
@@ -125,6 +132,7 @@ const props = defineProps({
   autoFocus: { type: Boolean, default: true },
   initialSearchTerm: { type: String, default: "" },
   large: Boolean,
+  prominentTagCloud: Boolean,
   placeholder: { type: String, default: "Search..." },
   showAllOnClear: Boolean,
 });
@@ -395,7 +403,18 @@ function rebuildTopTags() {
       }
       return left.name.localeCompare(right.name);
     })
-    .slice(0, tagCloudLimit);
+    .slice(0, props.prominentTagCloud ? 18 : tagCloudLimit);
+  const largestCount = Math.max(
+    1,
+    ...topTags.value.map((tag) => Number(tag.count) || 0),
+  );
+  topTags.value = topTags.value.map((tag) => {
+    const ratio = (Number(tag.count) || 0) / largestCount;
+    return {
+      ...tag,
+      prominence: ratio >= 0.66 ? "high" : ratio >= 0.34 ? "medium" : "low",
+    };
+  });
 }
 
 async function filterTagMatches(input) {
@@ -631,6 +650,30 @@ onBeforeUnmount(() => {
   line-height: 1.15;
   cursor: pointer;
   transition: color 120ms ease;
+}
+
+.lamanotes-search-prominent-tags .lamanotes-tag-cloud {
+  padding-top: 0.58rem;
+}
+
+.lamanotes-search-prominent-tags .lamanotes-tag-cloud-list {
+  column-gap: 1.05rem;
+  row-gap: 0.3rem;
+}
+
+.lamanotes-search-prominent-tags .lamanotes-tag-cloud-item {
+  font-size: 0.86rem;
+}
+
+.lamanotes-search-prominent-tags .lamanotes-tag-cloud-item-medium {
+  color: rgb(var(--theme-text-muted));
+  font-size: 0.94rem;
+}
+
+.lamanotes-search-prominent-tags .lamanotes-tag-cloud-item-high {
+  color: rgb(var(--theme-text));
+  font-size: 1.02rem;
+  font-weight: 600;
 }
 
 .lamanotes-tag-cloud-item :deep(svg) {

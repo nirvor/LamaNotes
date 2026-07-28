@@ -20,6 +20,7 @@ import sys
 import tempfile
 import threading
 import time
+import uuid
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -45,7 +46,8 @@ DESKTOP_FILE_SESSION_FILE = "desktop-file-session.json"
 DESKTOP_FILE_SESSION_MAX_PATHS = 16
 LOG_FILE = "lamanotes-client.log"
 INSTANCE_DIR = "instances"
-HANDOFF_TIMEOUT_SECONDS = 0.35
+HANDOFF_TIMEOUT_SECONDS = 1.25
+HANDOFF_RETRY_ATTEMPTS = 2
 INSTANCE_RECORD_MAX_AGE_SECONDS = 30
 INSTANCE_HEARTBEAT_SECONDS = 2.0
 WINDOW_STATE_PERSIST_SECONDS = 1.5
@@ -58,6 +60,8 @@ CREDENTIAL_FILE = "auth-token.bin"
 CREDENTIAL_ENTROPY = b"LamaNotes desktop credential v1"
 LEGACY_CREDENTIAL_ENTROPY = b"NirvNotes desktop credential v1"
 SHARD_PATHW = 0x00000003
+CLSID_VIRTUAL_DESKTOP_MANAGER = "{AA509086-5CA9-4C25-8F95-589D3C07B48A}"
+IID_VIRTUAL_DESKTOP_MANAGER = "{A5CD92FF-29BE-454C-8D04-D82879FB3F1B}"
 ALLOWED_EXTENSIONS = {
     ".md",
     ".txt",
@@ -95,6 +99,15 @@ WINDOWS_UPDATE_REQUIRED_FILES = (
     "app/_internal/webview/lib/runtimes/win-x64/native/WebView2Loader.dll",
     "app/_internal/webview/lib/runtimes/win-x86/native/WebView2Loader.dll",
 )
+
+
+class WindowsGuid(ctypes.Structure):
+    _fields_ = [
+        ("data1", ctypes.c_uint32),
+        ("data2", ctypes.c_uint16),
+        ("data3", ctypes.c_uint16),
+        ("data4", ctypes.c_ubyte * 8),
+    ]
 
 
 def validate_windows_update_archive(path: str | Path) -> None:
@@ -569,6 +582,8 @@ class LamaNotesApi:
         self._update_status: dict[str, Any] | None = None
         self._update_checked_at = 0.0
         self._update_lock = threading.Lock()
+        self._file_handoff_lock = threading.Lock()
+        self._file_handoffs: dict[str, dict[str, Any]] = {}
 
     def store_auth_token(self, token: str) -> dict[str, Any]:
         if not self._credential_store:
@@ -676,6 +691,77 @@ class LamaNotesApi:
         payloads = self._pending_launch_files
         self._pending_launch_files = []
         return payloads
+
+    def accept_external_paths(
+        self,
+        paths: list[str],
+        browser_base_url: str,
+        request_id: str,
+    ) -> int:
+        handoff_id = normalize_handoff_id(request_id)
+        if not handoff_id or not self.has_openable_external_paths(paths):
+            return 0
+
+        with self._file_handoff_lock:
+            existing = self._file_handoffs.get(handoff_id)
+            if existing:
+                return int(existing.get("accepted", 0) or 0)
+            self._file_handoffs[handoff_id] = {
+                "accepted": min(len(paths), 1),
+                "status": "accepted",
+                "updatedAt": time.time(),
+            }
+            self._trim_file_handoffs_locked()
+
+        threading.Thread(
+            target=self._dispatch_external_paths,
+            args=(paths[:1], browser_base_url, handoff_id),
+            daemon=True,
+        ).start()
+        return min(len(paths), 1)
+
+    def complete_file_handoff(
+        self,
+        request_id: str,
+        outcome: str,
+    ) -> dict[str, Any]:
+        handoff_id = normalize_handoff_id(request_id)
+        normalized_outcome = str(outcome or "").strip().lower()
+        if normalized_outcome not in {"completed", "cancelled", "failed"}:
+            normalized_outcome = "failed"
+        with self._file_handoff_lock:
+            handoff = self._file_handoffs.get(handoff_id)
+            if not handoff:
+                return {"updated": False}
+            handoff["status"] = normalized_outcome
+            handoff["updatedAt"] = time.time()
+        logging.info(
+            "external file handoff %s id=%s",
+            normalized_outcome,
+            handoff_id[:8],
+        )
+        return {"updated": True, "status": normalized_outcome}
+
+    def file_handoff_status(self, request_id: str) -> dict[str, Any]:
+        handoff_id = normalize_handoff_id(request_id)
+        with self._file_handoff_lock:
+            handoff = dict(self._file_handoffs.get(handoff_id) or {})
+        return {
+            "known": bool(handoff),
+            "status": str(handoff.get("status", "")),
+        }
+
+    def _trim_file_handoffs_locked(self) -> None:
+        if len(self._file_handoffs) <= 32:
+            return
+        oldest = sorted(
+            self._file_handoffs,
+            key=lambda key: float(
+                self._file_handoffs[key].get("updatedAt", 0) or 0
+            ),
+        )
+        for handoff_id in oldest[:-32]:
+            self._file_handoffs.pop(handoff_id, None)
 
     def open_local_files(self) -> list[dict[str, Any]]:
         if not self._window:
@@ -816,13 +902,25 @@ class LamaNotesApi:
         return self._file_store.has_openable_path(paths)
 
     def open_external_paths(self, paths: list[str], browser_base_url: str) -> int:
+        return self._dispatch_external_paths(paths[:1], browser_base_url, "")
+
+    def _dispatch_external_paths(
+        self,
+        paths: list[str],
+        browser_base_url: str,
+        handoff_id: str,
+    ) -> int:
         payloads = self._file_store.payloads_for_paths(
             paths[:1],
             record_recent=True,
         )
         if not payloads:
+            if handoff_id:
+                self.complete_file_handoff(handoff_id, "failed")
             return 0
 
+        if handoff_id:
+            payloads[0]["_handoffId"] = handoff_id
         self._pending_launch_files = payloads
         if self._window:
             timestamp = int(time.time() * 1000)
@@ -1458,6 +1556,154 @@ class WinRect(ctypes.Structure):
     ]
 
 
+def guid_from_string(value: str) -> WindowsGuid:
+    guid = WindowsGuid()
+    ole32 = ctypes.windll.ole32
+    clsid_from_string = ole32.CLSIDFromString
+    clsid_from_string.argtypes = [
+        ctypes.c_wchar_p,
+        ctypes.POINTER(WindowsGuid),
+    ]
+    clsid_from_string.restype = ctypes.c_long
+    result = clsid_from_string(value, ctypes.byref(guid))
+    if result < 0:
+        raise OSError(f"Windows rejected GUID {value}.")
+    return guid
+
+
+def window_virtual_desktop_id(hwnd: int | None) -> str:
+    if sys.platform != "win32" or not hwnd:
+        return ""
+
+    ole32 = ctypes.windll.ole32
+    co_initialize = ole32.CoInitializeEx
+    co_initialize.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+    co_initialize.restype = ctypes.c_long
+    initialized = co_initialize(None, 0)
+    should_uninitialize = initialized in {0, 1}
+    manager = ctypes.c_void_p()
+    try:
+        class_id = guid_from_string(CLSID_VIRTUAL_DESKTOP_MANAGER)
+        interface_id = guid_from_string(IID_VIRTUAL_DESKTOP_MANAGER)
+        co_create = ole32.CoCreateInstance
+        co_create.argtypes = [
+            ctypes.POINTER(WindowsGuid),
+            ctypes.c_void_p,
+            ctypes.c_ulong,
+            ctypes.POINTER(WindowsGuid),
+            ctypes.POINTER(ctypes.c_void_p),
+        ]
+        co_create.restype = ctypes.c_long
+        result = co_create(
+            ctypes.byref(class_id),
+            None,
+            1,  # CLSCTX_INPROC_SERVER
+            ctypes.byref(interface_id),
+            ctypes.byref(manager),
+        )
+        if result < 0 or not manager.value:
+            return ""
+
+        vtable = ctypes.cast(
+            manager,
+            ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p)),
+        ).contents
+        get_desktop_id = ctypes.WINFUNCTYPE(
+            ctypes.c_long,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.POINTER(WindowsGuid),
+        )(vtable[4])
+        desktop_id = WindowsGuid()
+        result = get_desktop_id(
+            manager,
+            ctypes.c_void_p(int(hwnd)),
+            ctypes.byref(desktop_id),
+        )
+        if result < 0:
+            return ""
+        return str(uuid.UUID(bytes_le=bytes(desktop_id)))
+    except Exception:
+        logging.debug(
+            "could not resolve Windows virtual desktop id",
+            exc_info=True,
+        )
+        return ""
+    finally:
+        if manager.value:
+            try:
+                vtable = ctypes.cast(
+                    manager,
+                    ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p)),
+                ).contents
+                release = ctypes.WINFUNCTYPE(
+                    ctypes.c_ulong,
+                    ctypes.c_void_p,
+                )(vtable[2])
+                release(manager)
+            except Exception:
+                logging.debug(
+                    "could not release Windows virtual desktop manager",
+                    exc_info=True,
+                )
+        if should_uninitialize:
+            ole32.CoUninitialize()
+
+
+def find_visible_process_window(process_id: int) -> int | None:
+    if sys.platform != "win32" or process_id <= 0:
+        return None
+
+    user32 = ctypes.windll.user32
+    candidates: list[tuple[int, int]] = []
+    enum_windows_proc = ctypes.WINFUNCTYPE(
+        ctypes.c_bool,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+    )
+
+    def callback(hwnd: int, _lparam: int) -> bool:
+        pid = ctypes.c_ulong()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if pid.value != process_id or not user32.IsWindowVisible(hwnd):
+            return True
+        rect = WinRect()
+        area = 0
+        if user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+            area = max(0, int(rect.right - rect.left)) * max(
+                0,
+                int(rect.bottom - rect.top),
+            )
+        candidates.append((area, int(hwnd)))
+        return True
+
+    callback_fn = enum_windows_proc(callback)
+    user32.EnumWindows(callback_fn, 0)
+    return max(candidates, default=(0, 0))[1] or None
+
+
+def foreground_window_context() -> dict[str, Any]:
+    if sys.platform != "win32":
+        return {"pid": 0, "desktopId": ""}
+    try:
+        user32 = ctypes.windll.user32
+        hwnd = int(user32.GetForegroundWindow() or 0)
+        pid = ctypes.c_ulong()
+        if hwnd:
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        return {
+            "pid": int(pid.value),
+            "desktopId": window_virtual_desktop_id(hwnd),
+        }
+    except Exception:
+        logging.debug("could not inspect foreground desktop", exc_info=True)
+        return {"pid": 0, "desktopId": ""}
+
+
+def current_process_virtual_desktop_id() -> str:
+    return window_virtual_desktop_id(find_visible_process_window(os.getpid()))
+
+
 def load_window_state(min_width: int, min_height: int) -> dict[str, Any]:
     try:
         state = json.loads(window_state_path().read_text(encoding="utf-8"))
@@ -1988,6 +2234,14 @@ class HandoffServer(ThreadingHTTPServer):
         self.browser_base_url = browser_base_url
 
 
+def normalize_handoff_id(value: Any) -> str:
+    return "".join(
+        character
+        for character in str(value or "").strip()
+        if character.isascii() and (character.isalnum() or character in "-_")
+    )[:96]
+
+
 class HandoffHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -2032,29 +2286,38 @@ class HandoffHandler(BaseHTTPRequestHandler):
             body = self.rfile.read(content_length) if content_length else b"{}"
             payload = json.loads(body.decode("utf-8"))
             paths = payload.get("files") if isinstance(payload, dict) else None
+            request_id = (
+                normalize_handoff_id(payload.get("requestId"))
+                if isinstance(payload, dict)
+                else ""
+            )
             if not isinstance(paths, list):
                 raise ValueError("files must be a list")
 
             clean_paths = [
                 str(path) for path in paths if isinstance(path, str)
             ][:1]
-            if not self.server.api.has_openable_external_paths(  # type: ignore[attr-defined]
+            if not request_id:
+                self._send_json(400, {"ok": False, "error": "missing_request_id"})
+                return
+
+            accepted = self.server.api.accept_external_paths(  # type: ignore[attr-defined]
                 clean_paths,
-            ):
+                self.server.browser_base_url,  # type: ignore[attr-defined]
+                request_id,
+            )
+            if not accepted:
                 self._send_json(422, {"ok": False, "error": "no_supported_files"})
                 return
 
-            thread = threading.Thread(
-                target=self.server.api.open_external_paths,  # type: ignore[attr-defined]
-                args=(
-                    clean_paths,
-                    self.server.browser_base_url,  # type: ignore[attr-defined]
-                ),
-                daemon=True,
+            self._send_json(
+                200,
+                {
+                    "ok": True,
+                    "accepted": accepted,
+                    "requestId": request_id,
+                },
             )
-            thread.start()
-
-            self._send_json(200, {"ok": True, "accepted": len(clean_paths)})
         except Exception as exc:
             logging.warning("external file handoff failed: %s", exc)
             self._send_json(400, {"ok": False, "error": "bad_request"})
@@ -2106,34 +2369,43 @@ def start_instance_registration(command_port: int) -> threading.Event:
     started_at = time.time()
     record_path = instance_dir() / f"{os.getpid()}.json"
     last_active = started_at
+    desktop_id = ""
 
-    def write_record(seen_at: float, active_at: float) -> None:
+    def write_record(
+        seen_at: float,
+        active_at: float,
+        virtual_desktop_id: str,
+    ) -> None:
         record = {
             "pid": os.getpid(),
             "port": command_port,
             "startedAt": started_at,
             "lastSeen": seen_at,
             "lastActive": active_at,
+            "desktopId": virtual_desktop_id,
         }
         tmp_path = record_path.with_suffix(".json.tmp")
         tmp_path.write_text(json.dumps(record, indent=2), encoding="utf-8")
         tmp_path.replace(record_path)
 
     try:
-        write_record(started_at, last_active)
+        write_record(started_at, last_active, desktop_id)
     except OSError:
         logging.debug(
             "could not write initial LamaNotes instance record", exc_info=True
         )
 
     def registration_loop() -> None:
-        nonlocal last_active
+        nonlocal desktop_id, last_active
         while not stop_event.is_set():
             now = time.time()
             if current_process_has_foreground_window():
                 last_active = now
+            current_desktop_id = current_process_virtual_desktop_id()
+            if current_desktop_id:
+                desktop_id = current_desktop_id
             try:
-                write_record(now, last_active)
+                write_record(now, last_active, desktop_id)
             except OSError:
                 logging.debug(
                     "could not write LamaNotes instance record", exc_info=True
@@ -2152,40 +2424,146 @@ def handoff_to_existing_instance(paths: list[str] | None = None) -> bool:
     if not clean_paths:
         return False
 
+    context = foreground_window_context()
     records = load_instance_records()
+    for record in records:
+        if record.get("desktopId"):
+            continue
+        process_id = int(record.get("pid", 0) or 0)
+        desktop_id = window_virtual_desktop_id(
+            find_visible_process_window(process_id)
+        )
+        if desktop_id:
+            record["desktopId"] = desktop_id
+    records = select_instance_records(
+        records,
+        preferred_pid=int(context.get("pid", 0) or 0),
+        preferred_desktop_id=str(context.get("desktopId", "") or ""),
+    )
+    handoff_id = secrets.token_urlsafe(18)
     for record in records:
         port = record.get("port")
         if not isinstance(port, int):
             continue
 
-        payload = json.dumps({"files": clean_paths}).encode("utf-8")
+        payload = json.dumps(
+            {
+                "files": clean_paths,
+                "requestId": handoff_id,
+            }
+        ).encode("utf-8")
         handoff_request = request.Request(
             f"http://127.0.0.1:{port}/open-files",
             data=payload,
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        try:
-            with request.urlopen(
-                handoff_request,
-                timeout=HANDOFF_TIMEOUT_SECONDS,
-            ) as response:
-                if 200 <= response.status < 300:
-                    logging.info(
-                        "reused LamaNotes pid=%s port=%s files=%s",
-                        record.get("pid"),
-                        port,
-                        len(clean_paths),
-                    )
-                    return True
-        except Exception:
-            remove_instance_record(record)
+        for attempt in range(HANDOFF_RETRY_ATTEMPTS):
+            try:
+                with request.urlopen(
+                    handoff_request,
+                    timeout=HANDOFF_TIMEOUT_SECONDS,
+                ) as response:
+                    if 200 <= response.status < 300:
+                        logging.info(
+                            "reused LamaNotes pid=%s port=%s files=%s desktop_match=%s",
+                            record.get("pid"),
+                            port,
+                            len(clean_paths),
+                            bool(
+                                context.get("desktopId")
+                                and record.get("desktopId")
+                                == context.get("desktopId")
+                            ),
+                        )
+                        return True
+            except Exception as exc:
+                if is_handoff_timeout(exc):
+                    if attempt + 1 < HANDOFF_RETRY_ATTEMPTS:
+                        continue
+                    if is_process_running(int(record.get("pid", 0) or 0)):
+                        logging.info(
+                            "handoff response timed out for live pid=%s; "
+                            "keeping the accepted target to avoid a duplicate window",
+                            record.get("pid"),
+                        )
+                        return True
+                break
+        remove_instance_record(record)
 
     return False
 
 
 def handoff_files_to_existing_instance(paths: list[str]) -> bool:
     return handoff_to_existing_instance(paths)
+
+
+def is_handoff_timeout(exc: Exception) -> bool:
+    reason = exc.reason if isinstance(exc, error.URLError) else exc
+    return isinstance(reason, (TimeoutError, socket.timeout)) or "timed out" in str(
+        reason
+    ).lower()
+
+
+def rank_instance_records(
+    records: list[dict[str, Any]],
+    *,
+    preferred_pid: int = 0,
+    preferred_desktop_id: str = "",
+) -> list[dict[str, Any]]:
+    normalized_desktop_id = str(preferred_desktop_id or "").lower()
+    return sorted(
+        records,
+        key=lambda item: (
+            bool(preferred_pid and int(item.get("pid", 0) or 0) == preferred_pid),
+            bool(
+                normalized_desktop_id
+                and str(item.get("desktopId", "") or "").lower()
+                == normalized_desktop_id
+            ),
+            float(item.get("lastActive", 0) or 0),
+            float(item.get("lastSeen", 0) or 0),
+            float(item.get("startedAt", 0) or 0),
+        ),
+        reverse=True,
+    )
+
+
+def select_instance_records(
+    records: list[dict[str, Any]],
+    *,
+    preferred_pid: int = 0,
+    preferred_desktop_id: str = "",
+) -> list[dict[str, Any]]:
+    ranked = rank_instance_records(
+        records,
+        preferred_pid=preferred_pid,
+        preferred_desktop_id=preferred_desktop_id,
+    )
+    normalized_desktop_id = str(preferred_desktop_id or "").lower()
+    if not normalized_desktop_id:
+        return ranked
+
+    current_desktop = [
+        record
+        for record in ranked
+        if (
+            preferred_pid
+            and int(record.get("pid", 0) or 0) == preferred_pid
+        )
+        or str(record.get("desktopId", "") or "").lower()
+        == normalized_desktop_id
+    ]
+    if current_desktop:
+        return current_desktop
+
+    # When Windows resolves all existing windows to other desktops, opening a
+    # file here should create one window on this desktop instead of moving the
+    # user's work to another desktop. Fall back only when the desktop API did
+    # not produce any usable identity (older or restricted Windows hosts).
+    if any(record.get("desktopId") for record in ranked):
+        return []
+    return ranked
 
 
 def load_instance_records() -> list[dict[str, Any]]:
