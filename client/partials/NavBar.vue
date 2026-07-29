@@ -62,7 +62,7 @@
         class="lamanotes-navbar-icon-only lamanotes-icon-only"
         @click="toggleMenu"
       />
-      <PrimeMenu ref="menu" :model="menuItems" :popup="true" />
+      <PopupMenu ref="menu" :model="menuItems" :popup="true" />
     </div>
   </nav>
 </template>
@@ -79,12 +79,12 @@ import {
   mdilPlusCircle,
 } from "@mdi/light-js";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useToast } from "primevue/usetoast";
+import { useToast } from "../toastStore.js";
 import { RouterLink, useRouter } from "vue-router";
 
 import { clearApiCaches, logOutSession } from "../api.js";
 import CustomButton from "../components/CustomButton.vue";
-import PrimeMenu from "../components/PrimeMenu.vue";
+import PopupMenu from "../components/PopupMenu.vue";
 import { authTypes, params, searchSortOptions } from "../constants.js";
 import { useGlobalStore } from "../globalStore.js";
 import { getToastOptions, toggleTheme } from "../helpers.js";

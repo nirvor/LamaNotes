@@ -76,7 +76,7 @@
 <script setup>
 import { mdiGoogle } from "@mdi/js";
 import { mdilLogin } from "@mdi/light-js";
-import { useToast } from "primevue/usetoast";
+import { useToast } from "../toastStore.js";
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 

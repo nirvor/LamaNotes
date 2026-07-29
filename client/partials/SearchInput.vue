@@ -105,7 +105,7 @@
 <script setup>
 import { mdiTag } from "@mdi/js";
 import { mdilMagnify } from "@mdi/light-js";
-import { useToast } from "primevue/usetoast";
+import { useToast } from "../toastStore.js";
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 

@@ -6,6 +6,7 @@ import contextlib
 import ctypes
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import importlib
 import ipaddress
 import json
 import logging
@@ -21,20 +22,10 @@ import tempfile
 import threading
 import time
 import uuid
-import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib import error, parse, request
-
-import webview
-from webview.dom import DOMEventHandler
-from webview.menu import Menu, MenuAction, MenuSeparator
-import urllib3
-from watchdog.events import FileSystemEventHandler
-from watchdog.observers import Observer
-
-from update_manifest import verify_update_manifest_signature
 
 DEFAULT_URL = "https://notes.thuber.org"
 APP_NAME = "LamaNotes"
@@ -100,6 +91,26 @@ WINDOWS_UPDATE_REQUIRED_FILES = (
     "app/_internal/webview/lib/runtimes/win-x86/native/WebView2Loader.dll",
 )
 
+webview = None
+DOMEventHandler = None
+Menu = None
+MenuAction = None
+MenuSeparator = None
+
+
+def load_webview() -> Any:
+    global webview, DOMEventHandler, Menu, MenuAction, MenuSeparator
+    if webview is None:
+        webview = importlib.import_module("webview")
+        DOMEventHandler = importlib.import_module(
+            "webview.dom"
+        ).DOMEventHandler
+        menu_module = importlib.import_module("webview.menu")
+        Menu = menu_module.Menu
+        MenuAction = menu_module.MenuAction
+        MenuSeparator = menu_module.MenuSeparator
+    return webview
+
 
 class WindowsGuid(ctypes.Structure):
     _fields_ = [
@@ -111,6 +122,8 @@ class WindowsGuid(ctypes.Structure):
 
 
 def validate_windows_update_archive(path: str | Path) -> None:
+    import zipfile
+
     try:
         with zipfile.ZipFile(Path(path)) as archive:
             files = {
@@ -348,8 +361,8 @@ class NativeFileStore:
         self._pending_changes: set[str] = set()
         self._watched_directories: set[str] = set()
         self._lock = threading.RLock()
-        self._observer: Observer | None = None
-        self._event_handler = NativeFileEventHandler(self._mark_path_changed)
+        self._observer: Any | None = None
+        self._event_handler: Any | None = None
 
     def payloads_for_paths(
         self,
@@ -520,11 +533,16 @@ class NativeFileStore:
         return path.is_file() and path.suffix.lower() in ALLOWED_EXTENSIONS
 
     def _watch_directory(self, directory: Path) -> None:
+        from watchdog.observers import Observer
+
         directory_key = normalized_path_key(directory)
         with self._lock:
             if directory_key in self._watched_directories:
                 return
             if self._observer is None:
+                self._event_handler = create_native_file_event_handler(
+                    self._mark_path_changed
+                )
                 self._observer = Observer()
                 self._observer.start()
             self._observer.schedule(
@@ -542,18 +560,19 @@ class NativeFileStore:
                     self._pending_changes.add(file_id)
 
 
-class NativeFileEventHandler(FileSystemEventHandler):
-    def __init__(self, callback: Any) -> None:
-        super().__init__()
-        self._callback = callback
+def create_native_file_event_handler(callback: Any):
+    from watchdog.events import FileSystemEventHandler
 
-    def on_any_event(self, event: Any) -> None:
-        if event.is_directory:
-            return
-        self._callback(event.src_path)
-        destination = getattr(event, "dest_path", "")
-        if destination:
-            self._callback(destination)
+    class NativeFileEventHandler(FileSystemEventHandler):
+        def on_any_event(self, event: Any) -> None:
+            if event.is_directory:
+                return
+            callback(event.src_path)
+            destination = getattr(event, "dest_path", "")
+            if destination:
+                callback(destination)
+
+    return NativeFileEventHandler()
 
 
 class LamaNotesApi:
@@ -767,8 +786,9 @@ class LamaNotesApi:
         if not self._window:
             return []
 
+        webview_module = load_webview()
         paths = self._window.create_file_dialog(
-            webview.OPEN_DIALOG,
+            webview_module.OPEN_DIALOG,
             allow_multiple=False,
             file_types=(
                 "Text and config (*.md;*.txt;*.cfg;*.ini;*.json;*.yaml;*.yml;*.toml;*.xml;*.log;*.csv;*.tex)",
@@ -813,8 +833,9 @@ class LamaNotesApi:
         safe_name = Path(str(suggested_name or "New Note.md")).name
         if Path(safe_name).suffix.lower() not in ALLOWED_EXTENSIONS:
             safe_name = f"{safe_name}.md"
+        webview_module = load_webview()
         selected = self._window.create_file_dialog(
-            webview.SAVE_DIALOG,
+            webview_module.SAVE_DIALOG,
             save_filename=safe_name,
             file_types=(
                 "Text and config (*.md;*.txt;*.cfg;*.ini;*.json;*.yaml;*.yml;*.toml;*.xml;*.log;*.csv;*.tex)",
@@ -960,6 +981,8 @@ class LamaNotesApi:
                 validate_update_response_url(manifest_url, response.geturl())
                 manifest = json.loads(response.read().decode("utf-8-sig"))
             validate_update_manifest(manifest)
+            from update_manifest import verify_update_manifest_signature
+
             signature_verified = verify_update_manifest_signature(
                 manifest,
                 metadata.get("updateSigningPublicKey", ""),
@@ -1946,14 +1969,34 @@ class LocalProxyServer(ThreadingHTTPServer):
         self.credential_store = credential_store
         self._upstream_state_lock = threading.Lock()
         self._upstream_offline_until = 0.0
-        self.upstream_pool = urllib3.PoolManager(
-            num_pools=2,
-            maxsize=8,
-            block=True,
-            retries=False,
-            timeout=urllib3.Timeout(connect=1.25, read=30),
-        )
+        self._upstream_pool_lock = threading.Lock()
+        self._upstream_pool = None
         super().__init__(server_address, LocalProxyHandler)
+
+    def get_upstream_pool(self) -> Any:
+        with self._upstream_pool_lock:
+            if self._upstream_pool is None:
+                urllib3 = importlib.import_module("urllib3")
+                self._upstream_pool = urllib3.PoolManager(
+                    num_pools=2,
+                    maxsize=8,
+                    block=True,
+                    retries=False,
+                    timeout=urllib3.Timeout(connect=1.25, read=30),
+                )
+            return self._upstream_pool
+
+    def warm_upstream_pool(self) -> None:
+        def warm() -> None:
+            try:
+                self.get_upstream_pool()
+            except Exception:
+                logging.warning(
+                    "could not warm local proxy upstream pool",
+                    exc_info=True,
+                )
+
+        threading.Thread(target=warm, daemon=True).start()
 
     def upstream_is_temporarily_offline(self) -> bool:
         with self._upstream_state_lock:
@@ -1968,9 +2011,10 @@ class LocalProxyServer(ThreadingHTTPServer):
             self._upstream_offline_until = time.monotonic() + 2.0
 
     def server_close(self) -> None:
-        upstream_pool = getattr(self, "upstream_pool", None)
-        if upstream_pool is not None:
-            upstream_pool.clear()
+        with self._upstream_pool_lock:
+            if self._upstream_pool is not None:
+                self._upstream_pool.clear()
+                self._upstream_pool = None
         super().server_close()
 
 
@@ -2082,7 +2126,7 @@ class LocalProxyHandler(BaseHTTPRequestHandler):
 
         response = None
         try:
-            response = self.server.upstream_pool.request(  # type: ignore[attr-defined]
+            response = self.server.get_upstream_pool().request(  # type: ignore[attr-defined]
                 self.command,
                 upstream_url,
                 body=body,
@@ -2693,51 +2737,6 @@ def build_url(base_url: str, files: list[str], route: str = "") -> str:
     return f"{base_url}{normalize_app_route(route)}" if route else base_url
 
 
-def startup_html() -> str:
-    return """
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>
-      html,
-      body {
-        height: 100%;
-        margin: 0;
-        background: #20252b;
-        color: #f6f8fb;
-        font-family: "Segoe UI", system-ui, sans-serif;
-      }
-
-      body {
-        display: grid;
-        place-items: center;
-      }
-
-      .loader {
-        width: 34px;
-        height: 34px;
-        border: 2px solid rgba(39, 179, 205, 0.18);
-        border-top-color: #27b3cd;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-      }
-
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="loader" aria-label="Loading LamaNotes"></div>
-  </body>
-</html>
-""".strip()
-
-
 def dispatch_native_file_drag_state(window: webview.Window, active: bool) -> None:
     active_json = "true" if active else "false"
     run_js(
@@ -2753,6 +2752,8 @@ def register_native_file_drop(
     api: LamaNotesApi,
     browser_base_url: str,
 ) -> None:
+    load_webview()
+
     def handle_drop(event: Any) -> None:
         dispatch_native_file_drag_state(window, False)
         paths = paths_from_native_drop_event(event)
@@ -2781,18 +2782,6 @@ def register_native_file_drop(
 
     window.events.loaded += attach_to_page
     setattr(window, "_lamanotes_drop_page_handler", attach_to_page)
-
-
-def load_start_url_after_gui(
-    window: webview.Window,
-    start_url: str,
-    api: LamaNotesApi,
-    browser_base_url: str,
-) -> None:
-    logging.info("webview gui started")
-    register_native_file_drop(window, api, browser_base_url)
-    logging.info("loading start url %s", start_url)
-    window.load_url(start_url)
 
 
 def run_js(window: webview.Window, script: str) -> None:
@@ -2834,6 +2823,8 @@ def dispatch_native_launch_consumption(
 
 
 def build_menu(window_ref: dict[str, webview.Window], base_url: str) -> list[Menu]:
+    load_webview()
+
     def window() -> webview.Window | None:
         return window_ref.get("window")
 
@@ -2919,7 +2910,13 @@ def main() -> None:
             static_root=shell_root,
             credential_store=credential_store,
         )
+        initial_route = parse.urlsplit(normalize_app_route(args.route)).path
+        if not args.files and initial_route != "/open-file":
+            # Library starts can prepare the RackNerd connection while
+            # pywebview imports. Local files never pay for that network stack.
+            proxy_server.warm_upstream_pool()
 
+    webview_module = load_webview()
     api = LamaNotesApi(
         file_store,
         args.files,
@@ -2935,9 +2932,9 @@ def main() -> None:
     icon_path = resource_path("lamanotes.ico")
     saved_window_state = load_window_state(args.min_width, args.min_height)
 
-    window = webview.create_window(
+    window = webview_module.create_window(
         APP_NAME,
-        html=startup_html(),
+        url=start_url,
         js_api=api,
         width=saved_window_state.get("width", args.width),
         height=saved_window_state.get("height", args.height),
@@ -2956,15 +2953,15 @@ def main() -> None:
     logging.info("window created")
     api._window = window
     window_ref["window"] = window
+    register_native_file_drop(window, api, browser_base_url)
     handoff_server, handoff_port = start_handoff_server(api, browser_base_url)
     api.set_google_handoff_port(handoff_port)
     instance_registration_stop = start_instance_registration(handoff_port)
     register_window_state_events(window, args.min_width, args.min_height)
     window_state_stop = start_window_state_persistence(args.min_width, args.min_height)
     try:
-        webview.start(
-            load_start_url_after_gui,
-            args=(window, start_url, api, browser_base_url),
+        logging.info("starting webview with prepared url")
+        webview_module.start(
             gui="edgechromium",
             debug=args.debug,
             private_mode=False,

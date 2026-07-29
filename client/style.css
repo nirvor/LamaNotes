@@ -48,6 +48,8 @@
     --theme-text-very-muted: 104 116 132;
     --theme-shadow: 215 224 232;
     --theme-border: 213 222 231;
+    --theme-success: 5 150 105;
+    --theme-danger: 225 29 72;
     --theme-warning: 161 98 7;
     --theme-home-mark-filter: grayscale(1) contrast(1.18);
     --theme-home-mark-opacity: 0.22;
@@ -119,6 +121,8 @@
     --theme-text-very-muted: 155 168 185;
     --theme-shadow: none;
     --theme-border: 78 91 108;
+    --theme-success: 52 211 153;
+    --theme-danger: 251 113 133;
     --theme-warning: 251 191 36;
     --theme-home-mark-filter: grayscale(1) brightness(1.42) contrast(0.82);
     --theme-home-mark-opacity: 0.2;

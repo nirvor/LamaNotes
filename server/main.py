@@ -32,6 +32,7 @@ from auth.scopes import (
     PUBLICATIONS_WRITE,
     RESEARCH_EDIT,
 )
+from client_bootstrap import ClientBootstrapResponse, client_config_response
 from global_config import AuthType, GlobalConfig, GlobalConfigResponseModel
 from helpers import replace_base_href
 from notes.base import BaseNotes
@@ -357,6 +358,24 @@ def auth_check() -> str:
     return "OK"
 
 
+@router.get(
+    "/api/bootstrap",
+    dependencies=read_auth_deps,
+    response_model=ClientBootstrapResponse,
+)
+def get_client_bootstrap():
+    """Return the safe first-load contract without note bodies.
+
+    Authentication, UI config and the semantic Library index normally sit on
+    the same startup path. Combining the two safe payloads saves one network
+    roundtrip for browser and Windows clients.
+    """
+    return ClientBootstrapResponse(
+        config=client_config_response(global_config),
+        index=note_storage.get_semantic_index(),
+    )
+
+
 # endregion
 
 
@@ -556,16 +575,7 @@ def get_semantic_index():
 @router.get("/api/config", response_model=GlobalConfigResponseModel)
 def get_config():
     """Retrieve server-side config required for the UI."""
-    return GlobalConfigResponseModel(
-        auth_type=global_config.auth_type,
-        google_auth_enabled=global_config.google_auth_enabled,
-        password_login_enabled=global_config.password_login_enabled,
-        quick_access_hide=global_config.quick_access_hide,
-        quick_access_title=global_config.quick_access_title,
-        quick_access_term=global_config.quick_access_term,
-        quick_access_sort=global_config.quick_access_sort,
-        quick_access_limit=global_config.quick_access_limit,
-    )
+    return client_config_response(global_config)
 
 
 # endregion

@@ -80,11 +80,22 @@ responsive rules and anti-patterns for every host and note type.
 ## Performance standard
 
 - Local startup is independent of authentication and Library availability.
+- An authenticated first load may combine safe UI config and body-free index
+  metadata in one response; note bodies remain on demand.
 - Heavy viewers, diagrams, media tools and uncommon syntax modes load lazily.
 - Warm Library data may accelerate reads but never becomes a second source of
   truth.
 - Background polling pauses or slows when the app is hidden.
 - Repeated note switches must settle without unbounded memory growth.
+- `docs/PERFORMANCE.md` defines the reproducible regression budgets.
+
+## Trusted beta
+
+An additional installation remains another trusted device for the same
+logical Library principal. It does not create an account, collaborator or
+private share. Every authenticated device receives the same Library authority;
+local Workspace files remain device-local. The onboarding, update-trust and
+offboarding boundary is defined in `docs/TRUSTED_BETA.md`.
 
 ## Non-goals
 

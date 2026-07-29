@@ -19,6 +19,12 @@ credentials, private note content, host names or deployment details.
 - Windows update metadata and packages are readable without a Library session
   so an installed client can update before login.
 
+An additional trusted-beta device uses the same logical principal and receives
+the same Library authority. LamaNotes has no per-person access, per-note share
+or per-device server revocation. Do not onboard another device unless its user
+may read and change the complete Library. `docs/TRUSTED_BETA.md` defines the
+manual trust and offboarding procedure.
+
 Password sessions use an HttpOnly, Secure, SameSite-Strict cookie in the hosted
 client. The Windows client uses a bearer session protected with Windows DPAPI.
 Google OAuth secrets remain server-side; the native handoff uses the system

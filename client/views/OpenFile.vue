@@ -266,7 +266,7 @@ import {
   useRoute,
   useRouter,
 } from "vue-router";
-import { useToast } from "primevue/usetoast";
+import { useToast } from "../toastStore.js";
 
 import { apiErrorHandler, createNote } from "../api.js";
 import { writePlainTextToClipboard } from "../clipboard.js";
@@ -298,7 +298,10 @@ import {
 import { buildLocalLibraryNote } from "../localNotePromotion.js";
 import { localFilePathContext } from "../localFilePath.js";
 import { reportNativeReady } from "../nativeTelemetry.js";
-import { createDebouncedWork } from "../performanceScheduling.js";
+import {
+  createDebouncedWork,
+  scheduleIdleWork,
+} from "../performanceScheduling.js";
 
 const ToastViewer = defineAsyncComponent(
   () => import("../components/toastui/ToastViewer.vue"),
@@ -328,11 +331,6 @@ const router = useRouter();
 const toast = useToast();
 const globalStore = useGlobalStore();
 const localFileStorageAdapter = createLocalFileStorageAdapter();
-
-if (desktopShell.enabled) {
-  // Overlap the editor chunk with native file handoff instead of waiting for it.
-  void loadSourceEditor();
-}
 
 const activeFile = computed(
   () => files.value.find((file) => file.key === activeKey.value) || null,
@@ -470,6 +468,7 @@ let pathCopyResetTimer = null;
 let nativeWatcherBusy = false;
 let scrollSaveTimer = null;
 let localLoadStartedAt = performance.now();
+let editorInteractionStartedAt = null;
 let localLoadGeneration = 0;
 let lastEditorReadyGeneration = -1;
 let lastFileReadyGeneration = -1;
@@ -478,6 +477,7 @@ let textDropEditorReady = null;
 let latestTextDropPosition = null;
 let textDropPreviewActive = false;
 let pendingFileDecision = null;
+let cancelEditorWarmup = null;
 const draftPersistence = createDebouncedWork(persistDraftState, 240);
 const requestFileReplacement = createFileReplacementQueue({
   hasUnsavedChanges: () => Boolean(activeFile.value?.dirty),
@@ -543,6 +543,7 @@ onUnmounted(() => {
   textDropPreviewActive = false;
   flushDraftPersistence();
   draftPersistence.cancel();
+  cancelEditorWarmup?.();
   window.clearInterval(nativeWatcherTimer);
   window.clearTimeout(pathCopyResetTimer);
   window.clearTimeout(scrollSaveTimer);
@@ -923,7 +924,7 @@ function createLocalDraft(draftId) {
   activeKey.value = file.key;
   clearDesktopFileSession();
   documentSession.setDirty(file.dirty);
-  documentSession.enterEdit();
+  setEditMode(true);
   showStatus("Local draft. Save to choose its Windows file.");
 }
 
@@ -1264,6 +1265,8 @@ function refreshPreview(file) {
 
 function setEditMode(value) {
   if (value) {
+    editorInteractionStartedAt = performance.now();
+    cancelEditorWarmup?.();
     documentSession.enterEdit();
   } else {
     documentSession.leaveEdit();
@@ -1457,7 +1460,7 @@ function restoreLaunchSession(session) {
     documentSession.setDirty(Boolean(restoredActive.dirty));
   }
   if (session.editMode && activeFile.value) {
-    documentSession.enterEdit();
+    setEditMode(true);
   }
   restoreActiveScroll();
 }
@@ -1729,19 +1732,40 @@ function reportFileReady() {
       lastFileReadyGeneration = generation;
       performance.mark("lamanotes-file-ready");
       reportLocalReady("file");
+      scheduleSourceEditorWarmup();
     });
   });
 }
 
 function reportLocalReady(phase) {
+  const phaseStartedAt =
+    phase === "editor" && editorInteractionStartedAt != null
+      ? editorInteractionStartedAt
+      : localLoadStartedAt;
   reportNativeReady({
     phase,
     route: router.currentRoute.value.fullPath,
     browserMs: Math.round(performance.now()),
-    routeMs: Math.round(performance.now() - localLoadStartedAt),
+    routeMs: Math.round(performance.now() - phaseStartedAt),
     fileBytes: activeFile.value?.size || 0,
     loadId: localLoadGeneration,
   });
+  if (phase === "editor") {
+    editorInteractionStartedAt = null;
+  }
+}
+
+function scheduleSourceEditorWarmup() {
+  if (!desktopShell.enabled || editMode.value || cancelEditorWarmup) {
+    return;
+  }
+  cancelEditorWarmup = scheduleIdleWork(
+    () => {
+      cancelEditorWarmup = null;
+      void loadSourceEditor();
+    },
+    { delay: 280, timeout: 1200 },
+  );
 }
 
 function formatBytes(bytes = 0) {

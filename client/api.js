@@ -27,9 +27,11 @@ const api = axios.create();
 let configCache = null;
 const noteCache = new Map();
 const searchCache = new Map();
+let cacheGeneration = 0;
 let semanticIndexCache = null;
 let tagCache = null;
 let configRequest = null;
+let bootstrapRequest = null;
 let semanticIndexRequest = null;
 let semanticIndexRevalidatedAt = 0;
 const noteRequests = new Map();
@@ -95,6 +97,8 @@ export function apiErrorHandler(error, toast) {
 }
 
 export function clearApiCaches() {
+  cacheGeneration += 1;
+  bootstrapRequest = null;
   configCache = null;
   noteCache.clear();
   searchCache.clear();
@@ -131,6 +135,14 @@ export async function getConfig({ force = false } = {}) {
   }
 
   if (!force) {
+    if (bootstrapRequest) {
+      return bootstrapRequest.then(() => {
+        if (configCache?.data) {
+          return { ...configCache.data };
+        }
+        return fetchConfig();
+      });
+    }
     const warmConfig = getCachedConfig();
     if (warmConfig) {
       void fetchConfig().catch(() => {});
@@ -182,12 +194,34 @@ export async function logOutSession() {
 }
 
 export async function authCheck() {
-  try {
-    const response = await api.get("api/auth-check");
-    return response.data;
-  } catch (response) {
-    return Promise.reject(response);
+  if (bootstrapRequest) {
+    return bootstrapRequest;
   }
+
+  const requestGeneration = cacheGeneration;
+  const request = api
+    .get("api/bootstrap")
+    .then((response) => {
+      if (requestGeneration === cacheGeneration) {
+        applyBootstrap(response.data);
+      }
+      return "OK";
+    })
+    .catch((error) => {
+      // A newly built client can still be rolled back to an older compatible
+      // server. Keep the lightweight legacy endpoint as that safe fallback.
+      if (error?.response?.status === 404) {
+        return api.get("api/auth-check").then((response) => response.data);
+      }
+      return Promise.reject(error);
+    })
+    .finally(() => {
+      if (bootstrapRequest === request) {
+        bootstrapRequest = null;
+      }
+    });
+  bootstrapRequest = request;
+  return request;
 }
 
 export async function getNotes(term, sort, order, limit) {
@@ -314,6 +348,14 @@ export async function getSemanticIndex({ force = false } = {}) {
   }
 
   if (!force) {
+    if (bootstrapRequest) {
+      return bootstrapRequest.then(() => {
+        if (semanticIndexCache?.data) {
+          return cloneIndex(semanticIndexCache.data);
+        }
+        return fetchSemanticIndex();
+      });
+    }
     const warmIndex = getCachedSemanticIndex();
     if (warmIndex.length) {
       if (
@@ -440,10 +482,35 @@ function fetchSemanticIndex() {
   return semanticIndexRequest;
 }
 
+function applyBootstrap(payload) {
+  if (payload?.config && typeof payload.config === "object") {
+    configCache = {
+      loadedAt: Date.now(),
+      data: { ...payload.config },
+    };
+    setWarmConfig(payload.config);
+  }
+
+  if (Array.isArray(payload?.index)) {
+    const index = cloneIndex(payload.index);
+    semanticIndexCache = {
+      loadedAt: Date.now(),
+      data: index,
+    };
+    semanticIndexRevalidatedAt = Date.now();
+    tagCache = null;
+    setWarmIndex(index);
+    dispatchLibraryEvent(libraryIndexUpdatedEvent, cloneIndex(index));
+  }
+}
+
 function cloneIndex(index) {
   return (Array.isArray(index) ? index : []).map((note) => ({
     ...note,
     tags: Array.isArray(note.tags) ? [...note.tags] : [],
+    researchTopics: Array.isArray(note.researchTopics)
+      ? [...note.researchTopics]
+      : [],
   }));
 }
 

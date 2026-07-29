@@ -17,7 +17,7 @@
           class="lamanotes-icon-only mb-1"
           @click="toggleSortMenu"
         />
-        <PrimeMenu ref="sortMenu" :model="menuItems" :popup="true" />
+        <PopupMenu ref="sortMenu" :model="menuItems" :popup="true" />
       </div>
 
       <!-- Search Results -->
@@ -72,7 +72,7 @@
 </template>
 
 <script setup>
-import { useToast } from "primevue/usetoast";
+import { useToast } from "../toastStore.js";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
@@ -80,7 +80,7 @@ import { mdiPlusCircle, mdiSort } from "@mdi/js";
 import { apiErrorHandler, getNotes, prefetchNote } from "../api.js";
 import CustomButton from "../components/CustomButton.vue";
 import LoadingIndicator from "../components/LoadingIndicator.vue";
-import PrimeMenu from "../components/PrimeMenu.vue";
+import PopupMenu from "../components/PopupMenu.vue";
 import Tag from "../components/Tag.vue";
 import { params, searchSortOptions } from "../constants.js";
 import { shouldAutoFocusSearch } from "../inputModality.js";

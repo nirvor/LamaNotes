@@ -215,8 +215,7 @@ import {
   mdilDelete,
   mdilPencil,
 } from "@mdi/light-js";
-import Mousetrap from "mousetrap";
-import { useToast } from "primevue/usetoast";
+import { useToast } from "../toastStore.js";
 import {
   computed,
   defineAsyncComponent,
@@ -261,6 +260,7 @@ import { useDocumentFind } from "../documentFind.js";
 import { desktopShell, setDesktopWindowTitle } from "../desktopShell.js";
 import { useGlobalStore } from "../globalStore.js";
 import { getToastOptions } from "../helpers.js";
+import { isEditableShortcutTarget, isPlainKey } from "../keyboardShortcuts.js";
 import { isCurrentTokenStored } from "../tokenStorage.js";
 import {
   isPublicationPending,
@@ -1200,13 +1200,17 @@ function contentChangedHandler() {
   }
 }
 
-// Keyboard Shortcuts
-// 'e' to edit
-Mousetrap.bind("e", () => {
-  if (editMode.value === false && canModify.value) {
+function noteShortcutHandler(event) {
+  if (
+    isPlainKey(event, "e") &&
+    !isEditableShortcutTarget(event.target) &&
+    editMode.value === false &&
+    canModify.value
+  ) {
+    event.preventDefault();
     editHandler();
   }
-});
+}
 
 function keydownHandler(event) {
   documentSession.keydownHandler(event);
@@ -1708,6 +1712,7 @@ watch(
   },
 );
 onMounted(() => {
+  window.addEventListener("keydown", noteShortcutHandler);
   window.addEventListener(libraryNoteUpdatedEvent, cachedNoteUpdatedHandler);
   window.addEventListener(libraryNoteDeletedEvent, cachedNoteDeletedHandler);
   init();
@@ -1716,7 +1721,7 @@ onUnmounted(() => {
   clearContentChangedTimeout();
   publicationRequestSequence += 1;
   window.clearTimeout(publicationPollTimer);
-  Mousetrap.unbind("e");
+  window.removeEventListener("keydown", noteShortcutHandler);
   window.removeEventListener(libraryNoteUpdatedEvent, cachedNoteUpdatedHandler);
   window.removeEventListener(libraryNoteDeletedEvent, cachedNoteDeletedHandler);
   globalStore.clearNoteActions();

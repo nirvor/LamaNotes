@@ -39,6 +39,12 @@ The installer performs a small connectivity check but does not fail when the
 machine is offline. Local text and configuration files remain available without
 the VPS.
 
+Installing on another PC does not create another account or Library. It is a
+trusted device for the same single-principal service and can access the full
+Library after login. Read the
+[trusted beta boundary](../../docs/TRUSTED_BETA.md) before onboarding a person
+outside the owner's own devices.
+
 ## Command-line install
 
 ```powershell

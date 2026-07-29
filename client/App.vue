@@ -13,7 +13,7 @@
         isNoteRoute && globalStore.noteLayoutKind === 'markdown',
     }"
   >
-    <PrimeToast />
+    <ToastHost />
     <SearchModal v-if="isSearchModalVisible" v-model="isSearchModalVisible" />
     <NavBar
       v-if="showNavBar"
@@ -35,9 +35,7 @@
 </template>
 
 <script setup>
-import Mousetrap from "mousetrap";
-import "mousetrap/plugins/global-bind/mousetrap-global-bind";
-import { useToast } from "primevue/usetoast";
+import { useToast } from "./toastStore.js";
 import {
   computed,
   defineAsyncComponent,
@@ -55,7 +53,7 @@ import {
   getConfig,
   getSemanticIndex,
 } from "./api.js";
-import PrimeToast from "./components/PrimeToast.vue";
+import ToastHost from "./components/ToastHost.vue";
 import { useGlobalStore } from "./globalStore.js";
 import { loadTheme } from "./helpers.js";
 import {
@@ -67,6 +65,7 @@ import {
   loadDesktopRouteScroll,
   saveDesktopRouteScroll,
 } from "./desktopSession.js";
+import { isEditableShortcutTarget, isPlainKey } from "./keyboardShortcuts.js";
 import NavBar from "./partials/NavBar.vue";
 import LoadingIndicator from "./components/LoadingIndicator.vue";
 import { openNewNote } from "./newNoteNavigation.js";
@@ -85,35 +84,32 @@ const navBar = ref();
 const route = useRoute();
 const toast = useToast();
 
-// '/' to search
-Mousetrap.bind("/", () => {
-  if (route.name !== "login") {
+function globalShortcutHandler(event) {
+  if (route.name === "login" || event.defaultPrevented || event.repeat) {
+    return;
+  }
+  if (isPlainKey(event, "/") && !isEditableShortcutTarget(event.target)) {
+    event.preventDefault();
     toggleSearchModal();
-    return false;
+    return;
   }
-});
-
-// 'CTRL + ALT/OPT + N' to create new note
-Mousetrap.bindGlobal("ctrl+alt+n", () => {
-  if (route.name !== "login") {
+  if (event.ctrlKey && event.altKey && !event.metaKey && event.key === "n") {
+    event.preventDefault();
     openNewNote(router);
-    return false;
+    return;
   }
-});
-
-// 'CTRL + ALT/OPT + H' to go to home
-Mousetrap.bindGlobal("ctrl+alt+h", () => {
-  if (route.name !== "login") {
+  if (event.ctrlKey && event.altKey && !event.metaKey && event.key === "h") {
+    event.preventDefault();
     router.push({ name: "home" });
-    return false;
   }
-});
+}
 
 let routeScrollTimer = null;
 let cancelDeferredConfig = null;
 let cancelIndexWarmup = null;
 
 onMounted(() => {
+  window.addEventListener("keydown", globalShortcutHandler);
   loadInitialConfig();
   if (desktopShell.enabled) {
     window.addEventListener("scroll", scheduleRouteScrollSave, {
@@ -124,6 +120,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener("keydown", globalShortcutHandler);
   cancelDeferredConfig?.();
   cancelIndexWarmup?.();
   window.clearTimeout(routeScrollTimer);
@@ -160,7 +157,7 @@ function loadInitialConfig() {
   }
 
   const refreshConfig = () =>
-    getConfig({ force: Boolean(warmConfig) })
+    getConfig()
       .then((data) => {
         globalStore.config = data;
         if (!warmConfig && !localFirst) {
@@ -186,8 +183,8 @@ function loadInitialConfig() {
 
   if (localFirst) {
     cancelDeferredConfig = scheduleIdleWork(refreshConfig, {
-      delay: 900,
-      timeout: 2200,
+      delay: 1400,
+      timeout: 2600,
     });
   } else {
     void refreshConfig();

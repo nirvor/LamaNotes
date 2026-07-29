@@ -20,6 +20,7 @@ from lamanotes_client import (
     LEGACY_CREDENTIAL_ENTROPY,
     SHARD_PATHW,
     CredentialStore,
+    LocalProxyServer,
     NativeFileStore,
     LamaNotesApi,
     add_to_windows_recent_documents,
@@ -984,6 +985,28 @@ class NativeFileStoreTests(unittest.TestCase):
 
 
 class LocalProxyTests(unittest.TestCase):
+    def test_upstream_pool_is_lazy_and_reused(self) -> None:
+        urllib3 = Mock()
+        pool = Mock()
+        urllib3.Timeout.return_value = "timeout"
+        urllib3.PoolManager.return_value = pool
+
+        with patch(
+            "lamanotes_client.importlib.import_module",
+            return_value=urllib3,
+        ) as import_module:
+            server = LocalProxyServer(("127.0.0.1", 0), "https://notes.example")
+            try:
+                import_module.assert_not_called()
+                self.assertIs(server.get_upstream_pool(), pool)
+                self.assertIs(server.get_upstream_pool(), pool)
+                import_module.assert_called_once_with("urllib3")
+                urllib3.PoolManager.assert_called_once()
+            finally:
+                server.server_close()
+
+        pool.clear.assert_called_once()
+
     def test_offline_response_is_marked_and_subsequent_call_is_fast(self) -> None:
         local_url, server = start_local_proxy("http://127.0.0.1:1", 0)
         try:

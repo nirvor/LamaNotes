@@ -5,6 +5,8 @@
       class="lamanotes-home-mark"
       alt=""
       aria-hidden="true"
+      decoding="async"
+      fetchpriority="low"
     />
     <div class="lamanotes-home-inner">
       <SearchInput
@@ -66,7 +68,7 @@
 <script setup>
 import SvgIcon from "@jamescoyle/vue-icon";
 import { mdiDotsHorizontal } from "@mdi/js";
-import { useToast } from "primevue/usetoast";
+import { useToast } from "../toastStore.js";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 
@@ -82,7 +84,7 @@ import { useGlobalStore } from "../globalStore.js";
 import { isCloudNetworkError } from "../desktopShell.js";
 import { shouldAutoFocusSearch } from "../inputModality.js";
 import SearchInput from "../partials/SearchInput.vue";
-import homeMarkUrl from "../assets/brand/lamanotes-icon-master.png";
+import homeMarkUrl from "../assets/brand/lamanotes-home-mark.webp";
 
 const globalStore = useGlobalStore();
 const homeSearchAutoFocus = shouldAutoFocusSearch(window);

@@ -55,6 +55,8 @@ collaboration suite or automatic multi-device file-sync service.
 
 - [Product contract](docs/PRODUCT.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Performance contract](docs/PERFORMANCE.md)
+- [Trusted beta boundary](docs/TRUSTED_BETA.md)
 - [Release and rollback](docs/RELEASE.md)
 - [Windows client](windows-client/README.md)
 - [RackNerd deployment](deploy/racknerd/README.md)

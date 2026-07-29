@@ -14,7 +14,7 @@ const [
   navBarSource,
   noteSource,
   openFileSource,
-  primeMenuSource,
+  popupMenuSource,
   renderSource,
   searchInputSource,
   styleSource,
@@ -29,7 +29,7 @@ const [
   readFile(clientFile("partials/NavBar.vue"), "utf8"),
   readFile(clientFile("views/Note.vue"), "utf8"),
   readFile(clientFile("views/OpenFile.vue"), "utf8"),
-  readFile(clientFile("components/PrimeMenu.vue"), "utf8"),
+  readFile(clientFile("components/PopupMenu.vue"), "utf8"),
   readFile(clientFile("components/toastui/renderEnhancements.js"), "utf8"),
   readFile(clientFile("partials/SearchInput.vue"), "utf8"),
   readFile(clientFile("style.css"), "utf8"),
@@ -113,7 +113,9 @@ test("V2 tokens and legacy aliases stay in one design contract", () => {
 });
 
 test("Home uses quiet navigation surfaces instead of an empty landing page", () => {
-  assert.match(homeSource, /lamanotes-icon-master\.png/);
+  assert.match(homeSource, /lamanotes-home-mark\.webp/);
+  assert.match(homeSource, /decoding="async"/);
+  assert.match(homeSource, /fetchpriority="low"/);
   assert.match(homeSource, /prominent-tag-cloud/);
   assert.match(homeSource, /lamanotes-home-pinned-section/);
   assert.match(homeSource, /pinnedNoteContext\(note\)/);
@@ -207,12 +209,15 @@ test("all routes share stable global toolbar anchors and a row-based menu", () =
   );
   assert.match(navBarSource, /var\(--ln-toolbar-max\)/);
   assert.match(styleSource, /--ln-toolbar-max: 68rem/);
-  assert.match(primeMenuSource, /lamanotes-menu-action/);
-  assert.doesNotMatch(primeMenuSource, /item\.controls/);
+  assert.match(popupMenuSource, /lamanotes-menu-action/);
+  assert.doesNotMatch(popupMenuSource, /item\.controls/);
   assert.match(
-    primeMenuSource,
-    /role: context\.item\.toggle \? "menuitemcheckbox" : "menuitem"/,
+    popupMenuSource,
+    /:role="item\.toggle \? 'menuitemcheckbox' : 'menuitem'"/,
   );
+  assert.match(popupMenuSource, /event\.key === "ArrowDown"/);
+  assert.match(popupMenuSource, /event\.key === "Escape"/);
+  assert.match(popupMenuSource, /anchor\.value\.focus/);
 });
 
 test("local file promotion and opening live in the menu", () => {

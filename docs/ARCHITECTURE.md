@@ -48,6 +48,12 @@ The FastAPI server owns authentication, HTML note storage, search metadata,
 attachments, publications and the bounded index consumed by the client. It
 stores no local Workspace paths.
 
+After authentication, `/api/bootstrap` combines the public UI configuration
+and body-free semantic index in one safe first-load response. The separate
+`/api/config`, `/api/index` and legacy `/api/auth-check` routes remain
+compatible fallbacks. The client seeds its existing bounded caches from the
+combined response; this is not another persistence layer.
+
 The bounded `/api/index` response and per-note context share a derived
 `researchTopics` field. It is populated only when the normalized tags contain
 the exact `research` tag, and then only with sorted, deduplicated
@@ -119,6 +125,10 @@ Library content and deployment state remain outside the source repository.
 | Media               | Hosted asset file              | Served through the approved asset route |
 | Session             | Server plus Windows protection | Cleared on logout or invalid auth       |
 | Last Workspace file | Native desktop state           | Shared by all local app windows         |
+
+Every installed Windows device uses the same fixed RackNerd Library origin.
+Giving the build to another trusted device does not introduce another server,
+account namespace or synchronization path; see `docs/TRUSTED_BETA.md`.
 
 ## Compatibility boundary
 

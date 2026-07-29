@@ -94,6 +94,12 @@ try {
     --clean `
     --windowed `
     --name $Name `
+    --hidden-import webview `
+    --hidden-import webview.dom `
+    --hidden-import webview.menu `
+    --hidden-import urllib3 `
+    --hidden-import watchdog.events `
+    --hidden-import watchdog.observers `
     --icon $Icon `
     --distpath $Dist `
     --workpath $Build `
