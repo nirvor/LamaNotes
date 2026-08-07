@@ -9,6 +9,15 @@
       <button
         type="button"
         class="lamanotes-work-icon-button"
+        title="Smaller text"
+        aria-label="Smaller text"
+        @click="insertSmallText"
+      >
+        <SvgIcon type="mdi" :path="mdiFormatFontSizeDecrease" size="0.84rem" />
+      </button>
+      <button
+        type="button"
+        class="lamanotes-work-icon-button"
         title="Insert code block"
         aria-label="Insert code block"
         @click="insertCodeBlock"
@@ -92,6 +101,7 @@ import {
   mdiContentCopy,
   mdiEyeOffOutline,
   mdiEyeOutline,
+  mdiFormatFontSizeDecrease,
   mdiFormatListChecks,
 } from "@mdi/js";
 import { computed, nextTick, ref, watch } from "vue";
@@ -140,6 +150,15 @@ function insertAtCursor(snippet, options = {}) {
 function insertCodeBlock() {
   const selectedText = sourceEditor.value?.getSelectedText?.() || "";
   insertAtCursor(`\n\`\`\`text\n${selectedText}\n\`\`\`\n`);
+}
+
+function insertSmallText() {
+  const selected = selectedText();
+  const openingTag = "<small>";
+  insertAtCursor(`${openingTag}${selected}</small>`, {
+    anchorOffset: openingTag.length,
+    headOffset: openingTag.length + selected.length,
+  });
 }
 
 function insertChecklist() {

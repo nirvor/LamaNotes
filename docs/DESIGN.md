@@ -45,7 +45,8 @@ numbers.
 | `--ln-space-1` to `--ln-space-5`                    | Compact spacing scale                                     |
 | `--ln-radius-control`, `--ln-radius-card`           | Small control and card radii                              |
 | `--ln-shadow-card`                                  | One restrained card shadow                                |
-| `--ln-font-body`, `--ln-font-h1` to `--ln-font-h3`  | Normal reading and note heading hierarchy                 |
+| `--ln-font-body`, `--ln-font-small`                 | Normal and compact secondary text                         |
+| `--ln-font-h1` to `--ln-font-h3`                    | Note heading hierarchy                                    |
 | `--ln-control-size`, `--ln-touch-target`            | Compact pointer controls and about 42px touch targets     |
 | `--ln-content-max`, `--ln-toolbar-max`              | Article shell and shared toolbar measure                  |
 | `--ln-reading-max`                                  | Optional prose measure                                    |
@@ -248,6 +249,12 @@ The editor preview uses the same `HtmlViewer` and shared stylesheet as the
 saved Library note. Component snippets use semantic HTML,
 `data-lamanotes-component`, and shared classes. Do not generate layout
 `style` attributes.
+
+Work-note Markdown may wrap a short secondary status or detail in
+`<small>...</small>`. The compact editor action inserts this semantic tag and
+the text otherwise inherits the normal typeface, colour, weight and line
+height. Use it for individual phrases or rows, not as a replacement for the
+normal note body or heading hierarchy.
 
 Scaffolds contain only short replaceable prompts. The editor and publish modal
 show a non-blocking warning for known example links, media paths, topic

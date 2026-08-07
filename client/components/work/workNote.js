@@ -254,8 +254,15 @@ function setWorkMarkdownTag(markdown = "", tag = "", enabled = true) {
 }
 
 function renderInlineMarkdown(value = "") {
+  const smallSpans = [];
+  let text = String(value).replace(/<small>(.*?)<\/small>/gi, (_, content) => {
+    const index = smallSpans.length;
+    smallSpans.push(`<small>${renderInlineMarkdown(content)}</small>`);
+    return `@@LAMANOTES_SMALL_${index}@@`;
+  });
+
   const codeSpans = [];
-  let text = String(value).replace(/`([^`]+)`/g, (_, code) => {
+  text = text.replace(/`([^`]+)`/g, (_, code) => {
     const index = codeSpans.length;
     codeSpans.push(`<code>${escapeHtml(code)}</code>`);
     return `@@LAMANOTES_CODE_${index}@@`;
@@ -277,6 +284,9 @@ function renderInlineMarkdown(value = "") {
 
   codeSpans.forEach((replacement, index) => {
     text = text.replace(`@@LAMANOTES_CODE_${index}@@`, replacement);
+  });
+  smallSpans.forEach((replacement, index) => {
+    text = text.replace(`@@LAMANOTES_SMALL_${index}@@`, replacement);
   });
 
   return text;

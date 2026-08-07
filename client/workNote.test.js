@@ -21,6 +21,16 @@ test("work task lists render exactly one shared checkbox per item", () => {
   assert.equal((rendered.match(/ checked/g) || []).length, 2);
 });
 
+test("work notes render small Markdown text without opening raw HTML", () => {
+  const rendered = renderMarkdownToHtml(
+    "- <small>**Paused/stopped**</small>\n- <script>unsafe</script>",
+  );
+
+  assert.match(rendered, /<small><strong>Paused\/stopped<\/strong><\/small>/);
+  assert.match(rendered, /&lt;script&gt;unsafe&lt;\/script&gt;/);
+  assert.doesNotMatch(rendered, /<script>/);
+});
+
 test("legacy HTML checklists are eligible for the simple work editor", () => {
   const checklist =
     '<ul><li class="task-list-item"><input type="checkbox"> Apples</li><li class="task-list-item"><input type="checkbox"> Pears</li></ul>';
@@ -45,4 +55,14 @@ test("work notes keep the simple Markdown source used by the editor", () => {
   assert.match(note, /data-lamanotes-work-markdown/);
   assert.match(note, /# Shopping/);
   assert.match(note, /- \[ \] Apples/);
+});
+
+test("work note snapshots keep compact secondary text in source and HTML", () => {
+  const note = buildWorkNoteHtml(
+    "Status",
+    "- <small>**Paused/stopped**</small>",
+  );
+
+  assert.match(note, /<small><strong>Paused\/stopped<\/strong><\/small>/);
+  assert.match(note, /&lt;small&gt;\*\*Paused\/stopped\*\*&lt;\/small&gt;/);
 });

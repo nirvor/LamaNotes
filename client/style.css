@@ -65,6 +65,7 @@
     --ln-border-subtle: 1px solid rgb(var(--theme-border) / 0.9);
     --ln-shadow-card: 0 0.22rem 0.85rem rgb(17 36 57 / 0.08);
     --ln-font-body: 1rem;
+    --ln-font-small: 0.86em;
     --ln-font-h1: 1.54rem;
     --ln-font-h2: 1.38rem;
     --ln-font-h3: 1.23rem;

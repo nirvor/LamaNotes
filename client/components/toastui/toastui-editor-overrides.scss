@@ -93,6 +93,16 @@
   }
 }
 
+.toastui-editor-contents small,
+.ProseMirror small {
+  color: inherit;
+  font-family: inherit;
+  font-size: var(--ln-font-small);
+  font-style: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+}
+
 .toastui-editor-contents {
   overflow-x: hidden;
 }
