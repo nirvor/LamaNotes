@@ -35,6 +35,183 @@ function normalizeMarkdown(value = "") {
     .replace(/\r/g, "\n");
 }
 
+const smallOpeningTag = "<small>";
+const smallClosingTag = "</small>";
+const smallLinePrefixPattern =
+  /^(\s*(?:(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?|>\s+))([\s\S]*?)(\s*)$/;
+
+function smallTextLineParts(value = "") {
+  const line = String(value);
+  const structural = line.match(smallLinePrefixPattern);
+  if (structural) {
+    return {
+      prefix: structural[1],
+      content: structural[2],
+      suffix: structural[3],
+    };
+  }
+
+  const ordinary = line.match(/^(\s*)([\s\S]*?)(\s*)$/);
+  return {
+    prefix: ordinary?.[1] || "",
+    content: ordinary?.[2] || "",
+    suffix: ordinary?.[3] || "",
+  };
+}
+
+function unwrappedSmallText(value = "") {
+  const content = String(value);
+  const plain = content.match(/^<small>([\s\S]*)<\/small>$/i);
+  if (plain) {
+    return plain[1];
+  }
+
+  const emphasized = content.match(
+    /^(\*\*|__|\*|_)<small>([\s\S]*)<\/small>\1$/i,
+  );
+  if (emphasized) {
+    return `${emphasized[1]}${emphasized[2]}${emphasized[1]}`;
+  }
+
+  return null;
+}
+
+function normalizeSmallTextLine(value = "") {
+  const line = String(value);
+  const swallowedPrefix = line.match(
+    /^(\s*)<small>(\s*(?:(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?|>\s+))([\s\S]*?)<\/small>(\s*)$/i,
+  );
+  if (!swallowedPrefix) {
+    return line;
+  }
+
+  return `${swallowedPrefix[1]}${swallowedPrefix[2]}<small>${swallowedPrefix[3]}</small>${swallowedPrefix[4]}`;
+}
+
+function normalizeSmallTextMarkdown(value = "") {
+  const lines = normalizeMarkdown(value).split("\n");
+  let inCodeFence = false;
+
+  return lines
+    .map((line) => {
+      if (line.trimStart().startsWith("```")) {
+        inCodeFence = !inCodeFence;
+        return line;
+      }
+      return inCodeFence ? line : normalizeSmallTextLine(line);
+    })
+    .join("\n");
+}
+
+function createSmallTextEdit(markdown = "", selectionRange = {}) {
+  const source = normalizeMarkdown(markdown);
+  const requestedStart = Number(selectionRange.start);
+  const requestedEnd = Number(selectionRange.end);
+  const start = Math.max(
+    0,
+    Math.min(
+      Number.isFinite(requestedStart) ? requestedStart : source.length,
+      source.length,
+    ),
+  );
+  const end = Math.max(
+    start,
+    Math.min(
+      Number.isFinite(requestedEnd) ? requestedEnd : start,
+      source.length,
+    ),
+  );
+  const selected = source.slice(start, end);
+
+  if (!selected) {
+    return {
+      from: start,
+      to: end,
+      text: `${smallOpeningTag}${smallClosingTag}`,
+      anchorOffset: smallOpeningTag.length,
+      headOffset: smallOpeningTag.length,
+      mode: "insert",
+    };
+  }
+
+  const before = source.slice(
+    Math.max(0, start - smallOpeningTag.length),
+    start,
+  );
+  const after = source.slice(end, end + smallClosingTag.length);
+  if (
+    before.toLowerCase() === smallOpeningTag &&
+    after.toLowerCase() === smallClosingTag
+  ) {
+    return {
+      from: start - smallOpeningTag.length,
+      to: end + smallClosingTag.length,
+      text: selected,
+      anchorOffset: 0,
+      headOffset: selected.length,
+      mode: "remove",
+    };
+  }
+
+  const lines = selected.split("\n");
+  const meaningfulLines = lines
+    .map(smallTextLineParts)
+    .filter(({ content }) => content.length > 0);
+  const removeSmall =
+    meaningfulLines.length > 0 &&
+    meaningfulLines.every(
+      ({ content }) => unwrappedSmallText(content) !== null,
+    );
+  const replacementLines = lines.map((line) => {
+    const parts = smallTextLineParts(line);
+    if (!parts.content) {
+      return line;
+    }
+    const unwrapped = unwrappedSmallText(parts.content);
+    const content = removeSmall
+      ? unwrapped
+      : unwrapped === null
+        ? `${smallOpeningTag}${parts.content}${smallClosingTag}`
+        : parts.content;
+    return `${parts.prefix}${content}${parts.suffix}`;
+  });
+  const text = replacementLines.join("\n");
+
+  if (lines.length === 1) {
+    const parts = smallTextLineParts(text);
+    const openingIndex = text.toLowerCase().indexOf(smallOpeningTag);
+    if (!removeSmall && openingIndex >= 0) {
+      const contentStart = openingIndex + smallOpeningTag.length;
+      const contentEnd = text.toLowerCase().lastIndexOf(smallClosingTag);
+      return {
+        from: start,
+        to: end,
+        text,
+        anchorOffset: contentStart,
+        headOffset: contentEnd,
+        mode: "apply",
+      };
+    }
+    return {
+      from: start,
+      to: end,
+      text,
+      anchorOffset: parts.prefix.length,
+      headOffset: text.length - parts.suffix.length,
+      mode: "remove",
+    };
+  }
+
+  return {
+    from: start,
+    to: end,
+    text,
+    anchorOffset: 0,
+    headOffset: text.length,
+    mode: removeSmall ? "remove" : "apply",
+  };
+}
+
 function normalizeTagName(tag = "") {
   return tag.replace(/^#/, "").trim().toLowerCase();
 }
@@ -141,7 +318,7 @@ function hasMovableWorkMarkdownTags(markdown = "") {
 }
 
 function normalizeWorkMarkdownTags(markdown = "") {
-  const lines = normalizeMarkdown(markdown).split("\n");
+  const lines = normalizeSmallTextMarkdown(markdown).split("\n");
   const bodyLines = [];
   const tags = new Set();
   let inCodeFence = false;
@@ -595,23 +772,23 @@ function extractWorkMarkdown(value = "") {
   }
 
   if (!isWorkNoteHtml(value)) {
-    return normalizeMarkdown(value);
+    return normalizeSmallTextMarkdown(value);
   }
 
   const documentValue = parseHtml(value);
   const template = documentValue.querySelector(markdownTemplateSelector);
   if (template) {
-    return normalizeMarkdown(
+    return normalizeSmallTextMarkdown(
       template.content?.textContent || template.innerHTML || "",
     );
   }
 
   const fallback = documentValue.querySelector("[data-lamanotes-work-source]");
   if (fallback) {
-    return normalizeMarkdown(fallback.textContent || "");
+    return normalizeSmallTextMarkdown(fallback.textContent || "");
   }
 
-  return normalizeMarkdown(documentValue.body?.textContent || "");
+  return normalizeSmallTextMarkdown(documentValue.body?.textContent || "");
 }
 
 function buildWorkNoteHtml(title = "Untitled", markdown = "", options = {}) {
@@ -649,6 +826,7 @@ ${rendered}
 
 export {
   buildWorkNoteHtml,
+  createSmallTextEdit,
   extractTagsFromMarkdown,
   extractWorkMarkdown,
   hasMovableWorkMarkdownTags,
@@ -656,6 +834,7 @@ export {
   isChecklistNoteHtml,
   isWorkNoteHtml,
   normalizeWorkMarkdownTags,
+  normalizeSmallTextMarkdown,
   renderMarkdownToHtml,
   setWorkMarkdownTag,
 };

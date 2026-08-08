@@ -46,6 +46,7 @@ numbers.
 | `--ln-radius-control`, `--ln-radius-card`           | Small control and card radii                              |
 | `--ln-shadow-card`                                  | One restrained card shadow                                |
 | `--ln-font-body`, `--ln-font-small`                 | Normal and compact secondary text                         |
+| `--ln-line-small`                                   | Compact row line height                                   |
 | `--ln-font-h1` to `--ln-font-h3`                    | Note heading hierarchy                                    |
 | `--ln-control-size`, `--ln-touch-target`            | Compact pointer controls and about 42px touch targets     |
 | `--ln-content-max`, `--ln-toolbar-max`              | Article shell and shared toolbar measure                  |
@@ -252,9 +253,12 @@ saved Library note. Component snippets use semantic HTML,
 
 Work-note Markdown may wrap a short secondary status or detail in
 `<small>...</small>`. The compact editor action inserts this semantic tag and
-the text otherwise inherits the normal typeface, colour, weight and line
-height. Use it for individual phrases or rows, not as a replacement for the
-normal note body or heading hierarchy.
+the text otherwise inherits the normal typeface, colour and weight. A fully
+compact row also receives the matching tighter line height and spacing. The
+action preserves Markdown list, checklist, number and quote markers, supports
+several selected rows and toggles an existing compact selection off. Use it for
+individual phrases or rows, not as a replacement for the normal note body or
+heading hierarchy.
 
 Scaffolds contain only short replaceable prompts. The editor and publish modal
 show a non-blocking warning for known example links, media paths, topic

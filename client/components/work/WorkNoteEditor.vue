@@ -9,8 +9,8 @@
       <button
         type="button"
         class="lamanotes-work-icon-button"
-        title="Smaller text"
-        aria-label="Smaller text"
+        title="Toggle smaller text"
+        aria-label="Toggle smaller text"
         @click="insertSmallText"
       >
         <SvgIcon type="mdi" :path="mdiFormatFontSizeDecrease" size="0.84rem" />
@@ -113,6 +113,7 @@ import { classifyPastedText, markdownForPaste } from "../paste/mediaPaste.js";
 import ToastViewer from "../toastui/ToastViewer.vue";
 import {
   buildWorkNoteHtml,
+  createSmallTextEdit,
   extractWorkMarkdown,
   normalizeWorkMarkdownTags,
 } from "./workNote.js";
@@ -153,11 +154,11 @@ function insertCodeBlock() {
 }
 
 function insertSmallText() {
-  const selected = selectedText();
-  const openingTag = "<small>";
-  insertAtCursor(`${openingTag}${selected}</small>`, {
-    anchorOffset: openingTag.length,
-    headOffset: openingTag.length + selected.length,
+  const selection = sourceEditor.value?.getSelectionRange?.();
+  const edit = createSmallTextEdit(markdown.value, selection);
+  sourceEditor.value?.replaceRange?.(edit.from, edit.to, edit.text, {
+    anchorOffset: edit.anchorOffset,
+    headOffset: edit.headOffset,
   });
 }
 

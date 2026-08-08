@@ -100,7 +100,70 @@
   font-size: var(--ln-font-small);
   font-style: inherit;
   letter-spacing: inherit;
-  line-height: inherit;
+  line-height: var(--ln-line-small);
+}
+
+.toastui-editor-contents,
+.ProseMirror {
+  :is(li, p):has(> small:only-child),
+  :is(li, p):has(> :is(strong, em):only-child > small:only-child) {
+    font-size: var(--ln-font-small);
+    line-height: var(--ln-line-small);
+  }
+
+  li:has(> p:only-child > small:only-child),
+  li.task-list-item:has(> input:first-child + p:last-child > small:only-child),
+  li:has(> p:only-child > :is(strong, em):only-child > small:only-child),
+  li.task-list-item:has(
+      > input:first-child
+        + p:last-child
+        > :is(strong, em):only-child
+        > small:only-child
+    ) {
+    margin-block: 0.08rem;
+  }
+
+  :is(p):has(> small:only-child),
+  :is(p):has(> :is(strong, em):only-child > small:only-child) {
+    margin-bottom: 0.52rem;
+  }
+
+  li > p:has(> small:only-child),
+  li > p:has(> :is(strong, em):only-child > small:only-child) {
+    margin-bottom: 0;
+  }
+
+  li:has(> p:only-child > small:only-child)::before,
+  li:has(
+      > p:only-child > :is(strong, em):only-child > small:only-child
+    )::before {
+    margin-top: 0.46rem;
+  }
+
+  :is(li, p):has(> small:only-child) > small,
+  :is(li, p):has(> :is(strong, em):only-child > small:only-child)
+    > :is(strong, em)
+    > small {
+    font-size: 1em;
+    line-height: inherit;
+  }
+
+  :is(li, p):has(> :is(strong, em):only-child > small:only-child)
+    > :is(strong, em) {
+    line-height: inherit;
+  }
+
+  li.task-list-item:has(> input:first-child + p:last-child > small:only-child)
+    > input[type="checkbox"].lamanotes-task-checkbox,
+  li.task-list-item:has(
+      > input:first-child
+        + p:last-child
+        > :is(strong, em):only-child
+        > small:only-child
+    )
+    > input[type="checkbox"].lamanotes-task-checkbox {
+    margin-top: 0.16rem;
+  }
 }
 
 .toastui-editor-contents {

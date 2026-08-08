@@ -3,8 +3,10 @@ import test from "node:test";
 
 import {
   buildWorkNoteHtml,
+  createSmallTextEdit,
   isChecklistNoteHtml,
   isWorkNoteHtml,
+  normalizeSmallTextMarkdown,
   renderMarkdownToHtml,
 } from "./components/work/workNote.js";
 
@@ -65,4 +67,63 @@ test("work note snapshots keep compact secondary text in source and HTML", () =>
 
   assert.match(note, /<small><strong>Paused\/stopped<\/strong><\/small>/);
   assert.match(note, /&lt;small&gt;\*\*Paused\/stopped\*\*&lt;\/small&gt;/);
+});
+
+test("smaller text keeps Markdown structure outside the semantic tag", () => {
+  const markdown =
+    "- **Paused/stopped**\n- [ ] Follow up\n1. Review\n> Context";
+  const edit = createSmallTextEdit(markdown, {
+    start: 0,
+    end: markdown.length,
+  });
+
+  assert.equal(
+    edit.text,
+    "- <small>**Paused/stopped**</small>\n- [ ] <small>Follow up</small>\n1. <small>Review</small>\n> <small>Context</small>",
+  );
+  assert.match(
+    renderMarkdownToHtml(edit.text),
+    /<ul><li><small><strong>Paused\/stopped<\/strong><\/small><\/li>/,
+  );
+});
+
+test("smaller text toggles off while keeping the useful selection", () => {
+  const markdown = "- **<small>Paused/stopped</small>**";
+  const start = markdown.indexOf("Paused");
+  const end = start + "Paused/stopped".length;
+  const edit = createSmallTextEdit(markdown, { start, end });
+  const updated = `${markdown.slice(0, edit.from)}${edit.text}${markdown.slice(edit.to)}`;
+
+  assert.equal(updated, "- **Paused/stopped**");
+  assert.equal(edit.mode, "remove");
+  assert.equal(edit.headOffset - edit.anchorOffset, "Paused/stopped".length);
+});
+
+test("legacy full-line small tags recover list structure outside code", () => {
+  const markdown = [
+    "<small>- All challenges done</small>",
+    "",
+    "```html",
+    "<small>- keep literal</small>",
+    "```",
+  ].join("\n");
+
+  assert.equal(
+    normalizeSmallTextMarkdown(markdown),
+    [
+      "- <small>All challenges done</small>",
+      "",
+      "```html",
+      "<small>- keep literal</small>",
+      "```",
+    ].join("\n"),
+  );
+});
+
+test("smaller text inserts a compact span at an empty cursor", () => {
+  const edit = createSmallTextEdit("Status", { start: 6, end: 6 });
+
+  assert.equal(edit.text, "<small></small>");
+  assert.equal(edit.anchorOffset, 7);
+  assert.equal(edit.headOffset, 7);
 });

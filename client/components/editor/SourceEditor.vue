@@ -665,8 +665,18 @@ function replaceSelection(text, options = {}) {
   if (!editorView) {
     return false;
   }
-  const value = String(text ?? "");
   const selection = editorView.state.selection.main;
+  return replaceRange(selection.from, selection.to, text, options);
+}
+
+function replaceRange(start, end, text, options = {}) {
+  if (!editorView) {
+    return false;
+  }
+  const value = String(text ?? "");
+  const documentLength = editorView.state.doc.length;
+  const from = Math.max(0, Math.min(Number(start) || 0, documentLength));
+  const to = Math.max(from, Math.min(Number(end) || from, documentLength));
   const anchorOffset = Number.isFinite(options.anchorOffset)
     ? options.anchorOffset
     : value.length;
@@ -674,11 +684,10 @@ function replaceSelection(text, options = {}) {
     ? options.headOffset
     : anchorOffset;
   editorView.dispatch({
-    changes: { from: selection.from, to: selection.to, insert: value },
+    changes: { from, to, insert: value },
     selection: {
-      anchor:
-        selection.from + Math.max(0, Math.min(anchorOffset, value.length)),
-      head: selection.from + Math.max(0, Math.min(headOffset, value.length)),
+      anchor: from + Math.max(0, Math.min(anchorOffset, value.length)),
+      head: from + Math.max(0, Math.min(headOffset, value.length)),
     },
     scrollIntoView: true,
   });
@@ -998,6 +1007,7 @@ defineExpose({
   insertDroppedText,
   previewDroppedTextPosition,
   replaceContent,
+  replaceRange,
   replaceSelection,
   selectSearchRange,
   setSearchMatches,
