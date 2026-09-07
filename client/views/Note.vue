@@ -930,9 +930,17 @@ async function addTaskItem({ afterIndex, text }) {
 
 async function noteSaveFailure(error, pendingContent = null) {
   if (error.response?.data?.detail?.code === "note-conflict") {
-    conflictContent = pendingContent;
+    const original = note.value;
+    conflictContent = null;
     try {
       conflictLatest = await getNote(note.value.title, { force: true });
+      if (pendingContent != null && !editMode.value) {
+        note.value = original;
+        documentSession.saveDraft(pendingContent);
+        setEditMode();
+        documentSession.setDirty(true);
+        await nextTick();
+      }
       conflictVisible.value = true;
     } catch (loadError) {
       apiErrorHandler(loadError, toast);
