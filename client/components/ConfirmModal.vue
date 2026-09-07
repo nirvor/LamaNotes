@@ -10,25 +10,26 @@
     <!-- Message -->
     <div class="mb-6">{{ message }}</div>
     <!-- Buttons -->
-    <div class="flex justify-end">
+    <div class="flex flex-wrap justify-end gap-2">
       <CustomButton
         :label="cancelButtonText"
         :style="cancelButtonStyle"
         @click="emitClose('cancel')"
-        class="mr-2"
+        class="shrink-0"
       />
       <CustomButton
         v-if="rejectButtonText"
         :label="rejectButtonText"
         :style="rejectButtonStyle"
         @click="emitClose('reject')"
-        class="mr-2"
+        class="shrink-0"
       />
       <CustomButton
         v-focus
         :label="confirmButtonText"
         :style="confirmButtonStyle"
         @click="emitClose('confirm')"
+        class="shrink-0"
       />
     </div>
   </Modal>
