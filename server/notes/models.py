@@ -1,3 +1,4 @@
+import hashlib
 import re
 from typing import List, Literal, Optional
 
@@ -41,11 +42,21 @@ class NoteCreate(CustomBaseModel):
     format: NoteFormat = "html"
 
 
+def note_version(content: str, note_format: str) -> str:
+    return hashlib.sha256(f"{note_format}\0{content or ''}".encode("utf-8")).hexdigest()
+
+
 class Note(CustomBaseModel):
     title: str
     content: Optional[str] = Field(None)
     last_modified: float
     format: NoteFormat = "html"
+    version: str = ""
+
+    @model_validator(mode="after")
+    def set_version(self):
+        self.version = note_version(self.content, self.format)
+        return self
 
 
 class NoteUpdate(CustomBaseModel):
@@ -56,6 +67,7 @@ class NoteUpdate(CustomBaseModel):
     ] = Field(None)
     new_content: Optional[str] = Field(None)
     new_format: Optional[NoteFormat] = Field(None)
+    expected_version: Optional[str] = Field(None, pattern=r"^[a-f0-9]{64}$")
 
 
 def normalize_research_topic(value: str) -> str:

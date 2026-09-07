@@ -142,6 +142,30 @@ This boundary allows the product description to be clean now without risking
 existing notes, installed clients or the live deployment through a cosmetic
 global rename.
 
+## Editing state and optimistic concurrency
+
+`SourceEditor.vue` owns the shared CodeMirror editing surface. Work and HTML
+editors adapt source/envelope handling and contextual tools. The mounted
+document owns an in-memory CodeMirror state snapshot, including undo history.
+It is discarded on document replacement, not persisted as another Library.
+
+`documentSession.js` compares a pre-save snapshot with the current editor after
+the response. Only a matching snapshot clears the draft or closes editing.
+Local saves likewise advance the saved baseline to the submitted content,
+without replacing text typed while the native write was pending.
+
+Full-note responses include `version`, SHA-256 of format plus a NUL separator
+plus the UTF-8 body. The client sends it as `expectedVersion` on PATCH. The
+filesystem adapter checks it under the existing publication lock before rename
+or write. A mismatch returns HTTP 409 with `detail.code = "note-conflict"`.
+The field is derived, with no sidecar or index persistence. Older callers may
+omit it for compatibility and therefore do not receive this protection.
+New clients require a current version before modifying a cached Library note.
+
+Checklist controls mutate the source through the same guarded save path.
+Markdown matching excludes fenced code examples. Reader-only completed-item
+visibility and touch hit areas are never serialized into note bodies.
+
 ## Release discipline
 
 1. Build and test the exact Git commit.

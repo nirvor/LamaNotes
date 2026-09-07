@@ -6,6 +6,7 @@
       :note-title="noteTitle"
       :task-checkboxes-disabled="taskCheckboxesDisabled"
       :task-checkbox-toggle-handler="taskCheckboxToggleHandler"
+      :task-item-add-handler="taskItemAddHandler"
       class="toast-viewer min-w-0 max-w-full pb-4"
     />
   </section>
@@ -21,6 +22,7 @@ const props = defineProps({
   initialValue: String,
   noteTitle: String,
   taskCheckboxToggleHandler: Function,
+  taskItemAddHandler: Function,
   taskCheckboxesDisabled: Boolean,
 });
 

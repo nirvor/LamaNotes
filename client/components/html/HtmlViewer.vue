@@ -18,6 +18,7 @@ const props = defineProps({
   initialValue: String,
   noteTitle: String,
   taskCheckboxToggleHandler: Function,
+  taskItemAddHandler: Function,
   taskCheckboxesDisabled: Boolean,
 });
 
@@ -83,6 +84,7 @@ function getTaskListOptions() {
   return {
     disabled: props.taskCheckboxesDisabled,
     onToggle: props.taskCheckboxToggleHandler,
+    onAdd: props.taskItemAddHandler,
   };
 }
 
@@ -99,6 +101,13 @@ async function enhance() {
   });
 }
 
+watch(
+  () => props.noteTitle,
+  () => {
+    if (viewerElement.value)
+      viewerElement.value.lamanotesHiddenTaskLists = new Set();
+  },
+);
 watch(() => props.initialValue, enhance);
 watch(() => props.taskCheckboxesDisabled, enhance);
 onMounted(enhance);

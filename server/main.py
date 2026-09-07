@@ -36,7 +36,7 @@ from client_bootstrap import ClientBootstrapResponse, client_config_response
 from global_config import AuthType, GlobalConfig, GlobalConfigResponseModel
 from helpers import replace_base_href
 from notes.base import BaseNotes
-from notes.errors import ResearchNoteConflictError, ResearchNoteContractError
+from notes.errors import NoteConflictError, ResearchNoteConflictError, ResearchNoteContractError
 from notes.models import (
     Note,
     NoteContext,
@@ -453,6 +453,8 @@ if global_config.auth_type != AuthType.READ_ONLY:
     def patch_note(title: str, data: NoteUpdate):
         try:
             return note_storage.update(title, data)
+        except NoteConflictError as error:
+            raise HTTPException(status_code=409, detail={"code": "note-conflict", "message": str(error)})
         except ValueError:
             raise HTTPException(
                 status_code=400,

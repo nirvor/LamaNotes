@@ -19,6 +19,19 @@
   />
 
   <ConfirmModal
+    v-model="conflictVisible"
+    title="Note changed elsewhere"
+    message="Your edits are still here. Use latest replaces them with the current Library version. Keep mine overwrites the version just loaded from the Library."
+    confirmButtonText="Keep mine"
+    confirmButtonStyle="danger"
+    rejectButtonText="Use latest"
+    rejectButtonStyle="subtle"
+    cancelButtonText="Keep editing"
+    @confirm="keepConflictEdits"
+    @reject="useLatestVersion"
+  />
+
+  <ConfirmModal
     v-model="isUpdateModalVisible"
     title="Update online"
     :message="publicationUpdateMessage"
@@ -126,6 +139,7 @@
         :note-title="note.title"
         :task-checkboxes-disabled="!canModify"
         :task-checkbox-toggle-handler="toggleTaskCheckbox"
+        :task-item-add-handler="addTaskItem"
         class="toast-viewer min-w-0 max-w-full pb-4"
       />
       <WorkNoteViewer
@@ -134,6 +148,7 @@
         :note-title="note.title"
         :task-checkboxes-disabled="!canModify"
         :task-checkbox-toggle-handler="toggleTaskCheckbox"
+        :task-item-add-handler="addTaskItem"
       />
       <HtmlViewer
         v-else-if="!editMode && isHtmlFormat && !isWorkNote"
@@ -141,17 +156,19 @@
         :note-title="note.title"
         :task-checkboxes-disabled="!canModify"
         :task-checkbox-toggle-handler="toggleTaskCheckbox"
+        :task-item-add-handler="addTaskItem"
         class="toast-viewer min-w-0 max-w-full pb-4"
       />
       <SourceEditor
         v-else-if="editMode && editorFormat === 'markdown'"
         ref="contentEditor"
-        :initialValue="getInitialEditorValue()"
+        :initialValue="editorInitialValue"
         language="markdown"
         :show-line-numbers="globalStore.showLineNumbers"
         :normalize-tags="true"
         :structured-paste="true"
         :session-key="`cloud:${newTitle || note.title || 'new'}`"
+        :session-state="editorMemory"
         :aria-label="`Edit ${newTitle || note.title || 'note'}`"
         :addImageBlobHook="addImageBlobHook"
         @change="editorContentChangedHandler"
@@ -163,7 +180,8 @@
         :key="editorKey"
         ref="contentEditor"
         :current-kind="editorKind"
-        :initialValue="getInitialEditorValue()"
+        :session-state="editorMemory"
+        :initialValue="editorInitialValue"
         :note-title="newTitle"
         :addImageBlobHook="addImageBlobHook"
         :show-line-numbers="globalStore.showLineNumbers"
@@ -180,7 +198,8 @@
         :key="editorKey"
         ref="contentEditor"
         :current-kind="editorKind"
-        :initialValue="getInitialEditorValue()"
+        :session-state="editorMemory"
+        :initialValue="editorInitialValue"
         :note-title="newTitle"
         :addImageBlobHook="addImageBlobHook"
         :show-kind-switch="isNewNote"
@@ -255,6 +274,7 @@ import {
 } from "../components/work/workNote.js";
 import { authTypes } from "../constants.js";
 import { useDocumentSession } from "../documents/documentSession.js";
+import { appendMarkdownTask, toggleMarkdownTask } from "../checklists.js";
 import { createVpsNoteStorageAdapter } from "../documents/storageAdapters.js";
 import { useDocumentFind } from "../documentFind.js";
 import { desktopShell, setDesktopWindowTitle } from "../desktopShell.js";
@@ -383,6 +403,7 @@ let publicationPollTimer = null;
 let publicationPollAttempt = 0;
 let publicationRequestSequence = 0;
 let pendingNoteDecision = null;
+let updatingSavedRoute = false;
 const isPinned = computed(() =>
   documentHasSystemTag(
     note.value.content || "",
@@ -402,6 +423,11 @@ const automationLanguage = computed(() =>
 const reservedFilenameCharacters = /[<>:"/\\|?*]/;
 const router = useRouter();
 const newTitle = ref();
+const editorMemory = {};
+const editorInitialValue = ref("");
+const conflictVisible = ref(false);
+let conflictLatest = null;
+let conflictContent = null;
 const toast = useToast();
 const noteStorageAdapter = createVpsNoteStorageAdapter({
   create: createNote,
@@ -420,6 +446,9 @@ const documentSession = useDocumentSession({
   legacyDraftKeys: () => [note.value.title],
   persistDraft: () => isCurrentTokenStored(),
   saveDocument: persistNote,
+  getSnapshot: () =>
+    JSON.stringify([newTitle.value, editorFormat.value, getEditorContent()]),
+  onPendingEdits: contentChangedHandler,
   copyDocument: getCopyPayload,
   afterSave: noteSaveSuccess,
   onSaveError: noteSaveFailure,
@@ -467,6 +496,7 @@ function init() {
   }
 
   resetPublicationState();
+  editorMemory.snapshot = null;
   noteLoadStartedAt = performance.now();
   loadingIndicator.value.setLoading();
   if (props.title) {
@@ -570,7 +600,7 @@ function toggleEditModeHandler() {
 
 function editHandler() {
   const draftContent = documentSession.loadDraft();
-  if (draftContent) {
+  if (draftContent != null) {
     isDraftModalVisible.value = true;
   } else {
     setEditMode();
@@ -594,6 +624,7 @@ function setEditMode() {
     editorKind.value = "markdown";
   }
   documentSession.setDirty(false);
+  editorInitialValue.value = getInitialEditorValue();
   documentSession.enterEdit();
 }
 
@@ -611,7 +642,7 @@ function focusEditor() {
 
 function getInitialEditorValue() {
   const draftContent = documentSession.loadDraft();
-  const content = draftContent ? draftContent : note.value.content;
+  const content = draftContent != null ? draftContent : note.value.content;
   if (editorFormat.value === "html" && editorKind.value === "work") {
     if (isWorkNoteHtml(content)) {
       return extractWorkMarkdown(content);
@@ -676,40 +707,25 @@ async function persistNote() {
     title: newTitle.value,
     content: newContent,
     format: editorFormat.value,
+    expectedVersion: wasNew ? "" : await currentNoteVersion(),
   });
   note.value = data;
   if (!pendingNoteDecision) {
-    if (wasNew) {
-      await router.push({
-        name: "note",
-        params: { title: note.value.title },
-      });
-    } else {
+    updatingSavedRoute = true;
+    try {
       await router.replace({
         name: "note",
         params: { title: note.value.title },
       });
+    } finally {
+      updatingSavedRoute = false;
     }
   }
   return data;
 }
 
 function updateTaskCheckboxMarkdown(content, taskIndex, checked) {
-  let currentTaskIndex = 0;
-  const checkboxPattern = /^(\s*(?:[-*+]|\d+[.)])\s+)\[(?: |x|X)\]/gm;
-  const marker = checked ? "[x]" : "[ ]";
-
-  const updatedContent = content.replace(checkboxPattern, (match, prefix) => {
-    if (currentTaskIndex === taskIndex) {
-      currentTaskIndex += 1;
-      return `${prefix}${marker}`;
-    }
-
-    currentTaskIndex += 1;
-    return match;
-  });
-
-  return currentTaskIndex > taskIndex ? updatedContent : null;
+  return toggleMarkdownTask(content, taskIndex, checked);
 }
 
 function updateTaskCheckboxHtml(content, taskIndex, checked) {
@@ -761,7 +777,9 @@ function updateTaskCheckboxWorkHtml(content, taskIndex, checked) {
     return null;
   }
 
-  return buildWorkNoteHtml(note.value.title, updatedMarkdown);
+  return buildWorkNoteHtml(note.value.title, updatedMarkdown, {
+    systemTags: getLamaNotesMetaTags(content).filter(isSystemTag),
+  });
 }
 
 async function toggleTaskCheckbox({ index, checked }) {
@@ -796,10 +814,11 @@ async function toggleTaskCheckbox({ index, checked }) {
       note.value.title,
       newContent,
       note.value.format || "html",
+      await currentNoteVersion(),
     );
     documentSession.clearDraft();
   } catch (error) {
-    apiErrorHandler(error, toast);
+    await noteSaveFailure(error, newContent);
     throw error;
   }
 }
@@ -830,6 +849,7 @@ async function togglePinned() {
       note.value.title,
       newContent,
       note.value.format || "html",
+      await currentNoteVersion(),
     );
     documentSession.clearDraft();
     toast.add(
@@ -840,14 +860,84 @@ async function togglePinned() {
       ),
     );
   } catch (error) {
-    apiErrorHandler(error, toast);
+    await noteSaveFailure(error, newContent);
   } finally {
     pinBusy.value = false;
   }
 }
 
-function noteSaveFailure(error) {
-  if (error.response?.status === 409) {
+async function currentNoteVersion() {
+  if (note.value.version) return note.value.version;
+  const original = note.value;
+  const latest = await getNote(original.title, { force: true });
+  if (
+    latest.content !== original.content ||
+    latest.format !== original.format
+  ) {
+    throw {
+      response: { status: 409, data: { detail: { code: "note-conflict" } } },
+    };
+  }
+  if (!latest.version)
+    throw new Error(
+      "The Library needs an update before safe editing is available.",
+    );
+  return latest.version;
+}
+
+async function addTaskItem({ afterIndex, text }) {
+  if (!canModify.value || editMode.value) return;
+  const original = note.value.content || "";
+  let content;
+  if (isWorkNote.value || !isHtmlFormat.value) {
+    const markdown = isWorkNote.value
+      ? extractWorkMarkdown(original)
+      : original;
+    const updated = appendMarkdownTask(markdown, afterIndex, text);
+    if (updated == null) throw new Error("Checklist source not found.");
+    content = isWorkNote.value
+      ? buildWorkNoteHtml(note.value.title, updated, {
+          systemTags: getLamaNotesMetaTags(original).filter(isSystemTag),
+        })
+      : updated;
+  } else {
+    const doc = new DOMParser().parseFromString(original, "text/html");
+    const item = doc.body.querySelectorAll("li.task-list-item")[afterIndex];
+    if (!item) throw new Error("Checklist source not found.");
+    const added = doc.createElement("li");
+    added.className = "task-list-item";
+    const checkbox = doc.createElement("input");
+    checkbox.type = "checkbox";
+    added.append(checkbox, doc.createTextNode(String(text).trim()));
+    item.after(added);
+    content = /<(?:!doctype|html|body)\b/i.test(original)
+      ? `<!doctype html>\n${doc.documentElement.outerHTML}`
+      : doc.body.innerHTML;
+  }
+  try {
+    note.value = await updateNote(
+      note.value.title,
+      note.value.title,
+      content,
+      note.value.format,
+      await currentNoteVersion(),
+    );
+  } catch (error) {
+    await noteSaveFailure(error, content);
+    throw error;
+  }
+}
+
+async function noteSaveFailure(error, pendingContent = null) {
+  if (error.response?.data?.detail?.code === "note-conflict") {
+    conflictContent = pendingContent;
+    try {
+      conflictLatest = await getNote(note.value.title, { force: true });
+      conflictVisible.value = true;
+    } catch (loadError) {
+      apiErrorHandler(loadError, toast);
+    }
+  } else if (error.response?.status === 409) {
     toast.add(
       getToastOptions(
         "A note with this title already exists. Please try again with a new title.",
@@ -862,9 +952,66 @@ function noteSaveFailure(error) {
   }
 }
 
-function noteSaveSuccess() {
-  clearContentChangedTimeout();
-  toast.add(getToastOptions("Note saved successfully ✓", "Success", "success"));
+async function keepConflictEdits() {
+  if (!conflictLatest) return;
+  const content = conflictContent ?? getEditorContent();
+  const title = editMode.value ? newTitle.value : note.value.title;
+  const snapshot = JSON.stringify([title, editorFormat.value, content]);
+  try {
+    const saved = await updateNote(
+      note.value.title,
+      title,
+      content,
+      editorFormat.value,
+      conflictLatest.version,
+    );
+    note.value = saved;
+    if (
+      !editMode.value ||
+      JSON.stringify([
+        newTitle.value,
+        editorFormat.value,
+        getEditorContent(),
+      ]) === snapshot
+    ) {
+      documentSession.setDirty(false);
+      documentSession.clearDraft();
+    } else contentChangedHandler();
+    noteSaveSuccess({ pendingEdits: documentSession.dirty.value });
+    updatingSavedRoute = true;
+    try {
+      await router.replace({ name: "note", params: { title: saved.title } });
+    } finally {
+      updatingSavedRoute = false;
+    }
+  } catch (error) {
+    await noteSaveFailure(error, editMode.value ? null : content);
+  }
+}
+
+function useLatestVersion() {
+  if (!conflictLatest) return;
+  documentSession.clearDraft();
+  editorMemory.snapshot = null;
+  const editing = editMode.value;
+  documentSession.leaveEdit();
+  note.value = conflictLatest;
+  newTitle.value = note.value.title;
+  documentSession.setDirty(false);
+  if (editing) nextTick(setEditMode);
+}
+
+function noteSaveSuccess({ pendingEdits = false } = {}) {
+  if (!pendingEdits) clearContentChangedTimeout();
+  toast.add(
+    getToastOptions(
+      pendingEdits
+        ? "Saved. Newer edits are still unsaved."
+        : "Note saved successfully ✓",
+      "Success",
+      "success",
+    ),
+  );
   void loadPublicationState();
 }
 
@@ -1060,6 +1207,7 @@ function closeHandler() {
 }
 
 function confirmNoteNavigation() {
+  if (updatingSavedRoute) return true;
   if (!editMode.value || !isContentChanged()) {
     return true;
   }
@@ -1170,11 +1318,16 @@ function startContentChangedTimeout() {
 }
 
 function editorContentChangedHandler() {
+  documentSession.setDirty(true);
   startContentChangedTimeout();
   documentFindContentChanged();
 }
 
 function editorReadyHandler() {
+  nextTick(() => {
+    focusEditor();
+    documentSession.restoreEditorPosition(contentEditor.value);
+  });
   if (!findVisible.value) {
     return;
   }
@@ -1302,6 +1455,8 @@ function setNewNoteKind(kind) {
     kind === "work" ? buildWorkNoteHtml(newTitle.value || "Untitled", "") : "";
   documentSession.clearDraft();
   unsavedChanges.value = false;
+  editorMemory.snapshot = null;
+  editorInitialValue.value = getInitialEditorValue();
   editorKey.value += 1;
 }
 
@@ -1718,6 +1873,7 @@ onMounted(() => {
   init();
 });
 onUnmounted(() => {
+  editorMemory.snapshot = null;
   clearContentChangedTimeout();
   publicationRequestSequence += 1;
   window.clearTimeout(publicationPollTimer);

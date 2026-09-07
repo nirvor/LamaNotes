@@ -140,6 +140,9 @@
         :show-line-numbers="globalStore.showLineNumbers"
         :structured-paste="editorLanguage === 'markdown'"
         :session-key="editorSessionKey"
+        :session-state="
+          activeFile.editorMemory || (activeFile.editorMemory = {})
+        "
         :aria-label="`Edit ${activeFile.name}`"
         @change="activeFileChangedHandler"
         @keydown="documentKeydownHandler"
@@ -159,10 +162,15 @@
 
       <ToastViewer
         v-else-if="activeFile"
-        :key="`${activeFile.key}:${activeFile.previewRevision}`"
+        :key="activeFile.key"
         :initialValue="activeFile.previewMarkdown"
         :enhance-note-lead="false"
         :note-title="noteTitleForFile(activeFile)"
+        :task-checkboxes-disabled="
+          !activeFile.handle || activeFile.previewMode !== 'markdown'
+        "
+        :task-checkbox-toggle-handler="toggleLocalTask"
+        :task-item-add-handler="addLocalTask"
         class="toast-viewer min-w-0 max-w-full pb-4"
       />
 
@@ -276,6 +284,8 @@ import CsvTablePreview from "../components/CsvTablePreview.vue";
 import IconLabel from "../components/IconLabel.vue";
 import { useDocumentFind } from "../documentFind.js";
 import { useDocumentSession } from "../documents/documentSession.js";
+import { acceptFileSave } from "../documents/saveCheckpoint.js";
+import { appendMarkdownTask, toggleMarkdownTask } from "../checklists.js";
 import { createFileReplacementQueue } from "../fileReplacementQueue.js";
 import { createLocalFileStorageAdapter } from "../documents/storageAdapters.js";
 import {
@@ -348,8 +358,15 @@ const documentSession = useDocumentSession({
   draftKey: () => activeFile.value?.draftStorageKey || "",
   persistDraft: true,
   saveDocument: persistActiveFile,
+  getSnapshot: () => activeFile.value?.draftContent,
+  onPendingEdits: () => persistDraftState(activeFile.value),
   copyDocument: getActiveFileCopyPayload,
-  afterSave: () => showStatus("Saved to original file."),
+  afterSave: ({ pendingEdits }) =>
+    showStatus(
+      pendingEdits
+        ? "Saved. Newer edits are still unsaved."
+        : "Saved to original file.",
+    ),
   onSaveError: handleActiveFileSaveError,
   afterCopy: () => showStatus("Copied raw source to clipboard."),
   onCopyError: () => showStatus("Could not copy this file.", "error"),
@@ -1227,12 +1244,36 @@ function flushDraftPersistence() {
   draftPersistence.flush();
 }
 
+async function changeLocalChecklist(transform) {
+  const file = activeFile.value;
+  if (!file?.handle || editMode.value) return;
+  const changed = transform(file.draftContent);
+  if (changed == null) throw new Error("Checklist source not found.");
+  file.draftContent = changed;
+  markActiveFileDirty();
+  if (!(await saveActiveFile(false)))
+    throw new Error("Checklist change could not be saved.");
+}
+
+function toggleLocalTask({ index, checked }) {
+  return changeLocalChecklist((source) =>
+    toggleMarkdownTask(source, index, checked),
+  );
+}
+function addLocalTask({ afterIndex, text }) {
+  return changeLocalChecklist((source) =>
+    appendMarkdownTask(source, afterIndex, text),
+  );
+}
+
 function activeFileChangedHandler() {
   markActiveFileDirty();
   documentFindContentChanged();
 }
 
 function openFileEditorReadyHandler() {
+  nextTick(() => editorTextarea.value?.focusEditor?.());
+  documentSession.restoreEditorPosition(editorTextarea.value);
   reportEditorReady();
   if (!findVisible.value) {
     return;
@@ -1296,9 +1337,10 @@ async function persistActiveFile({ force = false } = {}) {
   }
 
   if (!file.handle && file.isNewDraft && supportsNativeFileBridge()) {
+    const submittedContent = file.draftContent;
     const payload = await window.pywebview.api.create_native_file(
       file.name,
-      file.draftContent,
+      submittedContent,
     );
     if (payload?.cancelled) {
       return false;
@@ -1311,6 +1353,8 @@ async function persistActiveFile({ force = false } = {}) {
       throw new Error("The created local file could not be reopened.");
     }
     const savedFile = await fileToPreview(selectedFile);
+    savedFile.draftContent = file.draftContent;
+    acceptFileSave(savedFile, submittedContent);
     clearLocalDraftState(file);
     files.value = files.value.map((candidate) =>
       candidate.key === file.key ? savedFile : candidate,
@@ -1326,19 +1370,19 @@ async function persistActiveFile({ force = false } = {}) {
     throw error;
   }
 
+  const submittedContent = file.draftContent;
   const savedFile = await localFileStorageAdapter.save({
     handle: file.handle,
-    content: file.draftContent,
+    content: submittedContent,
     force,
   });
   const nativeMetadata = file.handle?.metadata || {};
-  file.content = file.draftContent;
+  acceptFileSave(file, submittedContent);
   file.size = savedFile.size;
   file.lastModified = savedFile.lastModified;
   file.encoding = nativeMetadata.encoding || file.encoding;
   file.lineEnding = nativeMetadata.lineEnding || file.lineEnding;
   file.version = nativeMetadata.version || file.version;
-  file.dirty = false;
   file.externalState = "";
   file.externalChange = null;
   compareOpen.value = false;

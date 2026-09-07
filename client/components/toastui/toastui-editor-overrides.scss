@@ -112,7 +112,9 @@
   }
 
   li:has(> p:only-child > small:only-child),
-  li.task-list-item:has(> input:first-child + p:last-child > small:only-child),
+  li.task-list-item:has(
+      > input:first-child + p:last-of-type > small:only-child
+    ),
   li:has(> p:only-child > :is(strong, em):only-child > small:only-child),
   li.task-list-item:has(
       > input:first-child
@@ -153,7 +155,7 @@
     line-height: inherit;
   }
 
-  li.task-list-item:has(> input:first-child + p:last-child > small:only-child)
+  li.task-list-item:has(> input:first-child + p:last-of-type > small:only-child)
     > input[type="checkbox"].lamanotes-task-checkbox,
   li.task-list-item:has(
       > input:first-child

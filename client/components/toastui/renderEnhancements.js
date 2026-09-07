@@ -8,6 +8,8 @@ import {
   mdiMagnifyMinusOutline,
   mdiMagnifyPlusOutline,
   mdiOpenInNew,
+  mdiPlus,
+  mdiEyeCheckOutline,
   mdiTag,
 } from "@mdi/js";
 import { writePlainTextToClipboard } from "../../clipboard.js";
@@ -42,6 +44,7 @@ const bottomTagsClass = "lamanotes-bottom-tags";
 const bottomTagChipClass = "lamanotes-bottom-tag-chip";
 const taskCheckboxClass = "lamanotes-task-checkbox";
 const taskCheckboxSavingClass = "lamanotes-task-checkbox-saving";
+let taskControlSequence = 0;
 const resetDelayMs = 1600;
 const maxInlineLatexLength = 500;
 const maxLeadSearchElements = 18;
@@ -1403,6 +1406,14 @@ export function enhanceCodeBlocks(rootElement) {
 }
 
 function setTaskCheckboxesBusy(rootElement, isBusy, taskListOptions) {
+  rootElement.lamanotesTasksBusy = isBusy;
+  rootElement
+    .querySelectorAll(
+      ".lamanotes-checklist-tools button, .lamanotes-checklist-tools input",
+    )
+    .forEach((control) => {
+      control.disabled = isBusy;
+    });
   rootElement.querySelectorAll(`.${taskCheckboxClass}`).forEach((checkbox) => {
     checkbox.disabled = isBusy || !!taskListOptions.disabled;
     checkbox.classList.toggle(taskCheckboxSavingClass, isBusy);
@@ -1412,14 +1423,28 @@ function setTaskCheckboxesBusy(rootElement, isBusy, taskListOptions) {
 function decorateTaskCheckbox(checkbox, index, rootElement, taskListOptions) {
   checkbox.classList.add(taskCheckboxClass);
   checkbox.dataset.lamanotesTaskIndex = String(index);
-  checkbox.disabled = !!taskListOptions.disabled || !taskListOptions.onToggle;
+  const item = checkbox.closest("li");
+  item.classList.toggle("lamanotes-task-done", checkbox.checked);
+  if (!checkbox.id) checkbox.id = `lamanotes-task-${++taskControlSequence}`;
+  let hitTarget = item.querySelector(":scope > .lamanotes-task-hit-target");
+  if (!hitTarget) {
+    hitTarget = document.createElement("label");
+    hitTarget.className = "lamanotes-task-hit-target";
+    hitTarget.setAttribute("aria-hidden", "true");
+    item.append(hitTarget);
+  }
+  hitTarget.htmlFor = checkbox.id;
+  checkbox.disabled =
+    !!taskListOptions.disabled ||
+    !taskListOptions.onToggle ||
+    !!rootElement.lamanotesTasksBusy;
   checkbox.setAttribute(
     "title",
     checkbox.disabled ? "Open edit mode to change this item" : "Toggle item",
   );
   checkbox.setAttribute(
     "aria-label",
-    checkbox.disabled ? "Checklist item" : "Toggle item",
+    `Checklist item: ${(item.textContent || "").trim().slice(0, 120)}`,
   );
 
   if (checkbox.lamanotesTaskChangeHandler) {
@@ -1427,12 +1452,17 @@ function decorateTaskCheckbox(checkbox, index, rootElement, taskListOptions) {
   }
 
   checkbox.lamanotesTaskChangeHandler = async () => {
-    if (checkbox.disabled || !taskListOptions.onToggle) {
+    if (
+      checkbox.disabled ||
+      rootElement.lamanotesTasksBusy ||
+      !taskListOptions.onToggle
+    ) {
       return;
     }
 
     const checked = checkbox.checked;
     const previousChecked = !checked;
+    item.classList.toggle("lamanotes-task-done", checked);
     setTaskCheckboxesBusy(rootElement, true, taskListOptions);
 
     try {
@@ -1442,6 +1472,7 @@ function decorateTaskCheckbox(checkbox, index, rootElement, taskListOptions) {
       });
     } catch {
       checkbox.checked = previousChecked;
+      item.classList.toggle("lamanotes-task-done", previousChecked);
     } finally {
       setTaskCheckboxesBusy(rootElement, false, taskListOptions);
     }
@@ -1494,6 +1525,111 @@ export function enhanceTaskListCheckboxes(rootElement, taskListOptions = {}) {
     const checkbox = ensureTaskCheckbox(taskItem);
     decorateTaskCheckbox(checkbox, index, rootElement, taskListOptions);
   });
+  rootElement
+    .querySelectorAll(".lamanotes-checklist-tools")
+    .forEach((element) => element.remove());
+  const lists = [...new Set([...taskItems].map((item) => item.parentElement))];
+  const hiddenLists = (rootElement.lamanotesHiddenTaskLists ||= new Set());
+  lists.forEach((list, listIndex) => {
+    const items = [...list.children].filter((item) =>
+      item.matches("li.task-list-item"),
+    );
+    const tools = document.createElement("div");
+    tools.className = "lamanotes-checklist-tools";
+    tools.setAttribute("role", "group");
+    tools.setAttribute("aria-label", "Checklist actions");
+    list.classList.toggle(
+      "lamanotes-hide-completed",
+      hiddenLists.has(listIndex),
+    );
+    if (items.some((item) => item.classList.contains("lamanotes-task-done"))) {
+      const toggle = createIconButton({
+        className: "lamanotes-format-button",
+        label: "Hide completed items",
+        path: mdiEyeCheckOutline,
+      });
+      const updateToggle = () => {
+        const hidden = hiddenLists.has(listIndex);
+        list.classList.toggle("lamanotes-hide-completed", hidden);
+        toggle.setAttribute("aria-pressed", String(hidden));
+        toggle.setAttribute(
+          "aria-label",
+          hidden ? "Show completed items" : "Hide completed items",
+        );
+        toggle.title = toggle.getAttribute("aria-label");
+      };
+      toggle.addEventListener("click", () => {
+        hiddenLists.has(listIndex)
+          ? hiddenLists.delete(listIndex)
+          : hiddenLists.add(listIndex);
+        updateToggle();
+      });
+      updateToggle();
+      tools.append(toggle);
+    }
+    if (taskListOptions.onAdd && !taskListOptions.disabled) {
+      const add = createIconButton({
+        className: "lamanotes-format-button",
+        label: "Add checklist item",
+        path: mdiPlus,
+      });
+      const form = document.createElement("form");
+      form.className = "lamanotes-checklist-entry";
+      form.hidden = true;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "New item";
+      input.setAttribute("aria-label", "New checklist item");
+      input.maxLength = 1000;
+      const submit = createIconButton({
+        className: "lamanotes-format-button",
+        label: "Add item",
+        path: mdiCheck,
+      });
+      submit.type = "submit";
+      form.append(input, submit);
+      add.addEventListener("click", () => {
+        form.hidden = !form.hidden;
+        if (!form.hidden) input.focus();
+      });
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          event.stopPropagation();
+          form.hidden = true;
+          add.focus();
+        }
+      });
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (
+          !input.value.trim() ||
+          input.disabled ||
+          rootElement.lamanotesTasksBusy
+        )
+          return;
+        const lastCheckbox = items
+          .at(-1)
+          ?.querySelector("input.lamanotes-task-checkbox");
+        setTaskCheckboxesBusy(rootElement, true, taskListOptions);
+        try {
+          await taskListOptions.onAdd({
+            afterIndex: Number(lastCheckbox?.dataset.lamanotesTaskIndex),
+            text: input.value,
+          });
+          input.value = "";
+          form.hidden = true;
+        } catch {
+          requestAnimationFrame(() => input.focus());
+        } finally {
+          setTaskCheckboxesBusy(rootElement, false, taskListOptions);
+        }
+      });
+      tools.append(add, form);
+    }
+    if (tools.childElementCount) list.after(tools);
+  });
+  if (rootElement.lamanotesTasksBusy)
+    setTaskCheckboxesBusy(rootElement, true, taskListOptions);
 }
 
 function isEscaped(text, index) {

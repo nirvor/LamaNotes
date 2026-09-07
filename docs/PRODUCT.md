@@ -77,6 +77,27 @@ responsive rules and anti-patterns for every host and note type.
 - Existing HTML checklists may enter the simple Work-note editor on first
   manual edit; ordinary HTML articles keep their source editor.
 
+## Everyday editing
+
+Local text/Markdown, Work notes and HTML articles share the compact source
+editor and formatting actions. Bold, italic, smaller text, lists, checklists,
+links and code act on the current selection. Ctrl+B, Ctrl+I and Ctrl+K work in
+all three editors. Reading and editing remain separate views.
+
+Switching to reading and back retains selection, scroll and undo while the
+same document remains open. Double-clicking an unambiguous paragraph starts
+editing near that paragraph. An ambiguous match keeps the previous position.
+
+A successful save confirms only the submitted text. Typing during a save stays
+in the editor as an unsaved draft. Library conflicts offer Keep editing, Use
+latest or an explicit Keep mine overwrite, never a silent merge. Existing local
+file conflict checks remain in place.
+
+Checklists can be extended directly in the reader. Completed items become
+quieter and can be hidden per list for the current reading session. Hiding does
+not delete, reorder or change the note. Touch targets grow to about 42px while
+desktop rows remain compact.
+
 ## Performance standard
 
 - Local startup is independent of authentication and Library availability.

@@ -341,6 +341,14 @@ templates for new work.
 
 ## Release visual gate
 
+The shared source editor keeps one compact icon toolbar, with labels/tooltips
+and keyboard equivalents. Link entry appears only when requested. Formatting
+retains the selected text, so applying or removing a style is repeatable.
+Work/HTML previews replace the editor rather than stacking a second view.
+Completed checklist rows use the existing muted-text token. Hide-completed and
+add-item controls belong to the list, not the global toolbar. No completion
+counter, progress card or automatic sorting is added.
+
 Before release, render at least:
 
 - a generic tagless article;

@@ -33,7 +33,7 @@ from publications.metadata import (
 )
 
 from ..base import BaseNotes
-from ..errors import ResearchNoteConflictError, ResearchNoteContractError
+from ..errors import NoteConflictError, ResearchNoteConflictError, ResearchNoteContractError
 from ..models import (
     Note,
     NoteComponent,
@@ -46,6 +46,7 @@ from ..models import (
     NoteLink,
     NoteMedia,
     NoteUpdate,
+    note_version,
     ResearchNoteUpdate,
     SearchResult,
 )
@@ -634,6 +635,10 @@ class FileSystemNotes(BaseNotes):
             filepath = self._existing_path_from_title(title)
             existing_content = self._read_file(filepath)
             existing_format = self._format_from_path(filepath)
+            if data.expected_version is not None and data.expected_version != note_version(
+                existing_content, existing_format
+            ):
+                raise NoteConflictError("This note changed on another device. Your edits have not been saved.")
 
             next_title = (
                 data.new_title if data.new_title is not None else title

@@ -266,8 +266,9 @@ export async function createNote(title, content, format = "html") {
   }
 }
 
-export async function getNote(title) {
+export async function getNote(title, { force = false } = {}) {
   const cacheKey = String(title || "");
+  if (force) return fetchNote(cacheKey);
   const cached = noteCache.get(cacheKey);
   if (cached && Date.now() - cached.loadedAt < noteCacheTtlMs) {
     return new Note({ ...cached.data });
@@ -371,12 +372,19 @@ export async function getSemanticIndex({ force = false } = {}) {
   return fetchSemanticIndex();
 }
 
-export async function updateNote(title, newTitle, newContent, format = "html") {
+export async function updateNote(
+  title,
+  newTitle,
+  newContent,
+  format = "html",
+  expectedVersion = "",
+) {
   try {
     const response = await api.patch(`api/notes/${encodeURIComponent(title)}`, {
       newTitle: newTitle,
       newContent: newContent,
       newFormat: format,
+      ...(expectedVersion ? { expectedVersion } : {}),
     });
     noteCache.delete(String(title || ""));
     removeWarmNote(title);

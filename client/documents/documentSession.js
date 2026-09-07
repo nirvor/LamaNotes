@@ -1,4 +1,6 @@
 import { nextTick, onBeforeUnmount, ref } from "vue";
+import { createSaveCheckpoint } from "./saveCheckpoint.js";
+import { findEditAnchor } from "./editorPosition.js";
 
 import {
   writeHtmlToClipboard,
@@ -34,6 +36,8 @@ export function useDocumentSession(options = {}) {
   const copied = ref(false);
   let lastContentTap = null;
   let copiedTimer = null;
+  let readScroll = 0;
+  let editAnchor = "";
 
   function getOptionValue(name, fallback = null) {
     const option = options[name];
@@ -78,11 +82,6 @@ export function useDocumentSession(options = {}) {
     }
 
     const value = String(content ?? "");
-    if (!value) {
-      clearDraft(overrideKey);
-      return;
-    }
-
     const storage = preferredDraftStorage();
     const otherStorage =
       storage === window.localStorage
@@ -121,6 +120,7 @@ export function useDocumentSession(options = {}) {
     }
 
     options.beforeEnterEdit?.();
+    if (!editMode.value) readScroll = window.scrollY || 0;
     editMode.value = true;
     focusEditorSoon();
     return true;
@@ -131,6 +131,7 @@ export function useDocumentSession(options = {}) {
     editMode.value = false;
     lastContentTap = null;
     options.afterLeaveEdit?.();
+    nextTick(() => window.scrollTo({ top: readScroll, behavior: "instant" }));
   }
 
   function requestEdit() {
@@ -176,6 +177,10 @@ export function useDocumentSession(options = {}) {
     }
 
     event.preventDefault();
+    editAnchor =
+      event.target
+        ?.closest?.("p, li, h1, h2, h3, h4, h5, h6")
+        ?.textContent?.trim() || "";
     requestEdit();
     return true;
   }
@@ -226,6 +231,15 @@ export function useDocumentSession(options = {}) {
     startEditFromContent(event, { allowSelection: true });
   }
 
+  function restoreEditorPosition(editor) {
+    if (!editAnchor || !editor?.getSearchText || !editor?.selectSearchRange)
+      return;
+    const position = findEditAnchor(editor.getSearchText(), editAnchor);
+    editAnchor = "";
+    if (position != null)
+      requestAnimationFrame(() => editor.selectSearchRange(position, position));
+  }
+
   async function save(saveOptions = {}) {
     const { close = false } = saveOptions;
     if (saving.value || !options.saveDocument) {
@@ -233,21 +247,31 @@ export function useDocumentSession(options = {}) {
     }
 
     const savedDraftKeys = [draftKey(), ...legacyDraftKeys()].filter(Boolean);
+    const isCurrentSave = createSaveCheckpoint(options.getSnapshot);
     saving.value = true;
     try {
       const saved = await options.saveDocument({ ...saveOptions, close });
       if (saved === false) {
         return false;
       }
-      setDirty(false);
-      clearStoredDraftKeys(savedDraftKeys);
-      options.afterSave?.({ close, result: saved });
-      if (close) {
+      const current = isCurrentSave();
+      setDirty(!current);
+      if (current) {
+        clearStoredDraftKeys(savedDraftKeys);
+      } else {
+        options.onPendingEdits?.();
+      }
+      options.afterSave?.({
+        close: close && current,
+        result: saved,
+        pendingEdits: !current,
+      });
+      if (close && current) {
         leaveEdit();
       }
-      return saved;
+      return close && !current ? false : saved;
     } catch (error) {
-      options.onSaveError?.(error);
+      await options.onSaveError?.(error);
       return false;
     } finally {
       saving.value = false;
@@ -333,6 +357,7 @@ export function useDocumentSession(options = {}) {
     leaveEdit,
     loadDraft,
     requestEdit,
+    restoreEditorPosition,
     save,
     saveDraft,
     setDirty,

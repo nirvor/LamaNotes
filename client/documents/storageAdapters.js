@@ -1,11 +1,18 @@
 export function createVpsNoteStorageAdapter({ create, update }) {
   return {
-    async save({ isNew, sourceTitle, title, content, format = "html" }) {
+    async save({
+      isNew,
+      sourceTitle,
+      title,
+      content,
+      format = "html",
+      expectedVersion = "",
+    }) {
       if (isNew) {
         return create(title, content, format);
       }
 
-      return update(sourceTitle, title, content, format);
+      return update(sourceTitle, title, content, format, expectedVersion);
     },
   };
 }

@@ -1,6 +1,47 @@
 <template>
   <div class="lamanotes-source-editor-shell">
     <div
+      v-if="hasFormatting || $slots.tools"
+      class="lamanotes-format-toolbar"
+      role="toolbar"
+      aria-label="Formatting"
+    >
+      <FormattingTools v-if="hasFormatting" @format="formatSelection" />
+      <slot name="tools" />
+    </div>
+    <form
+      v-if="linkVisible"
+      class="lamanotes-editor-link"
+      @submit.prevent="insertLink"
+    >
+      <input
+        ref="linkInput"
+        v-model="linkUrl"
+        aria-label="Link URL"
+        placeholder="https://"
+        required
+        @input="linkInput?.setCustomValidity('')"
+        @keydown.esc.stop.prevent="closeLink"
+      />
+      <button
+        type="submit"
+        class="lamanotes-format-button"
+        title="Insert link"
+        aria-label="Insert link"
+      >
+        <SvgIcon type="mdi" :path="mdiCheck" size="0.92rem" />
+      </button>
+      <button
+        type="button"
+        class="lamanotes-format-button"
+        title="Cancel link"
+        aria-label="Cancel link"
+        @click="closeLink"
+      >
+        <SvgIcon type="mdi" :path="mdiClose" size="0.92rem" />
+      </button>
+    </form>
+    <div
       ref="editorHost"
       class="lamanotes-source-editor"
       :class="{
@@ -57,6 +98,7 @@ import SvgIcon from "@jamescoyle/vue-icon";
 import {
   defaultKeymap,
   history,
+  historyField,
   historyKeymap,
   indentWithTab,
 } from "@codemirror/commands";
@@ -90,12 +132,22 @@ import {
 import { tags } from "@lezer/highlight";
 import {
   mdiClose,
+  mdiCheck,
   mdiCodeTags,
   mdiFormatQuoteClose,
   mdiTable,
   mdiText,
 } from "@mdi/js";
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
+import FormattingTools from "./FormattingTools.vue";
+import { formattingEdit, safeEditorLink } from "./formatting.js";
 
 import {
   fitStructuredPasteToContext,
@@ -115,10 +167,21 @@ const props = defineProps({
   addImageBlobHook: Function,
   transformPastedText: Function,
   structuredPaste: Boolean,
+  sessionState: Object,
+  formatting: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(["update:modelValue", "change", "keydown", "ready"]);
 const editorHost = ref();
+const hasFormatting = computed(
+  () =>
+    props.formatting &&
+    ["markdown", "md", "text", "txt", "html"].includes(props.language),
+);
+const linkVisible = ref(false);
+const linkUrl = ref("");
+const linkInput = ref();
+let linkSelection = null;
 const languageCompartment = new Compartment();
 const wrappingCompartment = new Compartment();
 const externalUpdate = Annotation.define();
@@ -514,6 +577,20 @@ function editorExtensions() {
     }),
     EditorView.domEventHandlers({
       keydown(event) {
+        if (
+          hasFormatting.value &&
+          (event.ctrlKey || event.metaKey) &&
+          !event.altKey
+        ) {
+          const kind = { b: "bold", i: "italic", k: "link" }[
+            event.key.toLowerCase()
+          ];
+          if (kind) {
+            event.preventDefault();
+            formatSelection(kind);
+            return true;
+          }
+        }
         emit("keydown", event);
         return event.defaultPrevented;
       },
@@ -621,9 +698,19 @@ function handleImageFiles(dataTransfer, event) {
 
   event.preventDefault();
   images.forEach((file) => {
-    props.addImageBlobHook(file, (url, altText = file.name) => {
-      insertText(`![${escapeMarkdownLabel(altText)}](${url})`);
-    });
+    props.addImageBlobHook(
+      file,
+      async (url, altText = file.name, metadata = {}) => {
+        if (props.language === "html") {
+          const { createMediaFigureSnippet } = await import(
+            "../html/componentKit.js"
+          );
+          insertText(createMediaFigureSnippet(url, altText, metadata));
+        } else {
+          insertText(`![${escapeMarkdownLabel(altText)}](${url})`);
+        }
+      },
+    );
   });
   return true;
 }
@@ -643,6 +730,49 @@ function insertText(text) {
     scrollIntoView: true,
   });
   editorView.focus();
+}
+
+function formatSelection(kind) {
+  if (!editorView) return;
+  if (kind === "link") {
+    linkSelection = getSelectionRange();
+    linkVisible.value = true;
+    nextTick(() => linkInput.value?.focus());
+    return;
+  }
+  const edit = formattingEdit(
+    getValue(),
+    getSelectionRange(),
+    kind,
+    props.language,
+  );
+  if (edit) replaceRange(edit.from, edit.to, edit.text, edit);
+}
+
+function closeLink() {
+  linkVisible.value = false;
+  linkUrl.value = "";
+  focusEditor();
+}
+
+function insertLink() {
+  if (!safeEditorLink(linkUrl.value)) {
+    linkInput.value?.setCustomValidity(
+      "Use an https, http, mailto or relative link.",
+    );
+    linkInput.value?.reportValidity();
+    return;
+  }
+  linkInput.value?.setCustomValidity("");
+  const edit = formattingEdit(
+    getValue(),
+    linkSelection,
+    "link",
+    props.language,
+    linkUrl.value,
+  );
+  if (edit) replaceRange(edit.from, edit.to, edit.text, edit);
+  closeLink();
 }
 
 function getSelectionRange() {
@@ -902,7 +1032,7 @@ function focusEditor() {
 }
 
 function getValue() {
-  return editorView?.state.doc.toString() || initialContent();
+  return editorView ? editorView.state.doc.toString() : initialContent();
 }
 
 function getSearchText() {
@@ -934,17 +1064,27 @@ function isWysiwygMode() {
 }
 
 onMounted(() => {
+  const saved = props.sessionState?.snapshot;
+  const config = { doc: initialContent(), extensions: editorExtensions() };
+  const state =
+    saved?.state?.doc === initialContent()
+      ? EditorState.fromJSON(saved.state, config, { history: historyField })
+      : EditorState.create(config);
   editorView = new EditorView({
-    state: EditorState.create({
-      doc: initialContent(),
-      extensions: editorExtensions(),
-    }),
+    state,
     parent: editorHost.value,
   });
   editorView.scrollDOM.addEventListener("scroll", scheduleSessionSave, {
     passive: true,
   });
-  restoreSessionState();
+  if (saved?.state?.doc === initialContent()) {
+    requestAnimationFrame(() => {
+      window.scrollTo(0, saved.pageScroll || 0);
+      editorView?.requestMeasure();
+    });
+  } else {
+    restoreSessionState();
+  }
   if (usesLazyLanguageMode(props.language)) {
     void applyLanguageExtension(props.language);
   }
@@ -986,6 +1126,12 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  if (props.sessionState && editorView) {
+    props.sessionState.snapshot = {
+      state: editorView.state.toJSON({ history: historyField }),
+      pageScroll: window.scrollY,
+    };
+  }
   languageLoadGeneration += 1;
   window.clearTimeout(tagNormalizeTimer);
   window.clearTimeout(sessionSaveTimer);

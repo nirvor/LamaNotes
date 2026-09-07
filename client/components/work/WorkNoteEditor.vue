@@ -1,89 +1,64 @@
 <template>
   <div class="lamanotes-work-editor">
-    <div class="lamanotes-work-editor-toolbar" aria-label="Work note tools">
-      <NoteKindSwitch
-        v-if="showKindSwitch"
-        :current-kind="currentKind"
-        @set-kind="setKind"
-      />
-      <button
-        type="button"
-        class="lamanotes-work-icon-button"
-        title="Toggle smaller text"
-        aria-label="Toggle smaller text"
-        @click="insertSmallText"
-      >
-        <SvgIcon type="mdi" :path="mdiFormatFontSizeDecrease" size="0.84rem" />
-      </button>
-      <button
-        type="button"
-        class="lamanotes-work-icon-button"
-        title="Insert code block"
-        aria-label="Insert code block"
-        @click="insertCodeBlock"
-      >
-        <SvgIcon type="mdi" :path="mdiCodeTags" size="0.84rem" />
-      </button>
-      <button
-        type="button"
-        class="lamanotes-work-icon-button"
-        title="Insert checklist item"
-        aria-label="Insert checklist item"
-        @click="insertChecklist"
-      >
-        <SvgIcon type="mdi" :path="mdiFormatListChecks" size="0.84rem" />
-      </button>
-      <button
-        type="button"
-        class="lamanotes-work-icon-button"
-        :class="{ 'lamanotes-work-icon-button-active': previewVisible }"
-        :title="previewVisible ? 'Hide preview' : 'Show preview'"
-        :aria-label="previewVisible ? 'Hide preview' : 'Show preview'"
-        :aria-pressed="previewVisible"
-        @click="togglePreview"
-      >
-        <SvgIcon
-          type="mdi"
-          :path="previewVisible ? mdiEyeOffOutline : mdiEyeOutline"
-          size="0.84rem"
-        />
-      </button>
-      <button
-        type="button"
-        class="lamanotes-work-icon-button lamanotes-work-copy-button"
-        :class="{ 'lamanotes-work-icon-button-active': copied }"
-        :title="copied ? 'Copied' : 'Copy markdown'"
-        :aria-label="copied ? 'Copied' : 'Copy markdown'"
-        @click="copyMarkdown"
-      >
-        <SvgIcon
-          type="mdi"
-          :path="copied ? mdiCheck : mdiContentCopy"
-          size="0.84rem"
-        />
-      </button>
-    </div>
-
     <SourceEditor
       v-show="!previewVisible"
       ref="sourceEditor"
       v-model="markdown"
-      class="lamanotes-work-editor-source"
       language="markdown"
       :normalize-tags="true"
       :show-line-numbers="showLineNumbers"
+      :session-state="sessionState"
       :add-image-blob-hook="addImageBlobHook"
       :transform-pasted-text="transformPastedText"
       :structured-paste="true"
       aria-label="Edit work note"
-      @change="contentChangedHandler"
-      @keydown="keydownHandler"
-      @ready="editorReadyHandler"
-    />
-
+      @change="$emit('change')"
+      @keydown="$emit('keydown', $event)"
+      @ready="$emit('ready')"
+    >
+      <template #tools>
+        <NoteKindSwitch
+          v-if="showKindSwitch"
+          :current-kind="currentKind"
+          @set-kind="$emit('set-kind', $event)"
+        />
+        <button
+          type="button"
+          class="lamanotes-format-button"
+          title="Show preview"
+          aria-label="Show preview"
+          @click="togglePreview"
+        >
+          <SvgIcon type="mdi" :path="mdiEyeOutline" size="0.92rem" />
+        </button>
+        <button
+          type="button"
+          class="lamanotes-format-button"
+          :title="copied ? 'Copied' : 'Copy markdown'"
+          :aria-label="copied ? 'Copied' : 'Copy markdown'"
+          @click="copyMarkdown"
+        >
+          <SvgIcon
+            type="mdi"
+            :path="copied ? mdiCheck : mdiContentCopy"
+            size="0.92rem"
+          />
+        </button>
+      </template>
+    </SourceEditor>
     <div v-if="previewVisible" class="lamanotes-work-editor-preview">
+      <div class="lamanotes-format-toolbar">
+        <button
+          type="button"
+          class="lamanotes-format-button"
+          title="Back to writing"
+          aria-label="Back to writing"
+          @click="togglePreview"
+        >
+          <SvgIcon type="mdi" :path="mdiPencilOutline" size="0.92rem" />
+        </button>
+      </div>
       <ToastViewer
-        :key="previewKey"
         :initialValue="markdown"
         :enhance-note-lead="false"
         :note-title="noteTitle"
@@ -92,269 +67,92 @@
     </div>
   </div>
 </template>
-
 <script setup>
+import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 import SvgIcon from "@jamescoyle/vue-icon";
 import {
   mdiCheck,
-  mdiCodeTags,
   mdiContentCopy,
-  mdiEyeOffOutline,
   mdiEyeOutline,
-  mdiFormatFontSizeDecrease,
-  mdiFormatListChecks,
+  mdiPencilOutline,
 } from "@mdi/js";
-import { computed, nextTick, ref, watch } from "vue";
-
-import NoteKindSwitch from "../NoteKindSwitch.vue";
 import SourceEditor from "../editor/SourceEditor.vue";
-import { writeMarkdownToClipboard } from "../../clipboard.js";
-import { classifyPastedText, markdownForPaste } from "../paste/mediaPaste.js";
+import NoteKindSwitch from "../NoteKindSwitch.vue";
 import ToastViewer from "../toastui/ToastViewer.vue";
 import {
   buildWorkNoteHtml,
-  createSmallTextEdit,
   extractWorkMarkdown,
   normalizeWorkMarkdownTags,
 } from "./workNote.js";
+import { classifyPastedText, markdownForPaste } from "../paste/mediaPaste.js";
+import { writeMarkdownToClipboard } from "../../clipboard.js";
 
 const props = defineProps({
-  currentKind: {
-    type: String,
-    default: "work",
-  },
+  currentKind: { type: String, default: "work" },
   initialValue: String,
   noteTitle: String,
   addImageBlobHook: Function,
   showLineNumbers: Boolean,
   showKindSwitch: Boolean,
+  sessionState: Object,
 });
-
-const emit = defineEmits(["change", "keydown", "ready", "set-kind"]);
-
-const copied = ref(false);
-const markdown = ref(initialMarkdown());
-const previewVisible = ref(false);
+defineEmits(["change", "keydown", "ready", "set-kind"]);
+const markdown = ref(extractWorkMarkdown(props.initialValue || ""));
 const sourceEditor = ref();
-
-const previewKey = computed(() => `${previewVisible.value}-${markdown.value}`);
-
-function initialMarkdown() {
-  const raw = extractWorkMarkdown(props.initialValue || "");
-  return raw.trim() ? raw : "";
+const previewVisible = ref(false);
+const copied = ref(false);
+let copyTimer;
+watch(
+  () => props.initialValue,
+  (value) => {
+    markdown.value = extractWorkMarkdown(value || "");
+  },
+);
+function getMarkdown() {
+  return normalizeWorkMarkdownTags(markdown.value).markdown;
 }
-
-function insertAtCursor(snippet, options = {}) {
-  sourceEditor.value?.replaceSelection?.(snippet, options);
-}
-
-function insertCodeBlock() {
-  const selectedText = sourceEditor.value?.getSelectedText?.() || "";
-  insertAtCursor(`\n\`\`\`text\n${selectedText}\n\`\`\`\n`);
-}
-
-function insertSmallText() {
-  const selection = sourceEditor.value?.getSelectionRange?.();
-  const edit = createSmallTextEdit(markdown.value, selection);
-  sourceEditor.value?.replaceRange?.(edit.from, edit.to, edit.text, {
-    anchorOffset: edit.anchorOffset,
-    headOffset: edit.headOffset,
-  });
-}
-
-function insertChecklist() {
-  insertAtCursor("\n- [ ] \n");
-}
-
-function selectedText() {
-  return sourceEditor.value?.getSelectedText?.() || "";
-}
-
 function transformPastedText(text) {
-  const snippet = markdownForPaste(classifyPastedText(text), selectedText());
-  return snippet || null;
+  return (
+    markdownForPaste(
+      classifyPastedText(text),
+      sourceEditor.value?.getSelectedText?.() || "",
+    ) || null
+  );
 }
-
-function setKind(kind) {
-  emit("set-kind", kind);
-}
-
 async function togglePreview() {
   previewVisible.value = !previewVisible.value;
   if (!previewVisible.value) {
     await nextTick();
-    sourceEditor.value?.focusEditor?.();
+    sourceEditor.value?.focusEditor();
   }
 }
-
-function normalizedMarkdown() {
-  return normalizeWorkMarkdownTags(markdown.value).markdown;
+function focusEditor() {
+  previewVisible.value = false;
+  nextTick(() => sourceEditor.value?.focusEditor());
+  return sourceEditor.value?.focusEditor();
 }
-
 async function copyMarkdown() {
   try {
-    await writeMarkdownToClipboard(normalizedMarkdown());
+    await writeMarkdownToClipboard(getMarkdown());
     copied.value = true;
-    setTimeout(() => {
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => {
       copied.value = false;
     }, 1400);
   } catch {
     copied.value = false;
   }
 }
-
-function contentChangedHandler() {
-  emit("change");
-}
-
-function keydownHandler(event) {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "b") {
-    event.preventDefault();
-    const selected = selectedText();
-    const snippet = `**${selected}**`;
-    insertAtCursor(snippet, {
-      anchorOffset: 2,
-      headOffset: 2 + selected.length,
-    });
-    return;
-  }
-
-  emit("keydown", event);
-}
-
-function getMarkdown() {
-  return normalizedMarkdown();
-}
-
-function getSearchText() {
-  return markdown.value;
-}
-
-function selectSearchRange(from, to) {
-  sourceEditor.value?.selectSearchRange?.(from, to);
-}
-
-function setSearchMatches(matches, currentIndex) {
-  sourceEditor.value?.setSearchMatches?.(matches, currentIndex);
-}
-
-function replaceContent(value) {
-  return sourceEditor.value?.replaceContent?.(value);
-}
-
-function getContent(title) {
-  return buildWorkNoteHtml(
-    title || props.noteTitle || "Untitled",
-    normalizedMarkdown(),
-  );
-}
-
-function focusEditor() {
-  previewVisible.value = false;
-  nextTick(() => sourceEditor.value?.focusEditor?.());
-  return sourceEditor.value?.focusEditor?.();
-}
-
-watch(
-  () => props.initialValue,
-  () => {
-    markdown.value = initialMarkdown();
-  },
-);
-
-function editorReadyHandler() {
-  sourceEditor.value?.focusEditor?.();
-  emit("ready");
-}
-
+onBeforeUnmount(() => clearTimeout(copyTimer));
 defineExpose({
   focusEditor,
-  getContent,
   getMarkdown,
-  getSearchText,
-  replaceContent,
-  selectSearchRange,
-  setSearchMatches,
+  getContent: (title) =>
+    buildWorkNoteHtml(title || props.noteTitle || "Untitled", getMarkdown()),
+  getSearchText: () => markdown.value,
+  selectSearchRange: (...args) =>
+    sourceEditor.value?.selectSearchRange(...args),
+  setSearchMatches: (...args) => sourceEditor.value?.setSearchMatches(...args),
+  replaceContent: (...args) => sourceEditor.value?.replaceContent(...args),
 });
 </script>
-
-<style lang="scss" scoped>
-.lamanotes-work-editor {
-  display: flex;
-  min-height: 65vh;
-  flex-direction: column;
-  border: var(--ln-border-subtle);
-  border-radius: var(--ln-radius-card);
-  overflow: visible;
-  background-color: rgb(var(--theme-background));
-}
-
-.lamanotes-work-editor-toolbar {
-  display: flex;
-  min-height: var(--ln-control-size);
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.14rem;
-  padding: 0.06rem 0.2rem;
-  border-bottom: 1px solid rgb(var(--theme-border));
-  color: rgb(var(--theme-text-muted));
-  background-color: rgb(var(--theme-background-elevated));
-}
-
-.lamanotes-work-icon-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--ln-control-size);
-  height: var(--ln-control-size);
-  border: 1px solid rgb(var(--theme-border));
-  border-radius: var(--ln-radius-control);
-  padding: 0;
-  color: rgb(var(--theme-text));
-  background-color: rgb(var(--theme-background));
-  touch-action: manipulation;
-}
-
-.lamanotes-work-copy-button {
-  margin-left: auto;
-}
-
-.lamanotes-work-icon-button:hover,
-.lamanotes-work-icon-button:focus-visible,
-.lamanotes-work-icon-button-active {
-  border-color: rgb(var(--theme-brand));
-  color: rgb(var(--theme-brand));
-  background-color: rgb(var(--theme-background-elevated));
-}
-
-.lamanotes-work-editor-source {
-  min-height: 65vh;
-  flex: 0 0 auto;
-  border: 0;
-}
-
-.lamanotes-work-editor-source :deep(.cm-editor),
-.lamanotes-work-editor-source :deep(.cm-scroller),
-.lamanotes-work-editor-source :deep(.cm-content) {
-  min-height: 65vh;
-}
-
-.lamanotes-work-editor-preview {
-  min-height: 65vh;
-  padding: 1.05rem 1.2rem;
-  background-color: rgb(var(--theme-background));
-}
-
-@media (pointer: coarse), (hover: none) {
-  .lamanotes-work-editor-toolbar {
-    gap: 0.22rem;
-    min-height: var(--ln-touch-target);
-    padding: 0.26rem;
-  }
-
-  .lamanotes-work-icon-button {
-    width: var(--ln-touch-target);
-    height: var(--ln-touch-target);
-  }
-}
-</style>
