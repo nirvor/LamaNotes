@@ -16,24 +16,22 @@ Fast local editing with an explicit,
 private HTML note library.
 "
 
-lamanotes_command="python -m \
-                  uvicorn \
-                  main:app \
-                  --app-dir server \
-                  --host ${LAMANOTES_HOST} \
-                  --port ${LAMANOTES_PORT} \
-                  --proxy-headers \
-                  --forwarded-allow-ips '*'"
+set -- python -m uvicorn main:app \
+    --app-dir server \
+    --host "${LAMANOTES_HOST}" \
+    --port "${LAMANOTES_PORT}" \
+    --proxy-headers \
+    --forwarded-allow-ips "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
 
-if [ `id -u` -eq 0 ] && [ `id -g` -eq 0 ]; then
+if [ "$(id -u)" -eq 0 ] && [ "$(id -g)" -eq 0 ]; then
     echo Setting file permissions...
-    chown -R ${PUID}:${PGID} ${LAMANOTES_PATH}
+    chown -R "${PUID}:${PGID}" "${LAMANOTES_PATH}"
 
     echo Starting LamaNotes as user ${PUID}...
-    exec ${EXEC_TOOL} ${PUID}:${PGID} ${lamanotes_command}
+    exec "${EXEC_TOOL}" "${PUID}:${PGID}" "$@"
 
 else
     echo "A user was set by docker, skipping file permission changes."
     echo Starting LamaNotes as user $(id -u)...
-    exec ${lamanotes_command}
+    exec "$@"
 fi
