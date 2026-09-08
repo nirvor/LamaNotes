@@ -24,6 +24,7 @@ const props = defineProps({
 });
 
 const viewerElement = ref();
+const emit = defineEmits(["rendered"]);
 let viewer = null;
 let enhancementRun = 0;
 
@@ -46,6 +47,7 @@ async function enhance() {
     noteTitle: props.noteTitle,
     taskList: getTaskListOptions(),
   });
+  if (run === enhancementRun) emit("rendered");
 }
 
 onMounted(async () => {

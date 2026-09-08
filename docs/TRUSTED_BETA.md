@@ -20,6 +20,11 @@ This is suitable only when the additional person and device may be trusted
 with the complete Library. If that boundary is too broad, stop. Do not simulate
 separation with tags or local folders.
 
+The private integration API is a separate machine-client boundary with explicit
+object grants and revocable capabilities (`docs/PRIVATE_API.md`). It does not
+reduce the authority of a trusted Windows/PWA owner login and is not a way to
+give a beta tester a restricted account.
+
 ## Device onboarding
 
 1. Give the beta tester one manually verified installer through a private

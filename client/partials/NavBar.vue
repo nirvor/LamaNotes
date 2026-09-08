@@ -69,7 +69,13 @@
 
 <script setup>
 import SvgIcon from "@jamescoyle/vue-icon";
-import { mdiFormatListNumbered, mdiThemeLightDark, mdiUpdate } from "@mdi/js";
+import {
+  mdiFormatListNumbered,
+  mdiThemeLightDark,
+  mdiUpdate,
+  mdiShieldLockOutline,
+  mdiInboxArrowDownOutline,
+} from "@mdi/js";
 import {
   mdilLogout,
   mdilHome,
@@ -164,6 +170,17 @@ const baseMenuItems = computed(() => {
     },
   );
   if (showLogOutButton()) {
+    items.push({ separator: true });
+    items.push({
+      label: "Private capture",
+      icon: mdiInboxArrowDownOutline,
+      command: () => router.push({ name: "capture" }),
+    });
+    items.push({
+      label: "Private access",
+      icon: mdiShieldLockOutline,
+      command: () => router.push({ name: "privateAccess" }),
+    });
     items.push({ separator: true });
     items.push({
       label: "Log Out",

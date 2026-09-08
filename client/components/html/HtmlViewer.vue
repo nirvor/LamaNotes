@@ -23,6 +23,7 @@ const props = defineProps({
 });
 
 const viewerElement = ref();
+const emit = defineEmits(["rendered"]);
 let enhancementRun = 0;
 
 const html = computed(() => cachedRenderableHtml(props.initialValue || ""));
@@ -99,6 +100,7 @@ async function enhance() {
     noteTitle: props.noteTitle,
     taskList: getTaskListOptions(),
   });
+  if (run === enhancementRun) emit("rendered");
 }
 
 watch(

@@ -25,6 +25,7 @@ from whoosh.searching import Hit
 from whoosh.support.charset import accent_map
 
 from helpers import get_env, is_valid_filename
+from notes.identity import preserve_note_id, read_note_id
 from logger import logger
 from publications.metadata import (
     PUBLICATION_FILE_LOCK,
@@ -601,12 +602,21 @@ class FileSystemNotes(BaseNotes):
 
     def create(self, data: NoteCreate) -> Note:
         """Create a new note."""
+        with PUBLICATION_FILE_LOCK:
+            return self._create_identified_note(data)
+
+    def _create_identified_note(self, data: NoteCreate) -> Note:
         self._raise_if_title_exists(data.title)
         note_format = data.format or "html"
         filepath = self._path_from_title(data.title, note_format)
         content = data.content or ""
         if note_format == "html":
             content = strip_publication_metadata(content)
+            note_id = read_note_id(content)
+            if note_id:
+                for candidate in glob.glob(os.path.join(self.storage_path, "*.html")):
+                    if read_note_id(self._read_file(candidate)) == note_id:
+                        raise ValueError("Duplicate note identity.")
         self._write_file(filepath, content)
         self._invalidate_semantic_index_cache()
         return Note(
@@ -648,6 +658,13 @@ class FileSystemNotes(BaseNotes):
                 if data.new_format is not None
                 else self._format_from_path(filepath)
             )
+            if existing_format == "html" and read_note_id(existing_content):
+                if next_format != "html":
+                    raise ValueError("An identified HTML note must remain HTML.")
+                if data.new_content is not None:
+                    data = data.model_copy(update={
+                        "new_content": preserve_note_id(existing_content, data.new_content)
+                    })
             new_filepath = self._path_from_title(next_title, next_format)
             if filepath != new_filepath:
                 self._raise_if_title_exists(next_title, ignore_path=filepath)

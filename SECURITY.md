@@ -67,3 +67,11 @@ trusted by an already installed client.
 
 Secrets, Library contents, local editor files and production configuration do
 not belong in this repository.
+# Private integration boundary
+
+Private machine clients use `/api/private/v1` with expiring, revocable,
+object-scoped capabilities. These do not authenticate on legacy Library routes.
+Only an owner session can classify an existing note as personal. Tags, topics
+and note kinds do not confer authority. The exact-note Reader uses a separate
+short-lived cookie, not an owner login. See `docs/PRIVATE_API.md` for delegation,
+source media, idempotency, backup and trusted-publisher constraints.

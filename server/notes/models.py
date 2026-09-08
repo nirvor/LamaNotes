@@ -7,6 +7,7 @@ from pydantic.functional_validators import AfterValidator
 from typing_extensions import Annotated
 
 from helpers import CustomBaseModel, is_valid_filename, strip_whitespace
+from .identity import read_note_id
 
 NoteFormat = Literal["html", "markdown"]
 NoteKind = Literal["research", "work", "legacy-markdown"]
@@ -52,10 +53,13 @@ class Note(CustomBaseModel):
     last_modified: float
     format: NoteFormat = "html"
     version: str = ""
+    note_id: Optional[str] = None
 
     @model_validator(mode="after")
     def set_version(self):
         self.version = note_version(self.content, self.format)
+        if self.format == "html":
+            self.note_id = read_note_id(self.content)
         return self
 
 

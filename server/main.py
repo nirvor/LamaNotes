@@ -1,4 +1,5 @@
 import json
+import os
 import re
 from html import escape
 from pathlib import Path
@@ -49,6 +50,9 @@ from notes.models import (
 from publications.errors import PublicationError
 from publications.models import PublicationStart, PublicationStateResponse
 from publications.service import PublicationService
+from private_api.routes import create_router as create_private_router
+from private_api.service import PrivateService
+from private_api.middleware import PrivateRequestLimit
 
 global_config = GlobalConfig()
 auth: BaseAuth = global_config.load_auth()
@@ -108,6 +112,9 @@ FONT_ASSET_RE = re.compile(
 async def add_static_cache_headers(request: Request, call_next):
     response = await call_next(request)
     path = request.url.path
+    if "/api/private/v1/" in path or path.endswith("/private-access"):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Vary"] = "Authorization, Cookie"
 
     if HASHED_ASSET_RE.search(path):
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
@@ -138,6 +145,10 @@ async def add_static_cache_headers(request: Request, call_next):
 @router.get("/login", include_in_schema=False)
 @router.get("/search", include_in_schema=False)
 @router.get("/new", include_in_schema=False)
+@router.get("/private-access", include_in_schema=False)
+@router.get("/capture", include_in_schema=False)
+@router.get("/n/{note_id}", include_in_schema=False)
+@router.get("/n/{note_id}/media", include_in_schema=False)
 @router.get("/open-file", include_in_schema=False)
 @router.get("/note/{title}", include_in_schema=False)
 def root(title: str = ""):
@@ -643,6 +654,13 @@ def healthcheck() -> str:
 
 # endregion
 
+private_service = PrivateService(
+    note_storage,
+    owner_id=os.environ.get("LAMANOTES_PRIVATE_OWNER_ID", "personal-owner"),
+    public_origin=os.environ.get("LAMANOTES_PRIVATE_PUBLIC_ORIGIN", "https://notes.thuber.org"),
+)
+app.add_middleware(PrivateRequestLimit)
+app.include_router(create_private_router(private_service, auth), prefix=global_config.path_prefix)
 app.include_router(router, prefix=global_config.path_prefix)
 app.mount(
     global_config.path_prefix,

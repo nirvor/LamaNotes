@@ -118,6 +118,14 @@ private share. Every authenticated device receives the same Library authority;
 local Workspace files remain device-local. The onboarding, update-trust and
 offboarding boundary is defined in `docs/TRUSTED_BETA.md`.
 
+## Private integrations
+
+Private assistant integrations use deliberate per-object enrollment and narrow,
+expiring capabilities. This is separate from the full-access trusted-device
+login. Tags never grant access. Captures stay local until explicit import;
+source/derived media remain linked to their note, not a new photo catalog.
+The contract and exact-note reader are documented in `docs/PRIVATE_API.md`.
+
 ## Non-goals
 
 LamaNotes is not a folder-based vault, graph browser, team wiki, project

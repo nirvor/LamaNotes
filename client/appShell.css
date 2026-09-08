@@ -1,0 +1,36 @@
+.lamanotes-app-shell {
+  overflow: visible;
+  padding-right: max(0.375rem, env(safe-area-inset-right));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  padding-left: max(0.375rem, env(safe-area-inset-left));
+}
+
+.lamanotes-app-shell-note {
+  max-width: min(100%, var(--ln-content-max));
+}
+
+.lamanotes-app-shell-note-work {
+  max-width: min(100%, 54rem);
+}
+
+.lamanotes-app-shell-note-markdown {
+  max-width: min(100%, 58rem);
+}
+
+.lamanotes-app-shell-note-article {
+  max-width: min(100%, var(--ln-content-max));
+}
+
+.lamanotes-app-shell-dashboard,
+.lamanotes-app-shell-note.lamanotes-app-shell-dashboard {
+  width: min(100%, calc(100vw - 1.5rem));
+  max-width: none;
+}
+
+.lamanotes-cloud-offline-strip {
+  align-self: flex-end;
+  margin: -0.3rem 0 0.45rem;
+  color: rgb(var(--theme-text-very-muted));
+  font-size: 0.68rem;
+  line-height: 1;
+}

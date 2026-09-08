@@ -168,6 +168,20 @@ visibility and touch hit areas are never serialized into note bodies.
 
 ## Release discipline
 
+Private integrations are isolated under `/api/private/v1` and defined in
+`docs/PRIVATE_API.md`. Immutable HTML note IDs survive renames. Personal-object
+grants are checked before metadata/context/search/media projection. Legacy
+owner sessions retain their current authority; private tokens cannot use those
+routes. `.private` stores access/capture/provenance/receipt data and imported
+assets, never another note body. Include it in Library backups. The v1 writer
+uses the existing process-wide publication lock and assumes one application
+worker per Library, as the current runtime does.
+
+The exact-note Reader is a separate Vite entry using existing viewer components
+and extracted, unchanged `appShell.css` / `noteShell.css`. Its single-object
+cookie cannot bootstrap the broad owner app. This supports trusted rendering
+without putting unrelated Library titles in screenshots.
+
 1. Build and test the exact Git commit.
 2. Create a named backup of configuration, Library data and the previous
    Windows update manifest.

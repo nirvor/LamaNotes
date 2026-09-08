@@ -215,6 +215,7 @@
 <script setup>
 import {
   mdiCloudUploadOutline,
+  mdiImageMultipleOutline,
   mdiCodeTags,
   mdiCogOutline,
   mdiContentCopy,
@@ -1702,6 +1703,13 @@ function getPublicationMenuItem() {
 function getNoteMenuItems() {
   const publicationItem = getPublicationMenuItem();
   const copyItems = getCopyMenuItems();
+  if (note.value.noteId && !editMode.value && !isNewNote.value) {
+    copyItems.push({
+      label: "Note media",
+      icon: mdiImageMultipleOutline,
+      command: () => router.push(`/n/${note.value.noteId}/media`),
+    });
+  }
   if (!publicationItem) {
     return copyItems;
   }
@@ -1892,64 +1900,4 @@ onUnmounted(() => {
 });
 </script>
 
-<style scoped>
-.lamanotes-note-shell,
-.lamanotes-note-content {
-  overflow-x: clip;
-  overflow-y: visible;
-}
-
-.lamanotes-note-shell {
-  width: min(100%, var(--ln-content-max));
-  margin-inline: auto;
-}
-
-.lamanotes-note-title-row {
-  display: flex;
-  min-width: 0;
-  max-width: 100%;
-  align-items: center;
-  gap: 0.45rem;
-}
-
-.lamanotes-note-title-text {
-  min-width: 0;
-  flex-grow: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: rgb(var(--theme-title-accent));
-  font-size: clamp(1.38rem, 4.4vw, 1.76rem);
-  line-height: 1.18;
-}
-
-.lamanotes-note-title-rule {
-  margin-top: 0.5rem;
-  margin-bottom: 0.62rem;
-}
-
-.lamanotes-note-shell-work {
-  width: min(100%, 54rem);
-}
-
-.lamanotes-note-shell-markdown {
-  width: min(100%, 58rem);
-}
-
-.lamanotes-note-shell-article {
-  width: min(100%, var(--ln-content-max));
-}
-
-.lamanotes-note-shell-wide {
-  width: min(100%, calc(100vw - 1.5rem));
-  max-width: none;
-  margin-inline: auto;
-}
-
-@supports not (overflow: clip) {
-  .lamanotes-note-shell,
-  .lamanotes-note-content {
-    overflow-x: visible;
-  }
-}
-</style>
+<style scoped src="../noteShell.css"></style>

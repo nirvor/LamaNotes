@@ -24,6 +24,28 @@ const router = createRouter({
   history: createWebHistory(""),
   routes: [
     {
+      path: "/n/:noteId/media",
+      name: "noteMedia",
+      component: () => import("./views/NoteMedia.vue"),
+      props: true,
+    },
+    {
+      path: "/private-access",
+      name: "privateAccess",
+      component: () => import("./views/PrivateAccess.vue"),
+    },
+    {
+      path: "/capture",
+      name: "capture",
+      component: () => import("./views/Capture.vue"),
+    },
+    {
+      path: "/n/:noteId",
+      name: "stableNote",
+      component: () => import("./views/StableNote.vue"),
+      props: true,
+    },
+    {
       path: "/",
       name: "home",
       component: loadHomeView,

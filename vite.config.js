@@ -7,6 +7,14 @@ export default defineConfig({
   plugins: [vue()],
   root: "client",
   base: "",
+  build: {
+    rollupOptions: {
+      input: {
+        main: "client/index.html",
+        privateReader: "client/private-reader.html",
+      },
+    },
+  },
   server: {
     // LAMANOTES_PATH_PREFIX is intentionally not applied by the dev server.
     port: 8080,

@@ -4,6 +4,33 @@
   "short_name": "LamaNotes",
   "description": "Fast local-first editing with an explicit, media-rich private note library.",
   "scope": "/",
+  "share_target": {
+    "action": "/capture/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "files",
+          "accept": [
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/gif",
+            "application/pdf",
+            "text/plain",
+            "audio/wav",
+            "audio/ogg",
+            "audio/mpeg",
+            "audio/flac"
+          ]
+        }
+      ]
+    }
+  },
   "start_url": "/",
   "launch_handler": {
     "client_mode": "focus-existing"

@@ -1003,7 +1003,8 @@
   fill: rgb(var(--ln-secondary-text));
 }
 
-.toastui-editor-contents .lamanote-research figure.lamanote-visual-wide {
+.toastui-editor-contents figure.lamanote-visual-wide {
+  display: grid;
   grid-template-columns: minmax(0, 1fr);
   justify-items: start;
   overflow-x: auto;
@@ -1011,9 +1012,7 @@
   scrollbar-width: thin;
 }
 
-.toastui-editor-contents
-  .lamanote-research
-  figure.lamanote-visual-wide:focus-visible {
+.toastui-editor-contents figure.lamanote-visual-wide:focus-visible {
   outline: 2px solid rgb(var(--theme-brand));
   outline-offset: 2px;
 }

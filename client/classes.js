@@ -7,6 +7,7 @@ class Note {
     this.content = note?.content;
     this.format = note?.format || "html";
     this.version = note?.version || "";
+    this.noteId = note?.noteId || "";
   }
 
   get lastModifiedAsDate() {

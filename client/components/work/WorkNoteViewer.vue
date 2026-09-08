@@ -8,6 +8,7 @@
       :task-checkbox-toggle-handler="taskCheckboxToggleHandler"
       :task-item-add-handler="taskItemAddHandler"
       class="toast-viewer min-w-0 max-w-full pb-4"
+      @rendered="$emit('rendered')"
     />
   </section>
 </template>
@@ -25,6 +26,7 @@ const props = defineProps({
   taskItemAddHandler: Function,
   taskCheckboxesDisabled: Boolean,
 });
+defineEmits(["rendered"]);
 
 const markdown = computed(() => extractWorkMarkdown(props.initialValue || ""));
 </script>
