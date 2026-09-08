@@ -94,11 +94,13 @@ class PrivateStore:
             **values,
         }
 
-    def capability(self, capability_id):
-        with self.connect() as db:
-            row = db.execute(
-                "SELECT * FROM capabilities WHERE id=?", (capability_id,)
-            ).fetchone()
+    def capability(self, capability_id, db=None):
+        if db is None:
+            with self.connect() as connection:
+                return self.capability(capability_id, connection)
+        row = db.execute(
+            "SELECT payload,revoked FROM capabilities WHERE id=?", (capability_id,)
+        ).fetchone()
         return (
             {**json.loads(row["payload"]), "revoked": bool(row["revoked"])}
             if row
@@ -210,6 +212,48 @@ class PrivateStore:
                 "UPDATE capabilities SET revoked=1 WHERE id=?",
                 (capability_id,),
             )
+
+    def renew_capability(self, capability_id, expires_in):
+        with self.connect() as db:
+            # Serialize renewal with revocation and other expiry changes.
+            db.execute("BEGIN IMMEDIATE")
+            target = self.capability(capability_id, db)
+            if not target:
+                missing()
+            if target["revoked"]:
+                raise HTTPException(409, {
+                    "code": "capability-revoked",
+                    "message": "Revoked capabilities cannot be renewed.",
+                })
+            now = int(time.time())
+            expires = max(target["expiresAt"], now + expires_in)
+            parent_id = target.get("parentId")
+            seen = {capability_id}
+            while parent_id:
+                parent = self.capability(parent_id, db)
+                if (
+                    parent_id in seen or len(seen) > 8 or not parent
+                    or parent["revoked"] or parent["expiresAt"] <= now
+                ):
+                    raise HTTPException(409, {
+                        "code": "capability-ancestor-unavailable",
+                        "message": "Renewal requires an active ancestor chain.",
+                    })
+                if expires > parent["expiresAt"]:
+                    raise HTTPException(409, {
+                        "code": "capability-parent-expiry",
+                        "message": "Renewal cannot exceed an ancestor's expiry.",
+                    })
+                seen.add(parent_id)
+                parent_id = parent.get("parentId")
+            if expires > target["expiresAt"]:
+                payload = {k: v for k, v in target.items() if k != "revoked"}
+                payload["expiresAt"] = expires
+                db.execute(
+                    "UPDATE capabilities SET payload=? WHERE id=?",
+                    (canonical(payload), capability_id),
+                )
+            return {**target, "expiresAt": expires}
 
     def descendant(self, child, parent):
         seen = set()

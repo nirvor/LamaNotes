@@ -36,6 +36,10 @@ class CapabilityCreate(StrictModel):
     capture_ids: list[CaptureId] = Field(default_factory=list, max_length=200)
 
 
+class CapabilityRenew(StrictModel):
+    expires_in: int = Field(strict=True, ge=60, le=2592000)
+
+
 class Enroll(StrictModel):
     title: str = Field(min_length=1, max_length=180)
     expected_version: Hash

@@ -7,6 +7,7 @@ import os
 import tempfile
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
 from fastapi import FastAPI, HTTPException
@@ -92,6 +93,214 @@ class PrivateApiTests(unittest.TestCase):
         return self.client.get(
             self.prefix + path, headers=headers or self.owner
         )
+
+    def stored_capability(self, capability_id):
+        with self.service.store.connect() as db:
+            return dict(db.execute(
+                "SELECT * FROM capabilities WHERE id=?", (capability_id,)
+            ).fetchone())
+
+    def alter_capability(self, capability_id, **changes):
+        row = self.stored_capability(capability_id)
+        payload = json.loads(row["payload"])
+        payload.update(changes)
+        with self.service.store.connect() as db:
+            db.execute("UPDATE capabilities SET payload=? WHERE id=?",
+                       (json.dumps(payload), capability_id))
+
+    def child_capability(self, headers, expires_in=120):
+        response = self.post("/capabilities/delegate", {
+            "clientId": "test-client", "jobId": "lr-" + "e" * 32,
+            "scopes": ["notes:read", "capabilities:delegate"],
+            "noteIds": [self.note["noteId"]], "expiresIn": expires_in,
+        }, headers)
+        self.assertEqual(response.status_code, 201, response.text)
+        value = response.json()
+        return {"Authorization": "Bearer " + value["token"]}, value
+
+    def test_owner_renewal_keeps_identity_objects_and_jobless_receipts(self):
+        capture_body = {"kind": "text", "text": "Renewal fixture",
+                        "provenance": {"channel": "codex"}}
+        owner_capture = self.post("/captures", capture_body).json()
+        headers, cap = self.cap([
+            "notes:read", "notes:create", "captures:read", "captures:create",
+            "assets:read", "assets:create",
+        ], expiresIn=60, captureIds=[owner_capture["captureId"]])
+        path = "/capabilities/" + cap["capabilityId"] + "/renew"
+        capture = self.post("/captures", capture_body, headers).json()
+        asset = self.upload(headers).json()
+        note_body = {"title": "Renewal note", "content": "<p>Fixture</p>"}
+        note = self.post("/notes", note_body, headers).json()
+        before = self.stored_capability(cap["capabilityId"])
+        with self.service.store.connect() as db:
+            objects = list(db.execute("SELECT * FROM objects"))
+            receipts = list(db.execute("SELECT * FROM receipts"))
+        now = cap["expiresAt"] + 1
+        with patch("private_api.store.time.time", return_value=now):
+            self.assertEqual(self.get("/index", headers).status_code, 401)
+            response = self.post(path, {"expiresIn": 600})
+            self.assertEqual(response.status_code, 200, response.text)
+            value = response.json()
+            self.assertEqual(response.headers["cache-control"], "no-store")
+            self.assertNotIn("token", value)
+            self.assertNotIn("digest", value)
+            self.assertEqual(value, {
+                **{k: v for k, v in cap.items() if k != "token"},
+                "expiresAt": now + 600, "revoked": False,
+            })
+            self.assertEqual(self.get("/index", headers).json()["total"], 2)
+            self.assertEqual(self.post("/captures", capture_body, headers).json()["captureId"], capture["captureId"])
+            self.assertEqual(self.post("/notes", note_body, headers).json()["noteId"], note["noteId"])
+            self.assertEqual(self.upload(headers).json()["assetId"], asset["assetId"])
+            self.assertEqual(self.get("/assets/" + asset["assetId"] + "/content", headers).content, b"private source")
+        after = self.stored_capability(cap["capabilityId"])
+        self.assertEqual(after["digest"], before["digest"])
+        self.assertEqual(after["revoked"], before["revoked"])
+        self.assertEqual(json.loads(after["payload"]), {**json.loads(before["payload"]), "expiresAt": now + 600})
+        with self.service.store.connect() as db:
+            self.assertEqual(list(db.execute("SELECT * FROM objects")), objects)
+            self.assertEqual(list(db.execute("SELECT * FROM receipts")), receipts)
+
+    def test_renewal_requires_owner_not_target_parent_or_service(self):
+        parent_headers, _ = self.cap(["notes:read", "capabilities:delegate"], expiresIn=600)
+        headers, cap = self.child_capability(parent_headers)
+        path = self.prefix + "/capabilities/" + cap["capabilityId"] + "/renew"
+        before = self.stored_capability(cap["capabilityId"])
+        for auth, status in (({}, 401), ({"Authorization": "Bearer legacy-service"}, 403),
+                             (headers, 403), (parent_headers, 403)):
+            response = self.client.post(path, json={"expiresIn": 300}, headers=auth)
+            self.assertEqual(response.status_code, status, response.text)
+        self.assertEqual(self.stored_capability(cap["capabilityId"]), before)
+
+    def test_renewal_rejects_unknown_ids_invalid_ttl_and_extra_fields(self):
+        _, cap = self.cap()
+        path = "/capabilities/" + cap["capabilityId"] + "/renew"
+        before = self.stored_capability(cap["capabilityId"])
+        bodies = [{}, *[{"expiresIn": ttl} for ttl in (59, 2592001, True, "600", 60.5)]]
+        for field, value in (("scopes", ["notes:create"]), ("noteIds", []),
+                             ("clientId", "other"), ("jobId", None), ("parentId", None)):
+            bodies.append({"expiresIn": 600, field: value})
+        for body in bodies:
+            with self.subTest(body=body):
+                self.assertEqual(self.post(path, body).status_code, 422)
+        self.assertEqual(self.post("/capabilities/lg-" + "0" * 32 + "/renew", {"expiresIn": 600}).status_code, 404)
+        self.assertEqual(self.stored_capability(cap["capabilityId"]), before)
+
+    def test_renewal_never_shortens_and_repeated_requests_are_safe(self):
+        now = int(time.time())
+        with patch("private_api.store.time.time", return_value=now):
+            _, cap = self.cap(expiresIn=600)
+            path = "/capabilities/" + cap["capabilityId"] + "/renew"
+            before = self.stored_capability(cap["capabilityId"])
+            for _ in range(2):
+                response = self.post(path, {"expiresIn": 60})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["expiresAt"], now + 600)
+            self.assertEqual(self.stored_capability(cap["capabilityId"]), before)
+            self.assertEqual(self.post(path, {"expiresIn": 2592000}).json()["expiresAt"], now + 2592000)
+            self.assertEqual(self.post(path, {"expiresIn": 60}).json()["expiresAt"], now + 2592000)
+
+    def test_revoked_target_cannot_be_renewed_even_after_expiry(self):
+        headers, cap = self.cap(expiresIn=60)
+        base = "/capabilities/" + cap["capabilityId"]
+        self.client.delete(self.prefix + base, headers=self.owner)
+        before = self.stored_capability(cap["capabilityId"])
+        with patch("private_api.store.time.time", return_value=cap["expiresAt"] + 1):
+            response = self.post(base + "/renew", {"expiresIn": 600})
+            self.assertEqual(response.status_code, 409)
+            self.assertEqual(response.json()["detail"]["code"], "capability-revoked")
+            self.assertEqual(self.get("/index", headers).status_code, 401)
+        self.assertEqual(self.stored_capability(cap["capabilityId"]), before)
+
+    def test_child_renewal_preserves_ancestry_and_respects_parent_expiry(self):
+        parent_headers, parent = self.cap(["notes:read", "capabilities:delegate"], expiresIn=600)
+        headers, child = self.child_capability(parent_headers)
+        path = "/capabilities/" + child["capabilityId"] + "/renew"
+        before = self.stored_capability(child["capabilityId"])
+        response = self.post(path, {"expiresIn": 700})
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["detail"]["code"], "capability-parent-expiry")
+        self.assertEqual(self.stored_capability(child["capabilityId"]), before)
+        now = child["expiresAt"] + 1
+        with patch("private_api.store.time.time", return_value=now):
+            self.assertEqual(self.get("/index", headers).status_code, 401)
+            response = self.post(path, {"expiresIn": 180})
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json()["parentId"], parent["capabilityId"])
+            self.assertEqual(response.json()["jobId"], child["jobId"])
+            self.assertEqual(response.json()["expiresAt"], now + 180)
+            self.assertEqual(self.get("/index", headers).status_code, 200)
+        self.assertEqual(self.stored_capability(child["capabilityId"])["digest"], before["digest"])
+
+    def test_renewal_checks_all_ancestors_and_rejects_broken_chains(self):
+        for state in ("revoked", "expired", "missing", "cycle", "expiry-bound"):
+            with self.subTest(state=state):
+                parent_headers, parent = self.cap(["notes:read", "capabilities:delegate"], expiresIn=900)
+                middle_headers, middle = self.child_capability(parent_headers, 600)
+                _, child = self.child_capability(middle_headers, 120)
+                parent_id = parent["capabilityId"]
+                before = self.stored_capability(child["capabilityId"])
+                if state == "revoked":
+                    self.client.delete(self.prefix + "/capabilities/" + parent_id, headers=self.owner)
+                elif state == "expired":
+                    self.alter_capability(parent_id, expiresAt=int(time.time()) - 1)
+                elif state == "missing":
+                    with self.service.store.connect() as db:
+                        db.execute("DELETE FROM capabilities WHERE id=?", (parent_id,))
+                elif state == "cycle":
+                    self.alter_capability(parent_id, parentId=child["capabilityId"])
+                else:
+                    self.alter_capability(parent_id, expiresAt=int(time.time()) + 150)
+                response = self.post("/capabilities/" + child["capabilityId"] + "/renew", {"expiresIn": 180})
+                self.assertEqual(response.status_code, 409, response.text)
+                expected = "capability-parent-expiry" if state == "expiry-bound" else "capability-ancestor-unavailable"
+                self.assertEqual(response.json()["detail"]["code"], expected)
+                self.assertEqual(self.stored_capability(child["capabilityId"]), before)
+
+    def test_renewal_rejects_over_depth_chain(self):
+        caps = [self.cap(expiresIn=600)[1] for _ in range(10)]
+        for child, parent in zip(caps, caps[1:]):
+            self.alter_capability(child["capabilityId"], parentId=parent["capabilityId"])
+        response = self.post("/capabilities/" + caps[0]["capabilityId"] + "/renew", {"expiresIn": 60})
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["detail"]["code"], "capability-ancestor-unavailable")
+
+    def test_renewal_does_not_restore_object_grants_or_extend_children_and_readers(self):
+        headers, parent = self.cap(["notes:read", "assets:read", "capabilities:delegate"], expiresIn=600)
+        child_headers, child = self.child_capability(headers, 60)
+        reader = self.client.post("https://testserver" + self.prefix + "/reader-session",
+                                  headers=headers, json={"noteId": self.note["noteId"], "expiresIn": 30})
+        self.assertEqual(reader.status_code, 200, reader.text)
+        with self.service.store.connect() as db:
+            readers = list(db.execute("SELECT * FROM reader_sessions"))
+        child_before = self.stored_capability(child["capabilityId"])
+        self.client.delete(self.prefix + "/grants/" + self.note["noteId"], headers=self.owner)
+        with patch("private_api.store.time.time", return_value=parent["expiresAt"] + 1):
+            response = self.post("/capabilities/" + parent["capabilityId"] + "/renew", {"expiresIn": 600})
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(self.get("/index", headers).json()["total"], 0)
+            self.assertEqual(self.get("/index", child_headers).status_code, 401)
+        self.assertFalse(self.service.store.object(self.note["noteId"])["active"])
+        self.assertEqual(self.stored_capability(child["capabilityId"]), child_before)
+        with self.service.store.connect() as db:
+            self.assertEqual(list(db.execute("SELECT * FROM reader_sessions")), readers)
+
+    def test_concurrent_renewals_keep_longest_expiry_and_revocation_wins(self):
+        now = int(time.time())
+        with patch("private_api.store.time.time", return_value=now):
+            headers, cap = self.cap(expiresIn=60)
+            base = "/capabilities/" + cap["capabilityId"]
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                results = list(pool.map(lambda ttl: self.post(base + "/renew", {"expiresIn": ttl}), (600, 1800)))
+            self.assertEqual([result.status_code for result in results], [200, 200])
+            self.assertEqual(self.service.store.capability(cap["capabilityId"])["expiresAt"], now + 1800)
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                renewal = pool.submit(self.post, base + "/renew", {"expiresIn": 2400})
+                revoke = pool.submit(self.client.delete, self.prefix + base, headers=self.owner)
+                self.assertIn(renewal.result().status_code, (200, 409))
+                self.assertEqual(revoke.result().status_code, 204)
+            self.assertTrue(self.service.store.capability(cap["capabilityId"])["revoked"])
+            self.assertEqual(self.get("/index", headers).status_code, 401)
 
     def test_private_index_search_and_context_never_expose_other_notes(self):
         headers, _ = self.cap()

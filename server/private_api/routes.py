@@ -24,6 +24,7 @@ from notes.errors import NoteConflictError
 from .models import (
     AttachAssets,
     CapabilityCreate,
+    CapabilityRenew,
     CaptureCreate,
     Enroll,
     ParentReference,
@@ -182,6 +183,16 @@ def create_router(service, auth):
     @router.delete("/capabilities/{capability_id}", status_code=204)
     def revoke_capability(capability_id: str, actor=Depends(principal)):
         store.revoke_capability(actor, capability_id)
+
+    @router.post("/capabilities/{capability_id}/renew")
+    def renew_capability(
+        capability_id: str,
+        data: CapabilityRenew,
+        response: Response,
+        _=Depends(owner),
+    ):
+        response.headers["Cache-Control"] = "no-store"
+        return store.renew_capability(capability_id, data.expires_in)
 
     @router.post("/grants/notes")
     def enroll(data: Enroll, _=Depends(owner)):

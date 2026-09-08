@@ -60,6 +60,39 @@ and its ancestors; exact same-client, non-null-job capabilities may inspect that
 job's creations for verification. Jobless peers do not inherit those objects.
 Explicit object grants still require active personal enrollment.
 
+### Owner-only renewal
+
+`POST /capabilities/{capabilityId}/renew` accepts only
+`{"expiresIn":2592000}` with a required integer from 60 to 2592000 seconds.
+Extra fields are rejected. It requires an authenticated owner session; private
+capabilities, including the target or its parent, cannot renew themselves.
+
+Success is 200 with `Cache-Control: no-store` and the flat capability metadata
+listed above plus `revoked:false`. No token or digest is returned. Only
+`expiresAt` changes, to `max(currentExpiresAt, floor(now) + expiresIn)`.
+Shorter requests and retries never shorten an existing expiry. Capability ID,
+token digest, client/job identity, scopes, object grants and parent are retained.
+This preserves jobless receipts and access to the capability's existing objects.
+
+An expired but unrevoked target may be renewed by its owner. For a child, every
+ancestor must still be active and unrevoked, and the resulting expiry must fit
+within every ancestor's expiry. Renew ancestors first if necessary. Renewal
+never revives a revoked capability or object grant, reparents a child, extends
+a descendant or changes a Reader session's own expiry. Renewing a root does
+not by itself restore expired children or expired Reader sessions.
+
+Unknown IDs return 404. Rejected renewals return 409 with `detail.code`:
+`capability-revoked` for a revoked target, `capability-ancestor-unavailable` for
+a missing, revoked, expired, cyclic or over-depth ancestor chain, or
+`capability-parent-expiry` when the requested expiry exceeds an ancestor.
+Malformed input returns 422. Validation and the update share one serialized
+database transaction with revocation and concurrent renewals.
+
+Renewal deliberately retains the same secret, including when restoring an
+expired root after an offline period. Suspected compromise requires revocation
+and replacement, not renewal. The endpoint does not schedule maintenance or
+distribute tokens, and an owner credential must never enter a model workspace.
+
 ## Notes and references
 
 - GET `/index` returns `{items,total}` after grants are applied.
