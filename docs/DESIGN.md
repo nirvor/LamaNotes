@@ -59,8 +59,10 @@ without glare. The warm copper title token is the one narrow exception to the
 blue hierarchy: it distinguishes a document `h1` from blue `h2` and `h3`
 headings. It does not colour tags, data series, controls, or status. Brighter
 amber and red remain reserved for warnings, destructive actions, failure, and
-negative states. Do not introduce gradients, glass surfaces, or rainbow
-series.
+negative states in the application UI. Scientific figures may use other
+colours, including these hues, when the subject and perceptual clarity justify
+them. The UI palette is not a restriction on data encodings. Avoid decorative
+gradients, glass surfaces, and arbitrary rainbow series.
 
 ## Article and content primitives
 
@@ -176,14 +178,14 @@ are not status badges and are never a required sequence. The old
 - Use `lamanote-plot`, `lamanote-diagram`, `lamanote-map`, or
   `lamanote-schematic` with `lamanote-visual-frame`.
 - Add `lamanote-flow` to process and decision diagrams. It uses the compact
-  flow canvas and fine connector contract. Do not repeat the section heading as
-  a large title inside the SVG or draw a full-canvas background rectangle.
+  flow canvas and fine connector defaults. A figure title or background canvas
+  is allowed when it makes the figure self-contained or preserves contrast.
 - Add `lamanote-visual-wide` only when labels or panels need an intrinsic wide
   canvas. The medium then pans horizontally inside its frame. Caption and
   takeaway stay at article width. Its media focus target supports Left/Right,
   Home, and End for keyboard panning.
-- Use `lamanote-visual-takeaway` for the one relationship or mechanism the
-  reader should retain.
+- Optionally use `lamanote-visual-takeaway` for the one relationship or
+  mechanism the reader should retain. Omit it when the caption already says it.
 - Captions state source, date, protocol, units, assumptions, and uncertainty as
   applicable.
 
@@ -192,15 +194,44 @@ rows, units, readable labels, exact values for small datasets, and annotations
 for protocol breaks or important exceptions. Do not draw a continuous trend
 through incompatible measurements.
 
-Research plots use the shared Python Plotly/Kaleido construction toolkit. The
-toolkit is a quality floor rather than one chart template: plot form, facets,
-uncertainty and annotations still follow the evidence. Every final Research
-plot has a visible titled legend, descriptive axis titles, outside ticks,
-restrained grid lines, a deliberate scale, and a documented source/date basis.
-Ordinary magnitude bars start at zero. A truncated or non-zero axis is allowed
-only when the scientific question requires it and the caption says why. Export
-matching light and dark SVGs from the same figure and use the shared
-`lamanote-plot-pair` wrapper.
+Paper-grade scientific clarity takes priority over a fixed visual template.
+Use the shared `scientific_figures.py` toolkit and `SCIENTIFIC_FIGURES.md` in
+LamaNotes-Research for figure construction. Matplotlib SVG/PNG, scientific
+schematics, and the existing Plotly/Kaleido light/dark pairs are supported.
+Choose plot form, shapes, fills, colours, type sizes, scale, ticks, grid,
+facets, and uncertainty representation for the scientific question. Units,
+axes where used, uncertainties where applicable, readable labels and a
+documented source/date basis remain required. Do not invent error bars where
+no uncertainty estimate exists. Ordinary magnitude bars start at zero; explain
+a scientifically justified truncated axis. Legends, legend titles, figure
+titles, subtitles, and separate question/takeaway blocks are optional. Direct
+labels or a caption can be sufficient. Do not add empty structure to satisfy
+a template.
+
+A single neutral paper figure can use this tag-independent envelope:
+
+```html
+<figure class="lamanote-plot lamanote-visual-frame" data-lamanotes-component="plot">
+  <img class="lamanote-figure-paper" src="attachments/figure.svg"
+       alt="Describe the variables, relationship and important uncertainty"
+       loading="lazy" decoding="async">
+  <figcaption>Finding, measurement basis, uncertainty and direct source/date.</figcaption>
+</figure>
+```
+
+`lamanote-figure-paper` belongs on an image or inline SVG. It supplies a white
+canvas in either theme, including for a transparent export with dark ink.
+The caption still uses the application theme. Exporting an opaque background
+is also valid; do not invert or recolour scientific images in the reader.
+Matching light/dark figures may continue to use `lamanote-plot-pair` and
+`lamanote-plot-image--light` / `--dark`. Two exports are not mandatory.
+Check the actual rendered figure, including its labels, caption and mobile
+panning, in both themes. A readable neutral figure is preferable to a broken
+dark variant.
+
+Additional CSV/JSON files of the actually plotted data are created only when
+explicitly requested. This does not restrict embedded interactive data,
+original inputs, or source attribution.
 
 Diagrams have a clear reading direction, named roles, consistent nodes and
 connectors, and visible gates or feedback where relevant. Use short node labels,
@@ -209,13 +240,15 @@ grid. Most flow diagrams should fit in a roughly 52rem frame without using the
 full article height. Colour and line style need a small legend only when they
 encode meaning. Illustration and measured evidence must stay distinguishable.
 
-Research flow and decision diagrams use the shared Mermaid renderer by default.
-It provides a common Dagre layout, 14px node type, linear connectors, compact
-node/rank spacing, bounded wrapping, transparent clusters, and rectangular
-nodes. Nodes are unfilled unless a fill encodes a necessary gate, warning,
-state, or comparison. Hand-written SVG remains appropriate for a genuine
-scientific schematic or geometry which Mermaid cannot express, but it must
-follow the same square-node, label and surface rules.
+Mermaid is a convenient default for flow and decision diagrams, not a required
+renderer for every scientific diagram. Its Dagre layout, 14px type, linear
+connectors and compact spacing are defaults, not authoring restrictions.
+Decision diamonds, rounded terminals, scientific symbols, filled regions and
+subject-appropriate colours or font sizes are valid. The reader preserves
+authored Mermaid styling and SVG geometry. Hand-written or tool-generated SVG
+and PNG are equally valid when they explain the mechanism better. Preserve
+clear reading direction, contrast, meaningful connectors and accessible text.
+Keep Mermaid's strict security mode and the existing HTML safety boundary.
 
 ### Links, sources, code, tables, and tags
 
@@ -248,8 +281,9 @@ scaffolds. The generic scaffold adds no tags. The Research scaffold adds exact
 
 The editor preview uses the same `HtmlViewer` and shared stylesheet as the
 saved Library note. Component snippets use semantic HTML,
-`data-lamanotes-component`, and shared classes. Do not generate layout
-`style` attributes.
+`data-lamanotes-component`, and shared classes. Do not generate inline layout
+styles for the note shell. Scientific SVG presentation attributes and renderer
+styles are allowed; they are part of the figure, not a second application UI.
 
 Work-note Markdown may wrap a short secondary status or detail in
 `<small>...</small>`. The compact editor action inserts this semantic tag and
@@ -319,22 +353,22 @@ Do not add:
 - filler KPIs, slogans, stock media, or decorative "insights";
 - one card per paragraph;
 - nested card, visual-frame, table, callout, panel, or result surfaces;
-- full-canvas SVG background rectangles and diagram titles which duplicate the
-  section heading;
+- redundant figure headings or decorative nested canvases; a scientific
+  figure's own background or self-contained title is not a violation;
 - tables which use a separate fill for the caption, header, first column, and
   highlighted row;
 - permanent sidebars or folder trees;
 - coloured left or right callout brackets;
-- inline layout styles in generated notes;
+- inline application-layout styles in generated notes;
 - a Research-only base stylesheet;
 - note-specific global CSS for one new article;
 - body-level horizontal scrolling;
 - multiple icon sets or emoji product icons.
 
-Inside Research Note visuals, do not add rounded node rectangles, rounded bars,
-or a second plot/diagram canvas. Research Note cards and visual frames use
-square geometry; compact product controls elsewhere may keep their normal
-radius.
+Research Note cards and visual frames retain their quiet square geometry.
+That surrounding UI choice must not flatten scientific shapes, erase fills,
+force a palette, or change type inside a figure. Compact product controls
+elsewhere may keep their normal radius.
 
 Large legacy note-specific styles remain scoped for compatibility. They are not
 templates for new work.

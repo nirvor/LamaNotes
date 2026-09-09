@@ -212,13 +212,21 @@ export const htmlComponentSnippets = [
     label: "Plot",
     body: () => `
 <figure class="lamanote-plot lamanote-visual-frame" data-lamanotes-component="plot">
-  <p class="lamanote-visual-question"><strong>Question:</strong> State the quantitative comparison this plot answers.</p>
+  <img class="lamanote-figure-paper" src="attachments/example-plot.svg" alt="Describe the variables, comparison, scale, and important uncertainty" loading="lazy" decoding="async">
+  <figcaption>Replace this scaffold with the finding, quantities and units, uncertainty or assumptions, and a direct source/date. Use an inspected SVG or PNG from the shared scientific-figures toolkit. Add a title, legend, or separate takeaway only when useful.</figcaption>
+</figure>
+`,
+  },
+  {
+    id: "plot-pair",
+    label: "Plot (light / dark)",
+    body: () => `
+<figure class="lamanote-plot lamanote-visual-frame" data-lamanotes-component="plot">
   <div class="lamanote-plot-pair" data-lamanotes-plot-engine="plotly">
     <img class="lamanote-plot-image lamanote-plot-image--light" src="attachments/example-plot-light.svg" alt="Describe the variables, comparison, direction, scale, and important exception" loading="lazy" decoding="async">
     <img class="lamanote-plot-image lamanote-plot-image--dark" src="attachments/example-plot-dark.svg" alt="Describe the variables, comparison, direction, scale, and important exception" loading="lazy" decoding="async">
   </div>
-  <p class="lamanote-visual-takeaway">Takeaway: state the one relationship the reader should retain.</p>
-  <figcaption><strong>Figure 1.</strong> Export the inspected Plotly figure through the shared Research toolkit. Keep the legend, axis titles, ticks, scale rationale, quantities and units, evidence date, assumptions or uncertainty, and a direct source.</figcaption>
+  <figcaption>Replace this scaffold with the finding, quantities and units, uncertainty or assumptions, and a direct source/date. Export both themes from the same inspected figure. Add titles and legends only when they explain the data.</figcaption>
 </figure>
 `,
   },
@@ -230,10 +238,11 @@ export const htmlComponentSnippets = [
   <pre><code class="language-mermaid">flowchart LR
     A["Input"] --> B["Process"]
     B --> C["Verification"]
-    C --> D["Decision"]
-    D --> E["Outcome"]</code></pre>
+    C --> D{"Valid?"}
+    D -->|Yes| E(["Outcome"])
+    D -->|No| B</code></pre>
   <p class="lamanote-visual-takeaway">Takeaway: explain what the architecture or mechanism changes.</p>
-  <figcaption><strong>Figure 2.</strong> Use the shared Mermaid renderer, short labels, rectangular unfilled nodes, clean connectors, one flow direction, and color only when it encodes meaning. Distinguish evidence-derived structure from illustration.</figcaption>
+  <figcaption>Use readable labels, clear flow direction, and shapes, fills, or colors suited to the mechanism. Distinguish evidence-derived structure from illustration and name the source or assumptions.</figcaption>
 </figure>
 `,
   },
@@ -243,9 +252,11 @@ export const htmlComponentSnippets = [
     body: () => `
 <figure class="lamanote-diagram lamanote-flow lamanote-visual-frame lamanote-visual-wide" data-lamanotes-component="diagram">
   <pre><code class="language-mermaid">flowchart LR
-    A["Input"] --> B["Process"] --> C["Verification"] --> D["Decision"] --> E["Outcome"]</code></pre>
+    A["Input"] --> B["Process"] --> C["Verification"] --> D{"Valid?"}
+    D -->|Yes| E(["Outcome"])
+    D -->|No| B</code></pre>
   <p class="lamanote-visual-takeaway">Takeaway: explain what the architecture or mechanism changes.</p>
-  <figcaption><strong>Figure 2.</strong> Keep the same rectangular Mermaid grammar. Use this wide variant only when readable labels require local horizontal panning.</figcaption>
+  <figcaption>Use this wide variant only when readable labels require local horizontal panning. Choose shapes and styling for the subject and explain the source or assumptions.</figcaption>
 </figure>
 `,
   },

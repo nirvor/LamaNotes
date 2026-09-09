@@ -87,11 +87,6 @@ test("V2 tokens and legacy aliases stay in one design contract", () => {
   assert.match(viewerCss, /\.lamanote-flow \.lamanote-flow-node \{/);
   assert.match(viewerCss, /\.lamanote-research[\s\S]*?border-radius: 0;/);
   assert.match(viewerCss, /\.lamanote-plot-pair \{/);
-  assert.match(viewerCss, /\.lamanotes-mermaid-flow \.node rect \{/);
-  assert.match(
-    viewerCss,
-    /\.lamanotes-mermaid-flow \.cluster-label text \{[\s\S]*?fill: rgb\(var\(--theme-heading\)\) !important;[\s\S]*?font-size: 12px !important;/,
-  );
   assert.match(renderSource, /tertiaryTextColor: heading/);
   assert.match(
     viewerCss,
@@ -105,10 +100,34 @@ test("V2 tokens and legacy aliases stay in one design contract", () => {
   assert.match(renderSource, /svgElement\.setAttribute\(\s*"viewBox"/);
   assert.match(renderSource, /defaultRenderer: "dagre-wrapper"/);
   assert.match(renderSource, /wrappingWidth: 160/);
-  assert.match(renderSource, /rectangle\.setAttribute\("rx", "0"\)/);
   assert.match(
     viewerCss,
     /\.lamanote-comparison tbody th \{[\s\S]*?background: transparent;/,
+  );
+});
+
+test("scientific figures retain authored geometry, fill and typography", () => {
+  assert.doesNotMatch(viewerCss, /r[xy]: 0 !important/);
+  const mermaidCss = viewerCss.slice(
+    viewerCss.indexOf("// Mermaid diagrams"),
+    viewerCss.indexOf("// Bottom tag assistant"),
+  );
+  assert.doesNotMatch(mermaidCss, /!important|font-size:|fill:/);
+  assert.match(mermaidCss, /color: inherit/);
+  assert.doesNotMatch(renderSource, /rectangle\.setAttribute\("r[xy]"/);
+  assert.match(renderSource, /securityLevel: "strict"/);
+  assert.match(renderSource, /flowchartTitleText/);
+  assert.match(
+    viewerCss,
+    /:is\(img, svg\)\.lamanote-figure-paper,[\s\S]*?\.lamanotes-media-lightbox-image\.lamanote-figure-paper \{[\s\S]*?background-color: #fff/,
+  );
+  assert.match(
+    renderSource,
+    /image\.classList\.toggle\(\s*"lamanote-figure-paper"/,
+  );
+  assert.match(
+    viewerCss,
+    /body\.dark[\s\S]*?lamanote-plot-image--dark[\s\S]*?display: block !important/,
   );
 });
 

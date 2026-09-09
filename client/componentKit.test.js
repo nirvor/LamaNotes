@@ -44,21 +44,30 @@ test("all picker snippets use the shared component contract", () => {
 
 test("plot and diagram scaffolds carry the visual quality contract", () => {
   const plot = getHtmlSnippet("plot");
+  const pair = getHtmlSnippet("plot-pair");
   const diagram = getHtmlSnippet("diagram");
   const wideDiagram = getHtmlSnippet("wide-diagram");
 
   assert.match(plot, /lamanote-plot lamanote-visual-frame/);
-  assert.match(plot, /data-lamanotes-plot-engine="plotly"/);
-  assert.match(plot, /example-plot-light\.svg/);
-  assert.match(plot, /example-plot-dark\.svg/);
-  assert.match(plot, /legend, axis titles, ticks, scale rationale/);
-  assert.match(plot, /lamanote-visual-question/);
-  assert.match(plot, /lamanote-visual-takeaway/);
+  assert.match(plot, /class="lamanote-figure-paper"/);
+  assert.match(plot, /example-plot\.svg/);
+  assert.equal((plot.match(/<img\b/g) || []).length, 1);
+  assert.doesNotMatch(
+    plot,
+    /lamanote-plot-pair|lamanote-visual-question|lamanote-visual-takeaway/,
+  );
+  assert.match(plot, /SVG or PNG/);
+  assert.match(plot, /only when useful/);
+  assert.match(pair, /data-lamanotes-plot-engine="plotly"/);
+  assert.match(pair, /example-plot-light\.svg/);
+  assert.match(pair, /example-plot-dark\.svg/);
   assert.match(plot, /quantities and units/);
   assert.match(diagram, /lamanote-diagram lamanote-flow lamanote-visual-frame/);
   assert.match(diagram, /class="language-mermaid"/);
   assert.match(diagram, /A\["Input"\]/);
-  assert.match(diagram, /rectangular unfilled nodes/);
+  assert.match(diagram, /D\{"Valid\?"\}/);
+  assert.match(diagram, /E\(\["Outcome"\]\)/);
+  assert.match(diagram, /shapes, fills, or colors/);
   assert.match(diagram, /flow direction/);
   assert.doesNotMatch(diagram, /lamanote-visual-wide/);
   assert.match(
@@ -66,6 +75,16 @@ test("plot and diagram scaffolds carry the visual quality contract", () => {
     /lamanote-diagram lamanote-flow lamanote-visual-frame lamanote-visual-wide/,
   );
   assert.match(wideDiagram, /lamanote-visual-wide/);
+});
+
+test("scientific figure scaffolds add no tags or mandatory decoration", () => {
+  for (const id of ["plot", "plot-pair", "diagram", "wide-diagram"]) {
+    const html = getHtmlSnippet(id);
+    assert.doesNotMatch(html, /#research|#r-|style=/);
+    assert.doesNotMatch(html, /rectangular unfilled|titled legend/);
+    assert.match(html, /<figcaption>/);
+    assert.ok(findHtmlPlaceholderWarnings(html).length);
+  }
 });
 
 test("result, comparison, and steps scaffold type-specific decisions", () => {

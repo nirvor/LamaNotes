@@ -1073,6 +1073,15 @@
   width: 100%;
 }
 
+// A neutral paper export keeps its own canvas in either application theme.
+.toastui-editor-contents
+  .lamanote-visual-frame
+  :is(img, svg).lamanote-figure-paper,
+.lamanotes-media-lightbox-image.lamanote-figure-paper {
+  background-color: #fff;
+  color-scheme: light;
+}
+
 .toastui-editor-contents .lamanote-plot-pair > .lamanote-plot-image {
   grid-area: 1 / 1;
   width: 100%;
@@ -1112,14 +1121,6 @@ body.dark
     .lamanote-comparison
   ) {
   border-radius: 0;
-}
-
-.toastui-editor-contents
-  .lamanote-research
-  :is(.lamanote-flow, .lamanote-plot)
-  rect {
-  rx: 0 !important;
-  ry: 0 !important;
 }
 
 .toastui-editor-contents .lamanote-visual-frame figcaption {
@@ -2048,44 +2049,14 @@ body.lamanotes-media-lightbox-open {
   margin: 0 auto;
 }
 
-.toastui-editor-contents .lamanotes-mermaid-diagram text {
-  font-family: "Poppins", sans-serif !important;
-}
-
-.toastui-editor-contents .lamanotes-mermaid-flow .node rect {
-  fill: transparent !important;
-  rx: 0 !important;
-  ry: 0 !important;
-}
-
-.toastui-editor-contents .lamanotes-mermaid-flow .cluster rect {
-  fill: transparent !important;
-  rx: 0 !important;
-  ry: 0 !important;
-}
-
-.toastui-editor-contents .lamanotes-mermaid-flow .cluster-label text {
-  fill: rgb(var(--theme-heading)) !important;
-  font-size: 12px !important;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.toastui-editor-contents .lamanotes-mermaid-flow .cluster-label span {
-  color: rgb(var(--theme-heading)) !important;
-  font-size: 12px !important;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.toastui-editor-contents .lamanotes-mermaid-flow .nodeLabel {
-  font-size: 14px !important;
-  line-height: 1.25;
-}
-
-.toastui-editor-contents .lamanotes-mermaid-flow .edgeLabel {
-  color: rgb(var(--ln-secondary-text));
-  font-size: 12px !important;
+// HTML labels inherit the diagram's colours, not surrounding article prose.
+.toastui-editor-contents
+  .lamanotes-mermaid-diagram
+  :is(.nodeLabel, .edgeLabel, .cluster-label)
+  p {
+  color: inherit;
+  line-height: inherit;
+  margin: 0;
 }
 
 // Bottom tag assistant

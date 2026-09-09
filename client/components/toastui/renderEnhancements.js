@@ -723,6 +723,10 @@ function openImageLightbox(mediaElement) {
 
   mediaLightboxLastFocusedElement = document.activeElement;
   image.src = url;
+  image.classList.toggle(
+    "lamanote-figure-paper",
+    mediaElement.classList.contains("lamanote-figure-paper"),
+  );
   image.alt = captionText || "Preview image";
   caption.textContent = captionText || "Image preview";
   caption.classList.toggle(
@@ -1978,6 +1982,25 @@ function tightenMermaidFlowViewport(diagram) {
     let bounds;
     try {
       bounds = graphRoot.getBBox();
+      for (const title of svgElement.querySelectorAll(".flowchartTitleText")) {
+        const titleBounds = title.getBBox();
+        const x = Math.min(bounds.x, titleBounds.x);
+        const y = Math.min(bounds.y, titleBounds.y);
+        bounds = {
+          x,
+          y,
+          width:
+            Math.max(
+              bounds.x + bounds.width,
+              titleBounds.x + titleBounds.width,
+            ) - x,
+          height:
+            Math.max(
+              bounds.y + bounds.height,
+              titleBounds.y + titleBounds.height,
+            ) - y,
+        };
+      }
     } catch {
       return;
     }
@@ -2039,10 +2062,6 @@ async function renderMermaidBlock(preElement, mermaid) {
   diagram.innerHTML = svg;
   if (/^\s*(?:flowchart|graph)\b/i.test(mermaidSource)) {
     diagram.classList.add("lamanotes-mermaid-flow");
-    diagram.querySelectorAll("rect").forEach((rectangle) => {
-      rectangle.setAttribute("rx", "0");
-      rectangle.setAttribute("ry", "0");
-    });
   }
 
   wrapper.append(diagram);
