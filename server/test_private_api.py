@@ -536,6 +536,61 @@ class PrivateApiTests(unittest.TestCase):
             data=fields,
         )
 
+    def test_pdf_download_filename_on_private_and_reader_routes(self):
+        headers, _ = self.cap(
+            ["assets:create", "assets:read", "notes:create", "notes:read"],
+            note_ids=[],
+        )
+        data = b"%PDF-1.4\n% synthetic download fixture\n%%EOF\n"
+        # The validated signature, not the upload filename or claimed MIME,
+        # determines the extension, including for existing extensionless assets.
+        asset = self.upload(headers, data, media="text/plain").json()
+        asset_id = asset["assetId"]
+        self.assertEqual(asset["mediaType"], "application/pdf")
+        self.assertTrue((self.service.store.assets / asset_id).is_file())
+        path = "/assets/" + asset_id + "/content"
+        note = self.post(
+            "/notes",
+            {
+                "title": "PDF download fixture",
+                "content": f'<a href="{self.prefix}{path}" download="Report.pdf">PDF</a>',
+                "assetIds": [asset_id],
+            },
+            headers,
+        ).json()
+        reader = self.post(
+            "/reader-session",
+            {"noteId": note["noteId"], "expiresIn": 60},
+            headers,
+        ).json()["readerUrl"]
+        responses = [
+            self.get(path, headers),
+            self.get(path),
+            self.client.get(reader + path),
+        ]
+        for response in responses:
+            with self.subTest(url=str(response.request.url)):
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.content, data)
+                self.assertEqual(
+                    response.headers["content-type"], "application/pdf"
+                )
+                self.assertEqual(
+                    response.headers["content-disposition"],
+                    f'attachment; filename="{asset_id}.pdf"',
+                )
+                self.assertEqual(response.headers["cache-control"], "no-store")
+        self.assertEqual(self.get("/assets/" + asset_id, headers).json(), asset)
+
+    def test_non_pdf_asset_disposition_is_unchanged(self):
+        asset = self.upload(self.owner).json()
+        response = self.get("/assets/" + asset["assetId"] + "/content")
+        self.assertEqual(
+            response.headers["content-disposition"],
+            f'attachment; filename="{asset["assetId"]}"',
+        )
+        self.assertEqual(response.content, b"private source")
+
     def test_assets_are_grant_filtered_and_sources_are_immutable(self):
         headers, _ = self.cap(["assets:create", "assets:read"], note_ids=[])
         source = self.upload(headers).json()

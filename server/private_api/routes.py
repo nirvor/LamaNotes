@@ -317,10 +317,13 @@ def create_router(service, auth):
             missing()
         media = asset["mediaType"]
         disposition = "inline" if media.startswith("image/") else "attachment"
+        # Storage keys have no extension. The response filename takes priority
+        # over an HTML download attribute, including for existing PDF assets.
+        filename = asset_id + ".pdf" if media == "application/pdf" else asset_id
         return FileResponse(
             path,
             media_type=media,
-            filename=asset_id,
+            filename=filename,
             content_disposition_type=disposition,
             headers={
                 "Cache-Control": "no-store",
