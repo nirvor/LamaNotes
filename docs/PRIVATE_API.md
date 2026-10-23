@@ -181,7 +181,7 @@ are not an executable media path. GET `/assets/{assetId}` returns metadata and
 GET `/assets/{assetId}/content` enforces the same object grant on the bytes.
 Non-image inputs download as attachments. Raw source bytes never get overwritten.
 
-LamaPhotos remains a local crop/print step. Its fragment is
+LamaShop remains a local crop/print step. Its fragment is
 `#lp=v1&target=lamanotes&return_id=ln-...&source_id=la-...` with opaque IDs only.
 Its return is fixed to `https://notes.thuber.org/n/{return_id}`. Credentials,
 paths and caller-selected return origins never belong in that fragment.
@@ -202,7 +202,7 @@ ownership links without rewriting the note body or replacing an original.
 The owner can use Note menu -> Note media to download sources and explicitly
 attach a returned crop. Media placement in the body remains an editor action.
 GET `/settings` is owner-only. `LAMANOTES_PRIVATE_CROP_ORIGIN` optionally sets
-the HTTPS LamaPhotos entry point; unset/invalid means no crop link. There is
+the HTTPS LamaShop entry point; unset/invalid means no crop link. There is
 no hardcoded private host or guessed public deployment.
 
 ## Exact-note reader for trusted rendering

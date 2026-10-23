@@ -73,7 +73,7 @@
       </fieldset>
     </form>
     <p class="private-help">
-      Originals stay unchanged. LamaPhotos downloads locally; returning here
+      Originals stay unchanged. LamaShop downloads locally. Returning here
       does not upload anything automatically.
     </p>
   </section>
