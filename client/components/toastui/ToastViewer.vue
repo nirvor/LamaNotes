@@ -82,6 +82,8 @@ watch(
     if (!viewer) {
       return;
     }
+    const { resetChecklistGroups } = await loadRenderEnhancements();
+    resetChecklistGroups(viewerElement.value);
     viewer.setMarkdown(value || "");
     await enhance();
   },

@@ -1521,13 +1521,9 @@ function ensureTaskCheckbox(taskItem) {
   return checkbox;
 }
 
-export function enhanceTaskListCheckboxes(rootElement, taskListOptions = {}) {
-  if (!rootElement) {
-    return;
-  }
-
+export function resetChecklistGroups(rootElement) {
   rootElement
-    .querySelectorAll(".lamanotes-checklist-group")
+    ?.querySelectorAll(".lamanotes-checklist-group")
     .forEach((group) => {
       const heading = group.querySelector(
         ":scope > .lamanotes-checklist-heading > :is(h2,h3,h4,h5,h6,p)",
@@ -1535,6 +1531,13 @@ export function enhanceTaskListCheckboxes(rootElement, taskListOptions = {}) {
       const list = group.querySelector(":scope > ul, :scope > ol");
       group.replaceWith(...[heading, list].filter(Boolean));
     });
+}
+
+export function enhanceTaskListCheckboxes(rootElement, taskListOptions = {}) {
+  if (!rootElement) {
+    return;
+  }
+  resetChecklistGroups(rootElement);
 
   const taskItems = rootElement.querySelectorAll(
     ".toastui-editor-contents li.task-list-item",

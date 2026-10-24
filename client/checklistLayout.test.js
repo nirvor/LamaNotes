@@ -4,6 +4,7 @@ import { JSDOM } from "jsdom";
 import {
   enhanceNoteLead,
   enhanceTaskListCheckboxes,
+  resetChecklistGroups,
 } from "./components/toastui/renderEnhancements.js";
 
 let dom, root;
@@ -77,6 +78,18 @@ test("a repeated enhancement preserves headings, section order and one control p
       .getAttribute("aria-pressed"),
     "true",
   );
+});
+
+test("before a Markdown update the original source-node hierarchy is restored", () => {
+  render(
+    `<h5>Produce</h5><ul>${task("Apples")}</ul><h5>Household</h5><ul>${task("Soap")}</ul>`,
+  );
+  const originalNodes = [...root.firstElementChild.children];
+  enhanceTaskListCheckboxes(root, options);
+  resetChecklistGroups(root);
+  assert.deepEqual([...root.firstElementChild.children], originalNodes);
+  assert.equal(root.querySelector(".lamanotes-checklist-tools"), null);
+  assert.equal(root.querySelector(".lamanotes-checklist-entry"), null);
 });
 
 test("Add opens only its own input and Escape restores the triggering button", () => {
