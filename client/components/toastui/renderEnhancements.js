@@ -1649,13 +1649,15 @@ export function enhanceTaskListCheckboxes(rootElement, taskListOptions = {}) {
     }
     if (tools.childElementCount) {
       const previous = list.previousElementSibling;
+      const boldLabel = previous?.matches("p")
+        ? previous.querySelector(":scope > strong:only-child")
+        : null;
+      const isLabel =
+        boldLabel &&
+        previous.textContent.length < 100 &&
+        previous.textContent.trim() === boldLabel.textContent.trim();
       const heading =
-        previous?.matches("h2,h3,h4,h5,h6") ||
-        (previous?.matches("p") &&
-          previous.querySelector(":scope > strong:only-child") &&
-          previous.textContent.length < 100)
-          ? previous
-          : null;
+        previous?.matches("h2,h3,h4,h5,h6") || isLabel ? previous : null;
       const group = document.createElement("div");
       group.className = "lamanotes-checklist-group";
       list.before(group);

@@ -166,6 +166,27 @@ test("unlabelled lists do not consume a preceding content paragraph", () => {
   assert.equal(root.querySelector(".lamanotes-checklist-heading"), null);
 });
 
+test("mixed prose containing bold text remains prose beside a checklist", () => {
+  render(
+    `<p>Remember <strong>fresh fruit</strong> this week.</p><ul>${task("Apples")}</ul>`,
+  );
+  enhanceTaskListCheckboxes(root, options);
+  assert.equal(
+    root.querySelector(".toastui-editor-contents > p").textContent,
+    "Remember fresh fruit this week.",
+  );
+  assert.equal(root.querySelector(".lamanotes-checklist-heading"), null);
+});
+
+test("a short standalone bold label can share the section actions", () => {
+  render(`<p><strong>Produce</strong></p><ul>${task("Apples")}</ul>`);
+  enhanceTaskListCheckboxes(root, options);
+  assert.equal(
+    root.querySelector(".lamanotes-checklist-heading > p").textContent,
+    "Produce",
+  );
+});
+
 test("nested lists and labels survive repeated grouping without moving to another section", () => {
   render(
     `<h5>Produce</h5><ul>${task("Apples")}<li>Next aisle<ul>${task("Pears", true)}</ul></li></ul><h5>Household</h5><ul>${task("Soap")}</ul>`,
