@@ -237,8 +237,8 @@ uploads selected assets and creates durable HTML through the existing idempotent
 capture/note routes. The local selection is cleared after the note is confirmed.
 
 Polish with Research issues a 15-minute selected-note ticket. Research consumes
-it through its existing root capability. Only that note is added to the
-capability's explicit note allowlist. Scope, expiry and other Library access
+it through its existing verifier capability. Only that note is added to the
+same integration's active verifier/worker root allowlists. Scopes, expiry and other Library access
 remain unchanged. Tickets are hashed in the private database, bound to their
 first consuming integration and replayable by that integration after a lost
 response. A changed or revoked note and an expired ticket are rejected. The

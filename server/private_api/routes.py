@@ -97,7 +97,6 @@ def create_router(service, auth):
     def consume_research_intake(data: ResearchIntakeConsume, actor=Depends(scope("references:read"))):
         if actor is None or actor.get("jobId") or actor.get("parentId"):
             raise HTTPException(403, "Use the existing Research integration.")
-        store.require(actor, "notes:read")
         store.require(actor, "capabilities:delegate")
         digest = hashlib.sha256(data.ticket.encode()).hexdigest()
         with store.connect() as db:
@@ -113,10 +112,18 @@ def create_router(service, auth):
                 raise HTTPException(409, "The selected note changed. Select its current version.")
             current = store.capability(actor["capabilityId"], db)
             store.validate_chain(current)
-            current.pop("revoked", None)
-            current["noteIds"] = sorted(set(current["noteIds"]) | {note["noteId"]})
-            db.execute("UPDATE capabilities SET payload=? WHERE id=?",
-                       (json.dumps(current), actor["capabilityId"]))
+            roots = []
+            for candidate in db.execute('SELECT id,payload FROM capabilities WHERE revoked=0').fetchall():
+                grant = json.loads(candidate['payload'])
+                if (grant['clientId'] == actor['clientId'] and not grant.get('parentId')
+                    and not grant.get('jobId') and grant['expiresAt'] > time.time()
+                    and {'notes:read','references:read'} & set(grant['scopes'])):
+                    roots.append((candidate['id'],grant))
+            if not any('notes:read' in grant['scopes'] for _,grant in roots):
+                raise HTTPException(503, 'The Research note reader is unavailable.')
+            for identifier, grant in roots:
+                grant['noteIds'] = sorted(set(grant['noteIds']) | {note['noteId']})
+                db.execute('UPDATE capabilities SET payload=? WHERE id=?', (json.dumps(grant),identifier))
             db.execute("UPDATE research_intakes SET consumed_by=? WHERE digest=?",
                        (actor["capabilityId"], digest))
         return {"parent": {"noteId": note["noteId"], "version": note["version"],

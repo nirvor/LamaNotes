@@ -44,6 +44,17 @@ class ShareIntakeTests(unittest.TestCase):
             db.execute('UPDATE research_intakes SET expires_at=0')
         self.assertEqual(self.post('/research-intakes/consume', {'ticket':ticket}, headers).status_code, 410)
 
+    def test_verifier_can_select_for_its_worker_without_gaining_note_read_scope(self):
+        reader, _ = self.cap(['notes:read', 'references:read', 'capabilities:delegate'], note_ids=[])
+        verifier, grant = self.cap(['references:read','capabilities:delegate'], note_ids=[])
+        ticket = self.post('/research-intakes', {'noteId':self.note['noteId'],'expectedVersion':self.note['version']}).json()['ticket']
+        result = self.post('/research-intakes/consume', {'ticket':ticket}, verifier)
+        self.assertEqual(result.status_code,200,result.text)
+        self.assertEqual(self.get('/notes/'+self.note['noteId'],reader).status_code,200)
+        self.assertEqual(self.get('/notes/'+self.note['noteId'],verifier).status_code,403)
+        saved = json.loads(self.stored_capability(grant['capabilityId'])['payload'])
+        self.assertNotIn('notes:read',saved['scopes'])
+
 
 def test_android_feed_does_not_serve_missing_corrupt_or_path_escaped_packages():
     with tempfile.TemporaryDirectory() as folder:
