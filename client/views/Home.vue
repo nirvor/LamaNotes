@@ -21,7 +21,7 @@
         hideLoader
       >
         <section
-          v-if="notes.length > 0"
+          v-if="notes.length > 0 || sharedNoteCount > 0"
           class="lamanotes-home-pinned-section bg-theme-background dark:bg-theme-background-elevated"
         >
           <div class="lamanotes-home-pinned-list">
@@ -40,6 +40,33 @@
                 class="lamanotes-home-pinned-meta"
               >
                 {{ pinnedNoteContext(note) }}
+              </span>
+            </RouterLink>
+            <RouterLink
+              v-if="sharedNoteCount > 0"
+              :to="{
+                name: 'search',
+                query: {
+                  term: '#shared',
+                  sortBy: searchSortOptions.lastModified,
+                },
+              }"
+              class="lamanotes-home-pinned-link lamanotes-home-shared-link"
+            >
+              <SvgIcon
+                type="mdi"
+                :path="mdiTrayArrowDown"
+                size="1.05rem"
+                aria-hidden="true"
+              />
+              <span class="lamanotes-home-shared-label">
+                <span class="lamanotes-home-pinned-name"
+                  >Shared to LamaNotes</span
+                >
+                <span class="lamanotes-home-pinned-meta"
+                  >#shared / {{ sharedNoteCount }}
+                  {{ sharedNoteCount === 1 ? "note" : "notes" }}</span
+                >
               </span>
             </RouterLink>
           </div>
@@ -67,7 +94,7 @@
 
 <script setup>
 import SvgIcon from "@jamescoyle/vue-icon";
-import { mdiDotsHorizontal } from "@mdi/js";
+import { mdiDotsHorizontal, mdiTrayArrowDown } from "@mdi/js";
 import { useToast } from "../toastStore.js";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
@@ -90,15 +117,13 @@ const globalStore = useGlobalStore();
 const homeSearchAutoFocus = shouldAutoFocusSearch(window);
 const loadingIndicator = ref();
 const notes = ref([]);
+const sharedNoteCount = ref(0);
 const toast = useToast();
 const visiblePinnedNotes = computed(() =>
   notes.value.slice(0, Number(globalStore.config.quickAccessLimit || 7)),
 );
 
 function init() {
-  if (globalStore.config.quickAccessHide) {
-    return;
-  }
   getSemanticIndex()
     .then((index) => {
       applySemanticIndex(index);
@@ -107,6 +132,7 @@ function init() {
     .catch((error) => {
       if (isCloudNetworkError(error)) {
         notes.value = [];
+        sharedNoteCount.value = 0;
         loadingIndicator.value.setLoaded();
         return;
       }
@@ -116,11 +142,18 @@ function init() {
 }
 
 function applySemanticIndex(index) {
+  const entries = Array.isArray(index) ? index : [];
+  sharedNoteCount.value = entries.filter((note) =>
+    (note.tags || []).some((tag) => String(tag).toLowerCase() === "shared"),
+  ).length;
   const tag = String(globalStore.config.quickAccessTerm || "#pinned")
     .replace(/^#/, "")
     .toLowerCase();
-  const matching = (Array.isArray(index) ? index : []).filter((note) =>
-    (note.tags || []).some((noteTag) => String(noteTag).toLowerCase() === tag),
+  const matching = (globalStore.config.quickAccessHide ? [] : entries).filter(
+    (note) =>
+      (note.tags || []).some(
+        (noteTag) => String(noteTag).toLowerCase() === tag,
+      ),
   );
   matching.sort((left, right) => {
     if (globalStore.config.quickAccessSort === "title") {
@@ -282,6 +315,18 @@ onBeforeUnmount(() => {
   line-height: 1.08;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.lamanotes-home-shared-link {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.5rem;
+}
+
+.lamanotes-home-shared-label {
+  display: grid;
+  min-width: 0;
+  gap: 0.06rem;
 }
 
 .lamanotes-home-pinned-link:hover,

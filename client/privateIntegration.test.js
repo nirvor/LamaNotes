@@ -3,6 +3,31 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 import { captureKind, captureNoteHtml, sharedSelection, validateSelection } from "./captureIntake.js";
+import { synchronizeDocumentTags, getLamaNotesMetaTags } from "./noteSystemTags.js";
+
+test("saved shares stay findable through the normal tag index after editing", () => {
+  for (const html of [
+    captureNoteHtml("A shared thought", ""),
+    captureNoteHtml("", "https://example.org"),
+    captureNoteHtml("", "", [
+      {
+        assetId: "la-" + "b".repeat(32),
+        mediaType: "image/jpeg",
+        name: "Photo.jpg",
+      },
+    ]),
+  ]) {
+    const saved = synchronizeDocumentTags({ content: html });
+    assert.deepEqual(getLamaNotesMetaTags(saved), ["shared"]);
+    assert.deepEqual(
+      getLamaNotesMetaTags(
+        synchronizeDocumentTags({ content: saved, previousContent: saved }),
+      ),
+      ["shared"],
+    );
+    assert.ok(!saved.includes("#pinned"));
+  }
+});
 
 test('Android links become sources and media remains playable with safe names', () => {
   assert.deepEqual(sharedSelection({text:'https://example.org/read'}), {title:'example.org',text:'',url:'https://example.org/read'});
