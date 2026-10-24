@@ -25,7 +25,8 @@
             "audio/wav",
             "audio/ogg",
             "audio/mpeg",
-            "audio/flac"
+            "audio/flac",
+            "audio/mp4"
           ]
         }
       ]

@@ -2,6 +2,8 @@ import json
 import os
 import re
 import time
+import hashlib
+import secrets
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -33,6 +35,8 @@ from .models import (
     ReferenceCheck,
     ResearchReference,
     ReaderSession,
+    ResearchIntake,
+    ResearchIntakeConsume,
 )
 from .store import missing
 
@@ -71,6 +75,52 @@ def create_router(service, auth):
         if not re.fullmatch(r"[A-Za-z0-9_-]{8,128}", key):
             raise HTTPException(422, "Use an opaque idempotency key.")
         return key
+
+    @router.post("/research-intakes")
+    def research_intake(data: ResearchIntake, request: Request, _=Depends(owner)):
+        origin = request.headers.get("origin")
+        if origin and origin != service.public_origin:
+            raise HTTPException(403, "Open this selection in LamaNotes.")
+        store.get_allowed(None, data.note_id, 'note')
+        note = service.read_note(None, data.note_id)
+        if note["version"] != data.expected_version:
+            raise HTTPException(409, "The note changed. Open its current version.")
+        token = secrets.token_urlsafe(32)
+        with store.connect() as db:
+            db.execute("DELETE FROM research_intakes WHERE expires_at<?", (int(time.time()),))
+            db.execute("INSERT INTO research_intakes(digest,note_id,version,expires_at) VALUES(?,?,?,?)",
+                       (hashlib.sha256(token.encode()).hexdigest(), data.note_id,
+                        data.expected_version, int(time.time()) + 900))
+        return {"ticket": token}
+
+    @router.post("/research-intakes/consume")
+    def consume_research_intake(data: ResearchIntakeConsume, actor=Depends(scope("references:read"))):
+        if actor is None or actor.get("jobId") or actor.get("parentId"):
+            raise HTTPException(403, "Use the existing Research integration.")
+        store.require(actor, "notes:read")
+        store.require(actor, "capabilities:delegate")
+        digest = hashlib.sha256(data.ticket.encode()).hexdigest()
+        with store.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT * FROM research_intakes WHERE digest=?", (digest,)).fetchone()
+            if not row or row["expires_at"] <= time.time():
+                raise HTTPException(410, "This selection expired. Open it again from LamaNotes.")
+            if row["consumed_by"] and row["consumed_by"] != actor["capabilityId"]:
+                raise HTTPException(409, "This selection was already opened elsewhere.")
+            store.get_allowed(None, row['note_id'], 'note')
+            note = service.read_note(None, row["note_id"])
+            if note["version"] != row["version"]:
+                raise HTTPException(409, "The selected note changed. Select its current version.")
+            current = store.capability(actor["capabilityId"], db)
+            store.validate_chain(current)
+            current.pop("revoked", None)
+            current["noteIds"] = sorted(set(current["noteIds"]) | {note["noteId"]})
+            db.execute("UPDATE capabilities SET payload=? WHERE id=?",
+                       (json.dumps(current), actor["capabilityId"]))
+            db.execute("UPDATE research_intakes SET consumed_by=? WHERE digest=?",
+                       (actor["capabilityId"], digest))
+        return {"parent": {"noteId": note["noteId"], "version": note["version"],
+                           "researchId": note.get("researchId")}}
 
     @router.post("/reader-session")
     def reader_session(

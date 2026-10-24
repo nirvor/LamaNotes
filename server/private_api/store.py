@@ -73,6 +73,11 @@ class PrivateStore:
                     digest TEXT PRIMARY KEY, capability_id TEXT NOT NULL,
                     note_id TEXT NOT NULL, expires_at INTEGER NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS research_intakes (
+                    digest TEXT PRIMARY KEY, note_id TEXT NOT NULL,
+                    version TEXT NOT NULL, expires_at INTEGER NOT NULL,
+                    consumed_by TEXT
+                );
             """)
         self.path.chmod(0o600)
 

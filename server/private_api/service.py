@@ -405,6 +405,8 @@ class PrivateService:
             return "image/webp"
         if data[:4] == b"RIFF" and data[8:12] == b"WAVE":
             return "audio/wav"
+        if supplied == "audio/mp4" and len(data) >= 16 and data[4:8] == b"ftyp":
+            return "audio/mp4"
         if supplied == "text/plain":
             data.decode("utf-8")
             return "text/plain"

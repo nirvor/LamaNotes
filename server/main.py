@@ -53,6 +53,7 @@ from publications.service import PublicationService
 from private_api.routes import create_router as create_private_router
 from private_api.service import PrivateService
 from private_api.middleware import PrivateRequestLimit
+from android_updates import update_router
 
 global_config = GlobalConfig()
 auth: BaseAuth = global_config.load_auth()
@@ -161,6 +162,7 @@ def root(title: str = ""):
 
 
 # region Windows client updates
+router.include_router(update_router(global_config.windows_update_dir))
 def load_windows_update_manifest():
     if not global_config.windows_update_dir:
         raise HTTPException(404, "Windows client updates are not configured.")

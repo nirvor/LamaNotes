@@ -231,9 +231,19 @@ lookalike is not evidence of the real LamaNotes reader.
 
 ## Owner/PWA UX and storage
 
-Menu -> Private access is the explicit enrollment/grant/revoke UI. Private
-capture previews selected data and requires a personal-content confirmation
-before importing. A separate Keep as note action creates durable HTML.
+Menu -> Private access is the explicit enrollment/grant/revoke UI. Capture
+previews selected text, links and media. Save note confirms personal content,
+uploads selected assets and creates durable HTML through the existing idempotent
+capture/note routes. The local selection is cleared after the note is confirmed.
+
+Polish with Research issues a 15-minute selected-note ticket. Research consumes
+it through its existing root capability. Only that note is added to the
+capability's explicit note allowlist. Scope, expiry and other Library access
+remain unchanged. Tickets are hashed in the private database, bound to their
+first consuming integration and replayable by that integration after a lost
+response. A changed or revoked note and an expired ticket are rejected. The
+browser removes the ticket fragment before sign-in and holds it in session
+storage until consumption. Research creates a draft and requires explicit Start.
 
 The PWA Share Target posts to `/capture/share`; the controlling service worker
 holds the selection locally in IndexedDB and redirects to a preview containing

@@ -45,6 +45,23 @@ export function captureKind(file, url) {
   return url ? "link" : "text";
 }
 
+export function sharedSelection(incoming) {
+  let text = String(incoming.text || '').trim(), url = String(incoming.url || '').trim();
+  if (!url && /^https?:\/\/\S+$/i.test(text)) { url = text; text = ''; }
+  const suggested = incoming.title || text.split('\n')[0] || incoming.files?.[0]?.name || (url ? new URL(url).hostname : 'Shared note');
+  const title = String(suggested).replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').trim().replace(/\.+$/, '').slice(0, 180) || 'Shared note';
+  return { title, text, url };
+}
+
+export function validateSelection(text, url, files) {
+  if (text.length > 100000 || url.length > 4000) throw new Error('The shared text or link is too large.');
+  if (files.length > 10 || files.reduce((total, file) => total + file.size, 0) > 20 * 1024 * 1024) throw new Error('Share up to 10 files, 20 MB in total.');
+  if (url) {
+    const parsed = new URL(url);
+    if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error('Use an HTTP or HTTPS source link without login details.');
+  }
+}
+
 export function captureNoteHtml(text, url, assets = []) {
   const escape = (value) =>
     String(value).replace(
@@ -66,19 +83,20 @@ export function captureNoteHtml(text, url, assets = []) {
     .filter((asset) => asset.mediaType.startsWith("image/"))
     .map(
       (asset) =>
-        `<figure class="lamanote-media"><img src="/api/private/v1/assets/${asset.assetId}/content" alt="Selected private image"><figcaption>Selected source image</figcaption></figure>`,
+        `<figure class="lamanote-media"><img src="/api/private/v1/assets/${asset.assetId}/content" alt="${escape(asset.name || 'Image')}"></figure>`,
     )
     .join("\n");
+  const audio = assets.filter(asset => asset.mediaType.startsWith('audio/')).map(asset => `<figure class="lamanote-media"><audio controls preload="metadata" src="/api/private/v1/assets/${asset.assetId}/content"></audio><figcaption>${escape(asset.name || 'Audio')}</figcaption></figure>`).join('\n');
   const files = assets
-    .filter((asset) => !asset.mediaType.startsWith("image/"))
+    .filter((asset) => !asset.mediaType.startsWith("image/") && !asset.mediaType.startsWith('audio/'))
     .map(
       (asset) =>
-        `<p><a href="/api/private/v1/assets/${asset.assetId}/content" download>Imported ${escape(asset.mediaType)}</a></p>`,
+        `<p><a href="/api/private/v1/assets/${asset.assetId}/content" download>${escape(asset.name || asset.mediaType)}</a></p>`,
     )
     .join("\n");
   return `<article class="lamanote lamanote-article" data-lamanotes-component="article">${text
     .split(/\n\s*\n/)
     .filter(Boolean)
     .map((paragraph) => `<p>${escape(paragraph).replace(/\n/g, "<br>")}</p>`)
-    .join("\n")}${source}${figures}${files}</article>`;
+    .join("\n")}${source}${figures}${audio}${files}</article>`;
 }

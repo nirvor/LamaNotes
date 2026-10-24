@@ -110,3 +110,12 @@ class AttachAssets(StrictModel):
 class ReaderSession(StrictModel):
     note_id: NoteId
     expires_in: int = Field(default=120, ge=30, le=300)
+
+
+class ResearchIntake(StrictModel):
+    note_id: NoteId
+    expected_version: Hash
+
+
+class ResearchIntakeConsume(StrictModel):
+    ticket: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{43}$")]

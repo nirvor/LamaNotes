@@ -2,7 +2,17 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
-import { captureKind, captureNoteHtml } from "./captureIntake.js";
+import { captureKind, captureNoteHtml, sharedSelection, validateSelection } from "./captureIntake.js";
+
+test('Android links become sources and media remains playable with safe names', () => {
+  assert.deepEqual(sharedSelection({text:'https://example.org/read'}), {title:'example.org',text:'',url:'https://example.org/read'});
+  assert.equal(sharedSelection({title:'A/B: C?',text:'A thought'}).title, 'A B  C');
+  assert.throws(() => validateSelection('', '', [{size:21*1024*1024}]), /20 MB/);
+  assert.throws(() => validateSelection('', 'https://user:pass@example.org', []), /login details/);
+  const html = captureNoteHtml('Voice note', '', [{assetId:'la-'+'a'.repeat(32),mediaType:'audio/mp4',name:'My <audio>.m4a'}]);
+  assert.ok(html.includes('<audio controls'));
+  assert.ok(html.includes('My &lt;audio&gt;.m4a'));
+});
 
 test("capture HTML escapes untrusted text and does not invent a research theme", () => {
   const html = captureNoteHtml(
