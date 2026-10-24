@@ -13,7 +13,7 @@ beforeEach(() => {
     url: "https://example.test",
   });
   globalThis.document = dom.window.document;
-  globalThis.requestAnimationFrame = (callback) => callback();
+  globalThis.requestAnimationFrame = (callback) => queueMicrotask(callback);
   root = document.querySelector("main");
 });
 afterEach(() => {
@@ -147,6 +147,10 @@ test("adding uses the original global item index and blocks duplicate pending sa
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(form.hidden, true);
   assert.equal(input.disabled, false);
+  assert.equal(
+    document.activeElement.getAttribute("aria-label"),
+    "Add checklist item",
+  );
 });
 
 test("failed saves retain the local entry and return focus for correction", async () => {

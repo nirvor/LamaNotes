@@ -1558,6 +1558,7 @@ export function enhanceTaskListCheckboxes(rootElement, taskListOptions = {}) {
     );
     const tools = document.createElement("div");
     tools.className = "lamanotes-checklist-tools";
+    tools.dataset.lamanotesChecklistIndex = String(listIndex);
     tools.setAttribute("role", "group");
     tools.setAttribute("aria-label", "Checklist actions");
     let entryForm = null;
@@ -1641,6 +1642,19 @@ export function enhanceTaskListCheckboxes(rootElement, taskListOptions = {}) {
           });
           input.value = "";
           form.hidden = true;
+          requestAnimationFrame(() => {
+            if (
+              rootElement.isConnected &&
+              (document.activeElement === input ||
+                document.activeElement === document.body)
+            ) {
+              rootElement
+                .querySelector(
+                  `[data-lamanotes-checklist-index="${listIndex}"] [aria-label="Add checklist item"]`,
+                )
+                ?.focus();
+            }
+          });
         } catch {
           requestAnimationFrame(() => input.focus());
         } finally {
