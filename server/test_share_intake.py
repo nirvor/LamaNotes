@@ -67,6 +67,8 @@ def test_android_feed_does_not_serve_missing_corrupt_or_path_escaped_packages():
             (root/'LamaDroid-update.json').write_text(json.dumps({'payload':base64.b64encode(json.dumps(data).encode()).decode(),'signature':'fixture'}))
         manifest()
         assert client.get('/api/android-client-update').status_code == 200
+        assert client.get('/api/android-client-update', headers={'host':'notes.thuber.org'}).status_code == 404
+        assert client.get('/api/android-client-update/download', headers={'host':'notes.thuber.org'}).status_code == 404
         assert client.get('/api/android-client-update/download').content == apk.read_bytes()
         data['file'] = '../LamaDroid-0.2.0.apk'; manifest()
         assert client.get('/api/android-client-update/download').status_code == 404
