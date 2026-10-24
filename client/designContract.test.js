@@ -63,7 +63,7 @@ test("HTML source and preview share the production viewer", () => {
 });
 
 test("V2 tokens and legacy aliases stay in one design contract", () => {
-  assert.match(styleSource, /--theme-background: 247 248 250/);
+  assert.match(styleSource, /--theme-background: 239 244 249/);
   assert.match(styleSource, /--theme-title-accent: 151 85 25/);
   assert.match(styleSource, /--ln-font-body: 1rem/);
   assert.match(styleSource, /--ln-touch-target: 2\.65rem/);

@@ -1,8 +1,8 @@
 .lamanotes-app-shell {
   overflow: visible;
-  padding-right: max(0.375rem, env(safe-area-inset-right));
+  padding-right: max(0.8rem, env(safe-area-inset-right));
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  padding-left: max(0.375rem, env(safe-area-inset-left));
+  padding-left: max(0.8rem, env(safe-area-inset-left));
 }
 
 .lamanotes-app-shell-note {

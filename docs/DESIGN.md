@@ -1,5 +1,27 @@
 # LamaNotes Design
 
+## LamaX application profile
+
+LamaFocus is the first working reference, LamaStart the second and this
+application the third. Match their quiet blue hierarchy, compact Poppins
+400/600 type, fine frames and short, task-specific controls. A normal app bar
+uses a 15px blue name and the existing 28px app mark, with a 43px minimum
+height. Related controls use 4-8px gaps and groups use 8-12px gaps. Preserve
+42-44px coarse-pointer targets and 16px editable text on phones.
+
+The shared light page/surface pair is `#eff4f9` / `#ffffff`. Dark uses
+`#1b1f25` / `#2b313a`. Brand blue is `#1e5c91` in light and `#97d2ff` in dark.
+Use a meaningful surface with a fine complete border instead of extra cards
+or shadow. Maps, photo stages and documents keep their useful content layout.
+The document-title copper accent remains a reading convention, not a second
+application brand. Product controls use English. User content keeps its language.
+
+Short checklist sections group their label, list and local actions without a
+visible box. Hide-completed and Add sit beside the section label, while the
+entry form appears directly under its own list. Preserve item order, heading
+semantics, keyboard focus and note bodies. No progress counters or list
+administration controls are added.
+
 ## V2 is still LamaNotes
 
 Design Study V2 is a careful continuation of V1, not a rebrand. V1 already
@@ -211,11 +233,20 @@ a template.
 A single neutral paper figure can use this tag-independent envelope:
 
 ```html
-<figure class="lamanote-plot lamanote-visual-frame" data-lamanotes-component="plot">
-  <img class="lamanote-figure-paper" src="attachments/figure.svg"
-       alt="Describe the variables, relationship and important uncertainty"
-       loading="lazy" decoding="async">
-  <figcaption>Finding, measurement basis, uncertainty and direct source/date.</figcaption>
+<figure
+  class="lamanote-plot lamanote-visual-frame"
+  data-lamanotes-component="plot"
+>
+  <img
+    class="lamanote-figure-paper"
+    src="attachments/figure.svg"
+    alt="Describe the variables, relationship and important uncertainty"
+    loading="lazy"
+    decoding="async"
+  />
+  <figcaption>
+    Finding, measurement basis, uncertainty and direct source/date.
+  </figcaption>
 </figure>
 ```
 

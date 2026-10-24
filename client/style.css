@@ -38,16 +38,16 @@
 
   body {
     --theme-brand: 30 92 145;
-    --theme-background: 247 248 250;
+    --theme-background: 239 244 249;
     --theme-background-elevated: 255 255 255;
     --theme-heading: 30 92 145;
     --theme-title-accent: 151 85 25;
     --theme-link: 72 102 145;
-    --theme-text: 25 31 39;
-    --theme-text-muted: 91 103 119;
-    --theme-text-very-muted: 104 116 132;
+    --theme-text: 44 49 57;
+    --theme-text-muted: 88 101 116;
+    --theme-text-very-muted: 98 110 123;
     --theme-shadow: 215 224 232;
-    --theme-border: 213 222 231;
+    --theme-border: 201 212 223;
     --theme-success: 5 150 105;
     --theme-danger: 225 29 72;
     --theme-warning: 161 98 7;
@@ -61,9 +61,9 @@
     --ln-space-4: 1rem;
     --ln-space-5: 1.45rem;
     --ln-radius-control: 0.32rem;
-    --ln-radius-card: 0.5rem;
+    --ln-radius-card: 0.4rem;
     --ln-border-subtle: 1px solid rgb(var(--theme-border) / 0.9);
-    --ln-shadow-card: 0 0.22rem 0.85rem rgb(17 36 57 / 0.08);
+    --ln-shadow-card: none;
     --ln-font-body: 1rem;
     --ln-font-small: 0.86em;
     --ln-line-small: 1.38;
@@ -112,17 +112,17 @@
   }
 
   body.dark {
-    --theme-brand: 142 203 255;
-    --theme-background: 33 37 43;
-    --theme-background-elevated: 44 49 57;
-    --theme-heading: 142 203 255;
+    --theme-brand: 151 210 255;
+    --theme-background: 27 31 37;
+    --theme-background-elevated: 43 49 58;
+    --theme-heading: 151 210 255;
     --theme-title-accent: 238 174 96;
     --theme-link: 164 187 224;
-    --theme-text: 255 255 255;
-    --theme-text-muted: 184 193 205;
-    --theme-text-very-muted: 155 168 185;
+    --theme-text: 248 249 250;
+    --theme-text-muted: 190 198 208;
+    --theme-text-very-muted: 166 178 191;
     --theme-shadow: none;
-    --theme-border: 78 91 108;
+    --theme-border: 84 99 118;
     --theme-success: 52 211 153;
     --theme-danger: 251 113 133;
     --theme-warning: 251 191 36;
@@ -355,7 +355,43 @@ body.lamanotes-native-text-drag-active::after {
   flex-wrap: wrap;
   gap: 0.15rem;
   align-items: center;
-  margin: -0.25rem 0 0.5rem 1.2rem;
+  margin: 0;
+  flex: 0 0 auto;
+}
+.lamanotes-checklist-group {
+  min-width: 0;
+  margin-block: 0.65rem;
+}
+.lamanotes-checklist-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  min-width: 0;
+}
+.toastui-editor-contents
+  .lamanotes-checklist-heading
+  > :is(h2, h3, h4, h5, h6, p) {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.toastui-editor-contents .lamanotes-checklist-heading > :is(h4, h5, h6, p) {
+  font-size: 0.93rem;
+  line-height: 1.4;
+  color: rgb(var(--theme-heading));
+}
+.toastui-editor-contents .lamanotes-checklist-group > :is(ul, ol) {
+  margin: 0.1rem 0 0.3rem;
+}
+.toastui-editor-contents
+  .lamanotes-checklist-group
+  > .lamanotes-checklist-tools {
+  justify-content: flex-end;
+}
+.lamanotes-checklist-group > .lamanotes-checklist-entry {
+  margin-top: 0.35rem;
+  max-width: none;
 }
 .lamanotes-checklist-entry {
   flex: 1 1 12rem;
@@ -405,9 +441,12 @@ body.lamanotes-native-text-drag-active::after {
   width: min(100% - 1rem, var(--ln-reading-max, 48rem));
   margin: 1rem auto;
   overflow-wrap: anywhere;
+  font-size: 0.93rem;
 }
 .private-view h1 {
-  font-size: var(--ln-font-h1);
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgb(var(--theme-heading));
   margin: 0 0 0.65rem;
 }
 .private-view fieldset {
@@ -517,5 +556,9 @@ body.lamanotes-native-text-drag-active::after {
   .private-rows label,
   .private-check {
     min-height: var(--ln-touch-target, 42px);
+  }
+  .private-field :is(input, select, textarea),
+  .lamanotes-checklist-entry input {
+    font-size: 16px;
   }
 }

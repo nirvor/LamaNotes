@@ -1212,7 +1212,12 @@ export function enhanceNoteLead(rootElement, options = {}) {
     return;
   }
 
-  const abstractMatch = findLeadAbstractList(contentRoot);
+  const abstractCandidate = findLeadAbstractList(contentRoot);
+  const abstractMatch = abstractCandidate?.listElement.querySelector(
+    "li.task-list-item, input[type='checkbox']",
+  )
+    ? null
+    : abstractCandidate;
   const structuredArticle = contentRoot.matches(
     ".lamanote-article, .lamanote-research, [data-lamanotes-component='article']",
   );
@@ -1413,7 +1418,7 @@ function setTaskCheckboxesBusy(rootElement, isBusy, taskListOptions) {
   rootElement.lamanotesTasksBusy = isBusy;
   rootElement
     .querySelectorAll(
-      ".lamanotes-checklist-tools button, .lamanotes-checklist-tools input",
+      ".lamanotes-checklist-tools button, .lamanotes-checklist-entry input, .lamanotes-checklist-entry button",
     )
     .forEach((control) => {
       control.disabled = isBusy;
@@ -1521,6 +1526,16 @@ export function enhanceTaskListCheckboxes(rootElement, taskListOptions = {}) {
     return;
   }
 
+  rootElement
+    .querySelectorAll(".lamanotes-checklist-group")
+    .forEach((group) => {
+      const heading = group.querySelector(
+        ":scope > .lamanotes-checklist-heading > :is(h2,h3,h4,h5,h6,p)",
+      );
+      const list = group.querySelector(":scope > ul, :scope > ol");
+      group.replaceWith(...[heading, list].filter(Boolean));
+    });
+
   const taskItems = rootElement.querySelectorAll(
     ".toastui-editor-contents li.task-list-item",
   );
@@ -1542,6 +1557,7 @@ export function enhanceTaskListCheckboxes(rootElement, taskListOptions = {}) {
     tools.className = "lamanotes-checklist-tools";
     tools.setAttribute("role", "group");
     tools.setAttribute("aria-label", "Checklist actions");
+    let entryForm = null;
     list.classList.toggle(
       "lamanotes-hide-completed",
       hiddenLists.has(listIndex),
@@ -1628,9 +1644,31 @@ export function enhanceTaskListCheckboxes(rootElement, taskListOptions = {}) {
           setTaskCheckboxesBusy(rootElement, false, taskListOptions);
         }
       });
-      tools.append(add, form);
+      tools.append(add);
+      entryForm = form;
     }
-    if (tools.childElementCount) list.after(tools);
+    if (tools.childElementCount) {
+      const previous = list.previousElementSibling;
+      const heading =
+        previous?.matches("h2,h3,h4,h5,h6") ||
+        (previous?.matches("p") &&
+          previous.querySelector(":scope > strong:only-child") &&
+          previous.textContent.length < 100)
+          ? previous
+          : null;
+      const group = document.createElement("div");
+      group.className = "lamanotes-checklist-group";
+      list.before(group);
+      if (heading) {
+        const row = document.createElement("div");
+        row.className = "lamanotes-checklist-heading";
+        row.append(heading, tools);
+        group.append(row, list);
+      } else {
+        group.append(list, tools);
+      }
+      if (entryForm) group.append(entryForm);
+    }
   });
   if (rootElement.lamanotesTasksBusy)
     setTaskCheckboxesBusy(rootElement, true, taskListOptions);
