@@ -98,5 +98,5 @@ export function captureNoteHtml(text, url, assets = []) {
     .split(/\n\s*\n/)
     .filter(Boolean)
     .map((paragraph) => `<p>${escape(paragraph).replace(/\n/g, "<br>")}</p>`)
-    .join("\n")}${source}${figures}${audio}${files}</article>`;
+    .join("\n")}${source}${figures}${audio}${files}<p class="lamanote-tags">#shared</p></article>`;
 }
