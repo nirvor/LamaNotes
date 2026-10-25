@@ -11,80 +11,83 @@
     <div class="lamanotes-home-inner">
       <SearchInput
         :auto-focus="homeSearchAutoFocus"
-        large
         prominent-tag-cloud
         class="lamanotes-home-search"
       />
       <LoadingIndicator
         ref="loadingIndicator"
-        class="lamanotes-home-pinned"
+        class="lamanotes-home-shortcuts"
         hideLoader
       >
         <section
-          v-if="notes.length > 0 || sharedNoteCount > 0"
-          class="lamanotes-home-pinned-section bg-theme-background dark:bg-theme-background-elevated"
+          class="lamanotes-home-pinned-section"
+          aria-label="Quick access"
         >
-          <div class="lamanotes-home-pinned-list">
+          <nav class="lamanotes-home-pinned-list" aria-label="Daily notes">
             <RouterLink
-              v-for="note in visiblePinnedNotes"
+              v-for="entry in dailyEntries"
+              :key="entry.key"
+              :to="entry.to"
+              class="lamanotes-home-pinned-link"
+              :title="entry.title"
+              @focus="warmNote(entry.title, entry.key)"
+              @pointerenter="warmNote(entry.title, entry.key)"
+            >
+              <SvgIcon
+                type="mdi"
+                :path="dailyIcons[entry.key]"
+                size="1.05rem"
+                aria-hidden="true"
+              />
+              <span class="lamanotes-home-pinned-name">{{ entry.title }}</span>
+              <span
+                v-if="entry.key === 'shared'"
+                class="lamanotes-home-pinned-meta"
+              >
+                {{ entry.count }} {{ entry.count === 1 ? "note" : "notes" }}
+              </span>
+            </RouterLink>
+          </nav>
+          <nav
+            v-if="home.pinned.length"
+            class="lamanotes-home-pinned-list lamanotes-home-other-pins"
+            aria-label="Pinned notes"
+          >
+            <RouterLink
+              v-for="note in home.pinned"
               :key="note.title"
-              :to="{ name: 'note', params: { title: note.title } }"
+              :to="note.to"
               class="lamanotes-home-pinned-link"
               :title="note.title"
               @focus="warmNote(note.title)"
               @pointerenter="warmNote(note.title)"
             >
+              <SvgIcon
+                type="mdi"
+                :path="mdiPinOutline"
+                size="1.05rem"
+                aria-hidden="true"
+              />
               <span class="lamanotes-home-pinned-name">{{ note.title }}</span>
               <span
                 v-if="pinnedNoteContext(note)"
                 class="lamanotes-home-pinned-meta"
+                >{{ pinnedNoteContext(note) }}</span
               >
-                {{ pinnedNoteContext(note) }}
-              </span>
             </RouterLink>
-            <RouterLink
-              v-if="sharedNoteCount > 0"
-              :to="{
-                name: 'search',
-                query: {
-                  term: '#shared',
-                  sortBy: searchSortOptions.lastModified,
-                },
-              }"
-              class="lamanotes-home-pinned-link lamanotes-home-shared-link"
-            >
-              <SvgIcon
-                type="mdi"
-                :path="mdiTrayArrowDown"
-                size="1.05rem"
-                aria-hidden="true"
-              />
-              <span class="lamanotes-home-shared-label">
-                <span class="lamanotes-home-pinned-name"
-                  >Shared to LamaNotes</span
-                >
-                <span class="lamanotes-home-pinned-meta"
-                  >#shared / {{ sharedNoteCount }}
-                  {{ sharedNoteCount === 1 ? "note" : "notes" }}</span
-                >
-              </span>
-            </RouterLink>
-          </div>
+          </nav>
           <RouterLink
-            v-if="notes.length > globalStore.config.quickAccessLimit"
-            :to="{
-              name: 'search',
-              query: {
-                term: globalStore.config.quickAccessTerm,
-                sortBy: searchSortOptions[globalStore.config.quickAccessSort],
-              },
-            }"
+            v-if="home.more"
+            :to="home.allPinnedRoute"
             class="lamanotes-home-pinned-more"
-            title="Show all pinned notes"
-            aria-label="Show all pinned notes"
           >
-            <span>All pinned notes</span>
-            <SvgIcon type="mdi" :path="mdiDotsHorizontal" size="0.9rem" />
+            {{ home.moreLabel }}
+            <SvgIcon
+              type="mdi"
+              :path="mdiDotsHorizontal"
+              size="0.9rem"
+              aria-hidden="true"
+            />
           </RouterLink>
         </section>
       </LoadingIndicator>
@@ -94,77 +97,63 @@
 
 <script setup>
 import SvgIcon from "@jamescoyle/vue-icon";
-import { mdiDotsHorizontal, mdiTrayArrowDown } from "@mdi/js";
-import { useToast } from "../toastStore.js";
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  mdiCartOutline,
+  mdiDotsHorizontal,
+  mdiNoteEditOutline,
+  mdiPinOutline,
+  mdiTrayArrowDown,
+} from "@mdi/js";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
-
 import {
   apiErrorHandler,
   getSemanticIndex,
   libraryIndexUpdatedEvent,
   prefetchNote,
+  refreshFocusQuicknotesIntegration,
 } from "../api.js";
 import LoadingIndicator from "../components/LoadingIndicator.vue";
-import { searchSortOptions } from "../constants.js";
 import { useGlobalStore } from "../globalStore.js";
 import { isCloudNetworkError } from "../desktopShell.js";
+import { buildHomeEntries } from "../homeEntries.js";
 import { shouldAutoFocusSearch } from "../inputModality.js";
+import { isSystemTag } from "../systemTags.js";
+import { useToast } from "../toastStore.js";
 import SearchInput from "../partials/SearchInput.vue";
 import homeMarkUrl from "../assets/brand/lamanotes-home-mark.webp";
 
 const globalStore = useGlobalStore();
 const homeSearchAutoFocus = shouldAutoFocusSearch(window);
 const loadingIndicator = ref();
-const notes = ref([]);
-const sharedNoteCount = ref(0);
+const index = ref([]);
 const toast = useToast();
-const visiblePinnedNotes = computed(() =>
-  notes.value.slice(0, Number(globalStore.config.quickAccessLimit || 7)),
-);
+const home = computed(() => buildHomeEntries(index.value, globalStore.config));
+const dailyEntries = computed(() => [...home.value.daily, home.value.shared]);
+const dailyIcons = {
+  shopping: mdiCartOutline,
+  quicknotes: mdiNoteEditOutline,
+  shared: mdiTrayArrowDown,
+};
 
-function init() {
-  getSemanticIndex()
-    .then((index) => {
-      applySemanticIndex(index);
-      loadingIndicator.value.setLoaded();
-    })
-    .catch((error) => {
-      if (isCloudNetworkError(error)) {
-        notes.value = [];
-        sharedNoteCount.value = 0;
-        loadingIndicator.value.setLoaded();
-        return;
-      }
-      loadingIndicator.value.setFailed();
-      apiErrorHandler(error, toast);
-    });
+function applySemanticIndex(entries) {
+  index.value = Array.isArray(entries) ? entries : [];
 }
 
-function applySemanticIndex(index) {
-  const entries = Array.isArray(index) ? index : [];
-  sharedNoteCount.value = entries.filter((note) =>
-    (note.tags || []).some((tag) => String(tag).toLowerCase() === "shared"),
-  ).length;
-  const tag = String(globalStore.config.quickAccessTerm || "#pinned")
-    .replace(/^#/, "")
-    .toLowerCase();
-  const matching = (globalStore.config.quickAccessHide ? [] : entries).filter(
-    (note) =>
-      (note.tags || []).some(
-        (noteTag) => String(noteTag).toLowerCase() === tag,
-      ),
-  );
-  matching.sort((left, right) => {
-    if (globalStore.config.quickAccessSort === "title") {
-      return left.title.localeCompare(right.title);
+async function init() {
+  try {
+    applySemanticIndex(await getSemanticIndex());
+    void refreshFocusQuicknotesIntegration();
+    loadingIndicator.value?.setLoaded();
+  } catch (error) {
+    if (isCloudNetworkError(error)) {
+      applySemanticIndex([]);
+      loadingIndicator.value?.setLoaded();
+      return;
     }
-    return Number(right.lastModified || 0) - Number(left.lastModified || 0);
-  });
-  notes.value = matching.slice(
-    0,
-    Number(globalStore.config.quickAccessLimit || 7) + 1,
-  );
+    loadingIndicator.value?.setFailed();
+    apiErrorHandler(error, toast);
+  }
 }
 
 function semanticIndexUpdatedHandler(event) {
@@ -172,38 +161,18 @@ function semanticIndexUpdatedHandler(event) {
   loadingIndicator.value?.setLoaded();
 }
 
-function warmNote(title) {
-  void prefetchNote(title).catch(() => {});
+function warmNote(title, key) {
+  if (key !== "shared") void prefetchNote(title).catch(() => {});
 }
 
 function pinnedNoteContext(note) {
-  const tags = (Array.isArray(note?.tags) ? note.tags : [])
-    .map((tag) => String(tag || "").trim())
-    .filter((tag) => tag && tag.toLowerCase() !== "pinned")
+  return (Array.isArray(note?.tags) ? note.tags : [])
+    .filter((tag) => tag && !isSystemTag(tag))
     .slice(0, 2)
-    .map((tag) => `#${tag}`);
-  const modified = Number(note?.lastModified);
-  if (Number.isFinite(modified) && modified > 0) {
-    tags.push(
-      new Intl.DateTimeFormat(undefined, {
-        month: "short",
-        day: "numeric",
-      }).format(new Date(modified * 1000)),
-    );
-  }
-  return tags.join(" / ");
+    .map((tag) => `#${tag}`)
+    .join(" ");
 }
 
-// Watch to allow for delayed config load.
-watch(
-  () => [
-    globalStore.config.quickAccessHide,
-    globalStore.config.quickAccessTerm,
-    globalStore.config.quickAccessSort,
-    globalStore.config.quickAccessLimit,
-  ],
-  init,
-);
 onMounted(() => {
   window.addEventListener(
     libraryIndexUpdatedEvent,
@@ -211,12 +180,12 @@ onMounted(() => {
   );
   init();
 });
-onBeforeUnmount(() => {
+onBeforeUnmount(() =>
   window.removeEventListener(
     libraryIndexUpdatedEvent,
     semanticIndexUpdatedHandler,
-  );
-});
+  ),
+);
 </script>
 
 <style scoped>
@@ -225,37 +194,31 @@ onBeforeUnmount(() => {
   display: flex;
   min-height: calc(100vh - 4rem);
   justify-content: center;
-  overflow: hidden;
   isolation: isolate;
 }
-
 .lamanotes-home-inner {
   position: relative;
   z-index: 1;
   display: flex;
   width: min(100%, 42rem);
+  min-width: 0;
   flex-direction: column;
-  padding-top: clamp(3.6rem, 10vh, 6.2rem);
+  gap: 0.8rem;
+  padding-top: clamp(0.75rem, 2.5vh, 1.6rem);
 }
-
-.lamanotes-home-search {
-  margin-bottom: 1rem;
-}
-
 .lamanotes-home-mark {
   position: absolute;
   z-index: 0;
-  top: clamp(20rem, calc(56vh - 8rem), 27rem);
-  right: max(calc(50% - 22rem), 0.5rem);
-  width: clamp(18rem, 42vw, 25.5rem);
+  right: max(calc(50% - 21rem), 1rem);
+  bottom: 1.5rem;
+  width: clamp(7rem, 15vw, 10rem);
   height: auto;
   pointer-events: none;
   user-select: none;
   filter: var(--theme-home-mark-filter);
-  opacity: var(--theme-home-mark-opacity);
+  opacity: 0.075;
 }
-
-.lamanotes-home-pinned {
+.lamanotes-home-shortcuts {
   display: flex;
   width: 100%;
   min-width: 0;
@@ -263,87 +226,68 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: stretch;
 }
-
 .lamanotes-home-pinned-section {
   overflow: hidden;
   border: 1px solid rgb(var(--theme-border));
-  border-radius: 0.375rem;
+  border-radius: var(--ln-radius-control);
+  background: rgb(var(--theme-background-elevated));
   box-shadow: none;
 }
-
 .lamanotes-home-pinned-list {
   display: grid;
   width: 100%;
   min-width: 0;
   grid-template-columns: minmax(0, 1fr);
 }
-
 .lamanotes-home-pinned-link {
   display: grid;
+  grid-template-columns: 1.1rem minmax(0, 1fr) auto;
   min-width: 0;
-  min-height: 2.15rem;
-  overflow: hidden;
-  align-content: center;
-  gap: 0.06rem;
+  min-height: 2.35rem;
+  align-items: center;
+  gap: 0.6rem;
   border: 0;
   border-bottom: 1px solid rgb(var(--theme-border) / 0.52);
-  padding: 0.22rem 0.72rem;
+  padding: 0.3rem 0.65rem;
   color: rgb(var(--theme-text-muted));
   background: transparent;
-  line-height: 1.15;
-  text-align: left;
+  line-height: 1.25;
   text-decoration: none;
 }
-
 .lamanotes-home-pinned-link:last-child {
   border-bottom: 0;
 }
-
+.lamanotes-home-other-pins {
+  border-top: 1px solid rgb(var(--theme-border));
+}
 .lamanotes-home-pinned-name {
   overflow: hidden;
   color: rgb(var(--theme-text));
-  font-size: 0.86rem;
-  line-height: 1.08;
+  font-size: 0.87rem;
+  font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .lamanotes-home-pinned-meta {
+  max-width: 15rem;
   overflow: hidden;
   color: rgb(var(--theme-text-very-muted));
-  font-size: 0.62rem;
-  line-height: 1.08;
+  font-size: 0.72rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.lamanotes-home-shared-link {
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  column-gap: 0.5rem;
-}
-
-.lamanotes-home-shared-label {
-  display: grid;
-  min-width: 0;
-  gap: 0.06rem;
-}
-
 .lamanotes-home-pinned-link:hover,
 .lamanotes-home-pinned-link:focus-visible {
   background: rgb(var(--theme-brand) / 0.055);
 }
-
 .lamanotes-home-pinned-link:hover .lamanotes-home-pinned-name,
 .lamanotes-home-pinned-link:focus-visible .lamanotes-home-pinned-name {
   color: rgb(var(--theme-brand));
 }
-
 .lamanotes-home-pinned-link:focus-visible {
   outline: 2px solid rgb(var(--theme-brand));
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
-
 .lamanotes-home-pinned-more {
   display: flex;
   min-height: 2.2rem;
@@ -351,32 +295,30 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   gap: 0.25rem;
   border-top: 1px solid rgb(var(--theme-border) / 0.52);
-  padding: 0.35rem 0.72rem;
-  color: rgb(var(--theme-text-very-muted));
-  font-size: 0.68rem;
+  padding: 0.35rem 0.65rem;
+  color: rgb(var(--theme-text-muted));
+  font-size: 0.75rem;
   text-decoration: none;
 }
-
 .lamanotes-home-pinned-more:hover,
 .lamanotes-home-pinned-more:focus-visible {
   color: rgb(var(--theme-brand));
 }
-
 @media (max-width: 560px) {
   .lamanotes-home-inner {
-    padding-top: clamp(2.8rem, 8vh, 4.4rem);
+    gap: 0.65rem;
+    padding-top: 0.6rem;
   }
-
   .lamanotes-home-mark {
-    top: 32rem;
-    right: -1.6rem;
-    width: 18rem;
-    opacity: 0.12;
+    display: none;
+  }
+  .lamanotes-home-pinned-meta {
+    max-width: 7rem;
   }
 }
-
 @media (pointer: coarse), (hover: none) {
-  .lamanotes-home-pinned-link {
+  .lamanotes-home-pinned-link,
+  .lamanotes-home-pinned-more {
     min-height: var(--ln-touch-target);
   }
 }

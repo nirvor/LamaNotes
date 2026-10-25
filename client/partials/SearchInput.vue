@@ -19,6 +19,7 @@
         v-focus="autoFocus"
         class="w-full bg-transparent focus:outline-none"
         :placeholder="placeholder"
+        aria-label="Search notes"
         @keydown="keydownHandler"
         @input="stateChangeHandler"
         @click="stateChangeHandler"
@@ -82,14 +83,22 @@
     </div>
 
     <!-- Empty Search Tag Cloud -->
-    <div v-if="tagCloudVisible" class="lamanotes-tag-cloud">
-      <div class="lamanotes-tag-cloud-list">
+    <div
+      v-if="tagCloudVisible"
+      class="lamanotes-tag-cloud"
+      :class="{ 'is-expanded': allTagsExpanded }"
+    >
+      <div
+        :id="tagListId"
+        class="lamanotes-tag-cloud-list"
+        role="group"
+        aria-label="Filter by tag"
+      >
         <button
-          v-for="tag in topTags"
+          v-for="tag in visibleTags"
           :key="tag.name"
           type="button"
           class="lamanotes-tag-cloud-item"
-          :class="`lamanotes-tag-cloud-item-${tag.prominence}`"
           :title="`${tag.count} ${tag.count === 1 ? 'note' : 'notes'}`"
           @click="tagCloudChosen(tag.name)"
           @mousedown.prevent
@@ -98,6 +107,16 @@
           <span>{{ tag.name }}</span>
         </button>
       </div>
+      <button
+        v-if="allTags.length > topTags.length"
+        type="button"
+        class="lamanotes-tag-cloud-toggle"
+        :aria-expanded="allTagsExpanded"
+        :aria-controls="tagListId"
+        @click="allTagsExpanded = !allTagsExpanded"
+      >
+        {{ allTagsExpanded ? "Fewer tags" : "All tags" }}
+      </button>
     </div>
   </div>
 </template>
@@ -106,7 +125,15 @@
 import { mdiTag } from "@mdi/js";
 import { mdilMagnify } from "@mdi/light-js";
 import { useToast } from "../toastStore.js";
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  useId,
+  watch,
+} from "vue";
 import { useRouter } from "vue-router";
 
 import {
@@ -121,12 +148,9 @@ import IconLabel from "../components/IconLabel.vue";
 import * as constants from "../constants.js";
 import { getSearchSuggestions } from "../searchSuggestions.js";
 import { isSystemTag } from "../systemTags.js";
-import {
-  getTagUsage,
-  normalizeTagName,
-  onTagUsageChange,
-  recordTagUse,
-} from "../tagUsage.js";
+import { normalizeTagName } from "../tagPolicy.js";
+import { buildTagSuggestions } from "../tagSuggestions.js";
+import { getTagUsage, onTagUsageChange, recordTagUse } from "../tagUsage.js";
 
 const props = defineProps({
   autoFocus: { type: Boolean, default: true },
@@ -143,7 +167,6 @@ const router = useRouter();
 const searchTerm = ref(searchTermForInput(props.initialSearchTerm));
 const toast = useToast();
 let tags = [];
-let tagCloudEntries = [];
 let semanticIndexEntries = [];
 const tagMatches = ref([]);
 const tagMenuItems = ref([]);
@@ -151,20 +174,21 @@ const tagMenuIndex = ref(0);
 const tagMenuVisible = ref(false);
 const tagCloudVisible = ref(false);
 const topTags = ref([]);
+const allTags = ref([]);
+const allTagsExpanded = ref(false);
+const tagListId = `tags-${useId()}`;
+const visibleTags = computed(() =>
+  allTagsExpanded.value ? allTags.value : topTags.value,
+);
 const suggestions = ref([]);
 const suggestionMenuItems = ref([]);
 const suggestionMenuIndex = ref(0);
 const suggestionMenuVisible = ref(false);
 let tagCloudLoaded = false;
-const tagCloudLimit = 14;
+const tagCloudLimit = 9;
 const suggestionDebounceMs = 120;
 let suggestionLoadTimer = null;
 let suggestionRun = 0;
-const priorityTagBonus = {
-  work: 90,
-  private: 70,
-  infra: 60,
-};
 
 function searchTermForInput(value = "") {
   return value === "*" ? "" : value || "";
@@ -349,72 +373,27 @@ async function showTagCloud() {
   }
 
   rebuildTopTags();
-  tagCloudVisible.value = topTags.value.length > 0;
+  tagCloudVisible.value = allTags.value.length > 0;
 }
 
 function applySemanticIndex(index) {
   semanticIndexEntries = Array.isArray(index) ? index : [];
-  const counts = new Map();
-  semanticIndexEntries.forEach((note) => {
-    new Set(note.tags || []).forEach((tag) => {
-      const normalizedTag = normalizeTagName(tag);
-      if (!normalizedTag || isSystemTag(normalizedTag)) {
-        return;
-      }
-      counts.set(normalizedTag, (counts.get(normalizedTag) || 0) + 1);
-    });
-  });
-  tagCloudEntries = [...counts.entries()].map(([name, count]) => ({
-    name,
-    count,
-  }));
-  tags = tagCloudEntries.map((tag) => `#${tag.name}`);
   tagCloudLoaded = true;
   rebuildTopTags();
   if (!searchTerm.value.trim()) {
-    tagCloudVisible.value = topTags.value.length > 0;
+    tagCloudVisible.value = allTags.value.length > 0;
   }
 }
 
 function rebuildTopTags() {
-  const usage = getTagUsage();
-  topTags.value = tagCloudEntries
-    .map((tag) => {
-      const tagUsage = usage[tag.name] || { count: 0, lastUsed: 0 };
-      const ageDays = tagUsage.lastUsed
-        ? (Date.now() - tagUsage.lastUsed) / 86400000
-        : Infinity;
-      const recencyBoost = Number.isFinite(ageDays)
-        ? Math.max(0, 18 - ageDays)
-        : 0;
-      const useBoost = Math.min(Number(tagUsage.count) || 0, 20) * 14;
-      const priorityBoost = priorityTagBonus[tag.name] || 0;
-      return {
-        ...tag,
-        score: tag.count * 10 + useBoost + recencyBoost + priorityBoost,
-      };
-    })
-    .sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-      if (right.count !== left.count) {
-        return right.count - left.count;
-      }
-      return left.name.localeCompare(right.name);
-    })
-    .slice(0, props.prominentTagCloud ? 18 : tagCloudLimit);
-  const largestCount = Math.max(
-    1,
-    ...topTags.value.map((tag) => Number(tag.count) || 0),
+  const built = buildTagSuggestions(
+    semanticIndexEntries,
+    getTagUsage(),
+    tagCloudLimit,
   );
-  topTags.value = topTags.value.map((tag) => {
-    const ratio = (Number(tag.count) || 0) / largestCount;
-    return {
-      ...tag,
-      prominence: ratio >= 0.66 ? "high" : ratio >= 0.34 ? "medium" : "low",
-    };
-  });
+  topTags.value = built.suggested;
+  allTags.value = built.all;
+  tags = built.all.map((tag) => `#${tag.name}`);
 }
 
 async function filterTagMatches(input) {
@@ -628,52 +607,52 @@ onBeforeUnmount(() => {
 <style scoped>
 .lamanotes-tag-cloud {
   width: 100%;
-  padding: 0.42rem 0.15rem 0;
+  padding: 0.35rem 0 0;
 }
 
 .lamanotes-tag-cloud-list {
   display: flex;
   flex-wrap: wrap;
-  column-gap: 0.9rem;
-  row-gap: 0.18rem;
+  align-items: center;
+  column-gap: 0.8rem;
+  row-gap: 0;
 }
 
 .lamanotes-tag-cloud-item {
   display: inline-flex;
   align-items: center;
-  gap: 0.28rem;
+  min-height: 1.75rem;
+  gap: 0.25rem;
   border: 0;
-  padding: 0.2rem 0;
+  padding: 0.1rem 0;
   color: rgb(var(--theme-text-muted));
   background: transparent;
-  font-size: 0.78rem;
-  line-height: 1.15;
+  font-size: 0.84rem;
+  font-weight: 400;
+  line-height: 1.3;
   cursor: pointer;
   transition: color 120ms ease;
 }
 
-.lamanotes-search-prominent-tags .lamanotes-tag-cloud {
-  padding-top: 0.58rem;
+.lamanotes-tag-cloud.is-expanded .lamanotes-tag-cloud-list {
+  max-height: 14rem;
+  overflow-y: auto;
 }
-
-.lamanotes-search-prominent-tags .lamanotes-tag-cloud-list {
-  column-gap: 1.05rem;
-  row-gap: 0.3rem;
+.lamanotes-tag-cloud-toggle {
+  display: block;
+  min-height: 1.7rem;
+  margin-left: auto;
+  border: 0;
+  padding: 0.1rem 0.05rem;
+  color: rgb(var(--theme-brand));
+  background: transparent;
+  font-size: 0.76rem;
+  font-weight: 400;
+  cursor: pointer;
 }
-
-.lamanotes-search-prominent-tags .lamanotes-tag-cloud-item {
-  font-size: 0.86rem;
-}
-
-.lamanotes-search-prominent-tags .lamanotes-tag-cloud-item-medium {
-  color: rgb(var(--theme-text-muted));
-  font-size: 0.94rem;
-}
-
-.lamanotes-search-prominent-tags .lamanotes-tag-cloud-item-high {
-  color: rgb(var(--theme-text));
-  font-size: 1.02rem;
-  font-weight: 600;
+.lamanotes-tag-cloud-toggle:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: 2px;
 }
 
 .lamanotes-tag-cloud-item :deep(svg) {
@@ -702,7 +681,7 @@ onBeforeUnmount(() => {
   border: 1px solid rgb(var(--theme-border));
   border-radius: 0.34rem;
   background: rgb(var(--theme-background-elevated));
-  box-shadow: 0 0.55rem 1.4rem rgb(0 0 0 / 0.18);
+  box-shadow: none;
 }
 
 .lamanotes-search-suggestion {
@@ -727,12 +706,13 @@ onBeforeUnmount(() => {
 
 @media (pointer: coarse), (hover: none) {
   .lamanotes-tag-cloud-item,
+  .lamanotes-tag-cloud-toggle,
   .lamanotes-search-suggestion {
     min-height: var(--ln-touch-target);
   }
 
   .lamanotes-tag-cloud-item {
-    padding-block: 0.45rem;
+    padding-block: 0.1rem;
   }
 }
 

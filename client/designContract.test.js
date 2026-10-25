@@ -131,7 +131,12 @@ test("scientific figures retain authored geometry, fill and typography", () => {
   );
 });
 
-test("Home uses quiet navigation surfaces instead of an empty landing page", () => {
+test("Home uses compact daily navigation and uniformly styled tag filters", () => {
+  assert.match(
+    navBarSource,
+    /v-if="isHome"[\s\S]*?aria-label="LamaNotes home"/,
+  );
+  assert.match(navBarSource, /router\.currentRoute\.value\.name === "home"/);
   assert.match(homeSource, /lamanotes-home-mark\.webp/);
   assert.match(homeSource, /decoding="async"/);
   assert.match(homeSource, /fetchpriority="low"/);
@@ -140,26 +145,30 @@ test("Home uses quiet navigation surfaces instead of an empty landing page", () 
   assert.match(homeSource, /pinnedNoteContext\(note\)/);
   assert.doesNotMatch(homeSource, /lamanotes-home-pinned-title/);
   assert.doesNotMatch(homeSource, /visiblePinnedLabel|mdiStar/);
+  assert.match(homeSource, /aria-label="Daily notes"/);
+  assert.match(homeSource, /aria-label="Pinned notes"/);
   assert.match(
     homeSource,
     /\.lamanotes-home-pinned-list \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/,
   );
   assert.match(
     homeSource,
-    /\.lamanotes-home-pinned-link \{[\s\S]*?min-height: 2\.15rem/,
+    /\.lamanotes-home-pinned-link \{[\s\S]*?min-height: 2\.35rem/,
   );
-  assert.match(homeSource, /width: clamp\(18rem, 42vw, 25\.5rem\)/);
+  assert.match(homeSource, /padding-top: clamp\(0\.75rem, 2\.5vh, 1\.6rem\)/);
+  assert.match(homeSource, /\.lamanotes-home-mark\s*\{\s*display: none;/);
   assert.match(
     homeSource,
-    /lamanotes-home-pinned-section bg-theme-background dark:bg-theme-background-elevated/,
-  );
-  assert.match(
-    homeSource,
-    /\.lamanotes-home-pinned-section \{[\s\S]*?border: 1px solid rgb\(var\(--theme-border\)\);[\s\S]*?border-radius: 0\.375rem;[\s\S]*?box-shadow: none;/,
+    /\.lamanotes-home-pinned-section \{[\s\S]*?border: 1px solid rgb\(var\(--theme-border\)\);[\s\S]*?box-shadow: none;/,
   );
   assert.match(searchInputSource, /prominentTagCloud: Boolean/);
-  assert.match(searchInputSource, /lamanotes-tag-cloud-item-high/);
-  assert.match(searchInputSource, /props\.prominentTagCloud \? 18/);
+  assert.doesNotMatch(searchInputSource, /tag-cloud-item-high|tag\.prominence/);
+  assert.match(searchInputSource, /const tagCloudLimit = 9;/);
+  assert.match(searchInputSource, /:aria-expanded="allTagsExpanded"/);
+  assert.match(
+    searchInputSource,
+    /\.lamanotes-tag-cloud-item \{[\s\S]*?font-size: 0\.84rem;\s*font-weight: 400;/,
+  );
 });
 
 test("media preview is a modal keyboard boundary", () => {

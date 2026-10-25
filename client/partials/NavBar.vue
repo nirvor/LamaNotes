@@ -1,5 +1,17 @@
 <template>
-  <nav class="lamanotes-navbar flex justify-end align-top">
+  <nav
+    class="lamanotes-navbar flex justify-end align-top"
+    :class="{ 'lamanotes-navbar-home': isHome }"
+  >
+    <RouterLink
+      v-if="isHome"
+      :to="{ name: 'home' }"
+      class="lamanotes-navbar-brand"
+      aria-label="LamaNotes home"
+    >
+      <img :src="notesMarkUrl" alt="" aria-hidden="true" />
+      <span>LamaNotes</span>
+    </RouterLink>
     <div
       class="lamanotes-navbar-actions flex grow flex-wrap items-center justify-end gap-1"
     >
@@ -101,10 +113,12 @@ import {
   nativeClientUpdate,
 } from "../nativeClientUpdate.js";
 import { clearStoredToken } from "../tokenStorage.js";
+import notesMarkUrl from "../assets/brand/lamanotes-lamaui.webp";
 
 const globalStore = useGlobalStore();
 const menu = ref();
 const router = useRouter();
+const isHome = computed(() => router.currentRoute.value.name === "home");
 const toast = useToast();
 let nativeUpdateCheckTimer = null;
 
@@ -300,6 +314,32 @@ function showLogOutButton() {
   align-items: center;
   align-self: center;
   line-height: 1;
+}
+
+.lamanotes-navbar-home {
+  min-height: 43px;
+  align-items: center;
+}
+.lamanotes-navbar-brand {
+  display: inline-flex;
+  min-height: 43px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  color: rgb(var(--theme-heading));
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+}
+.lamanotes-navbar-brand img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+.lamanotes-navbar-brand:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: 2px;
 }
 
 .lamanotes-navbar-actions {
