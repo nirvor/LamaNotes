@@ -1,0 +1,27 @@
+{
+  "id": "notes",
+  "sourceRevision": 2026102502,
+  "sourceSha256": "b603667e235f20286e06c759ad642de08aa934852207424005cf3311c0ae52f1",
+  "geometryVersion": 1,
+  "background": "#e7f1f5",
+  "files": {
+    "mark": "lamaui-notes-bc8caa406add-mark.webp",
+    "icons": {
+      "48": "lamaui-notes-bc8caa406add-48.png",
+      "128": "lamaui-notes-bc8caa406add-128.png",
+      "192": "lamaui-notes-bc8caa406add-192.png",
+      "512": "lamaui-notes-bc8caa406add-512.png"
+    },
+    "favicons": {
+      "16": "lamaui-notes-bc8caa406add-16.png",
+      "32": "lamaui-notes-bc8caa406add-32.png",
+      "64": "lamaui-notes-bc8caa406add-64.png"
+    },
+    "apple": "lamaui-notes-bc8caa406add-180.png",
+    "maskable": "lamaui-notes-bc8caa406add-maskable-512.png",
+    "ico": "lamaui-notes-bc8caa406add.ico",
+    "adaptiveForeground": "lamaui-notes-bc8caa406add-adaptive-foreground-432.png",
+    "adaptiveBackground": "lamaui-notes-bc8caa406add-adaptive-background-432.png",
+    "header": "lamaui-notes-bc8caa406add-header.webp"
+  }
+}

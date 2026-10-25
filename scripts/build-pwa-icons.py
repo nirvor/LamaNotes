@@ -1,28 +1,44 @@
-"""Package the shared launcher foreground for installed web-app icons."""
+"""Import the shared Notes mark and its versioned web/Windows icons."""
 import argparse
+import json
 from pathlib import Path
-from PIL import Image
+import re
+import shutil
+import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
-parser.add_argument('--source', type=Path, default=ROOT / 'client/assets/brand/lamanotes-lamaui.webp')
-parser.add_argument('--revision', default='notes-n1')
+parser.add_argument('--source-root', type=Path, required=True)
 args = parser.parse_args()
-source = Image.open(args.source).convert('RGBA')
-
-def icon(size):
-    canvas = Image.new('RGBA', (size, size), '#e7f1f5')
-    mark = source.crop(source.getchannel('A').getbbox())
-    mark.thumbnail((round(size * .64), round(size * .72)), Image.Resampling.LANCZOS)
-    canvas.alpha_composite(mark, ((size-mark.width)//2, (size-mark.height)//2))
-    return canvas.convert('RGB')
-
+source = args.source_root.resolve()
+exporter = source.parents[3] / 'scripts/export-web-brand.py'
 public = ROOT / 'client/public'
+output = public / 'brand'
+record = json.loads(subprocess.check_output([sys.executable, str(exporter), '--source-root', str(source),
+    '--app', 'notes', '--output-dir', str(output)], text=True))
+files = record['files']
+for name in ('lamanotes-lamaui.webp', 'lamanotes-home-mark.webp'):
+    shutil.copy2(output / files['mark'], ROOT / 'client/assets/brand' / name)
 for size in (192, 512):
-    icon(size).save(public / f'lamanotes-icon-light-{size}.png')
-    icon(size).save(public / f'lamanotes-icon-{size}.png')
-    icon(size).save(public / f'lamanotes-{args.revision}-{size}.png')
-icon(180).save(public / 'apple-touch-icon.png')
+    for alias in (f'lamanotes-icon-{size}.png', f'lamanotes-icon-light-{size}.png'):
+        shutil.copy2(output / files['icons'][str(size)], public / alias)
+shutil.copy2(output / files['apple'], public / 'apple-touch-icon.png')
 for size in (16, 32, 64):
-    icon(size).save(public / f'favicon-{size}.png')
-icon(256).save(public / 'favicon.ico', sizes=[(16,16),(32,32),(48,48),(64,64),(256,256)])
+    shutil.copy2(output / files['favicons'][str(size)], public / f'favicon-{size}.png')
+shutil.copy2(output / files['ico'], public / 'favicon.ico')
+shutil.copy2(output / files['ico'], ROOT / 'windows-client/lamanotes.ico')
+manifest_path = public / 'site.webmanifest'
+raw_manifest = manifest_path.read_text()
+manifest = json.loads(raw_manifest)
+manifest['icons'] = [{'src': 'brand/' + files['icons'][str(size)], 'sizes': f'{size}x{size}',
+    'type': 'image/png', 'purpose': 'any'} for size in (192, 512)]
+manifest['icons'].append({'src': 'brand/' + files['maskable'], 'sizes': '512x512',
+    'type': 'image/png', 'purpose': 'maskable'})
+icons = json.dumps(manifest['icons'], indent=2).replace('\n', '\n  ')
+updated, count = re.subn(r'(?s)("icons": )\[.*?\](,\n  "theme_color")', lambda match: match[1] + icons + match[2], raw_manifest)
+if count != 1:
+    raise ValueError('The Notes icon section was not found')
+manifest_path.write_text(updated)
+(ROOT / 'client/assets/brand/lamaui-source.json').write_text(json.dumps(record, indent=2) + '\n')
+print(json.dumps(record))
