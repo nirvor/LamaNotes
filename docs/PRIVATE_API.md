@@ -93,6 +93,29 @@ expired root after an offline period. Suspected compromise requires revocation
 and replacement, not renewal. The endpoint does not schedule maintenance or
 distribute tokens, and an owner credential must never enter a model workspace.
 
+### Exact Quicknotes service lease
+
+POST `/integrations/focus/refresh` accepts only `{}` and an authenticated owner
+session. A supplied Origin must match the Notes public origin. It reads the
+server's fixed `.private/focus-quicknotes.json` binding, containing noteId and
+capabilityId. It never accepts a caller-selected note, capability, scope or
+duration. The response uses `Cache-Control: no-store` and returns connected,
+and when connected, noteId, expiresAt and renewed. It never returns a token.
+
+Only an active root capability with clientId `focus-quicknotes`, exactly
+`notes:read`, exactly the bound noteId and no job, parent or captures is
+eligible. The note enrollment must remain active. Validation and expiry change
+share one serialized transaction. No other capability, grant or identity is
+changed. Renewal extends the existing token's lease to 30 days from now only
+when fewer than 29 days remain. Revocation and inactive enrollments fail closed.
+
+Normal authenticated owner use of the home page calls this refresh quietly.
+No new schedule is created. More than 30 days without owner use can leave the
+service unavailable, and a later owner refresh can renew the same expired but
+unrevoked lease. A revoked service or enrollment stays disconnected. Tags,
+`#private`, `#shared` and pinning are not eligibility rules. Setup and the
+separate fixed-source Focus proxy are documented in `FOCUS-QUICKNOTES.md`.
+
 ## Notes and references
 
 - GET `/index` returns `{items,total}` after grants are applied.

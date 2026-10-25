@@ -22,8 +22,12 @@ import {
   setWarmNote,
 } from "./libraryCache.js";
 import router from "./router.js";
+import { createFocusQuicknotesRefresher } from "./focusIntegration.js";
 
 const api = axios.create();
+export const refreshFocusQuicknotesIntegration = createFocusQuicknotesRefresher(() =>
+  api.post("api/private/v1/integrations/focus/refresh", {}).then((response) => response.data),
+);
 let configCache = null;
 const noteCache = new Map();
 const searchCache = new Map();

@@ -27,6 +27,7 @@ from .models import (
     AttachAssets,
     CapabilityCreate,
     CapabilityRenew,
+    FocusSourceRefresh,
     CaptureCreate,
     Enroll,
     ParentReference,
@@ -250,6 +251,15 @@ def create_router(service, auth):
     ):
         response.headers["Cache-Control"] = "no-store"
         return store.renew_capability(capability_id, data.expires_in)
+
+    @router.post("/integrations/focus/refresh")
+    def refresh_focus_integration(data: FocusSourceRefresh, request: Request, response: Response, _=Depends(owner)):
+        origin = request.headers.get("origin")
+        if origin and origin != service.public_origin:
+            raise HTTPException(403, "Open this connection in LamaNotes.")
+        from .focus_source import refresh_focus_source
+        response.headers["Cache-Control"] = "no-store"
+        return store.envelope(**refresh_focus_source(store))
 
     @router.post("/grants/notes")
     def enroll(data: Enroll, _=Depends(owner)):
