@@ -1,10 +1,9 @@
+import { normalizeTagName } from "./tagPolicy.js";
+export { normalizeTagName } from "./tagPolicy.js";
+
 const tagUsageStorageKey = "lamanotes:tag-usage";
 const tagUsageEventName = "lamanotes:tag-usage";
 const maxStoredTags = 80;
-
-export function normalizeTagName(tag = "") {
-  return String(tag).replace(/^#/, "").trim().toLowerCase();
-}
 
 function readTagUsage() {
   try {

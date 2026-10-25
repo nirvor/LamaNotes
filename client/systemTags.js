@@ -1,7 +1,9 @@
+import { normalizeTagName } from "./tagPolicy.js";
+
 const systemTags = new Set(["pinned"]);
 
 export function normalizeSystemTag(tag = "") {
-  return String(tag).replace(/^#/, "").trim().toLowerCase();
+  return normalizeTagName(tag);
 }
 
 export function isSystemTag(tag = "") {

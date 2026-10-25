@@ -26,6 +26,7 @@ from whoosh.support.charset import accent_map
 
 from helpers import get_env, is_valid_filename
 from notes.identity import preserve_note_id, read_note_id
+from notes.tag_policy import split_tag_list
 from logger import logger
 from publications.metadata import (
     PUBLICATION_FILE_LOCK,
@@ -1147,10 +1148,7 @@ class FileSystemNotes(BaseNotes):
 
     @staticmethod
     def _split_tag_list(value: str) -> Set[str]:
-        return {
-            tag.lower().lstrip("#")
-            for tag in re.findall(r"#?[a-zA-Z0-9_-]+", value or "")
-        }
+        return split_tag_list(value)
 
     @staticmethod
     def _research_topics(tags: Iterable[str]) -> List[str]:
@@ -1219,7 +1217,7 @@ class FileSystemNotes(BaseNotes):
                 last_modified=note.last_modified,
                 format=note.format,
                 note_kind=parser.note_kind,
-                tags=sorted(tags.union(parser.meta_tags)),
+                tags=sorted(tags),
                 primary_research_topic=parser.primary_research_topic,
                 research_id=parser.research_id,
                 research_origin=parser.research_origin,
@@ -1438,7 +1436,7 @@ class FileSystemNotes(BaseNotes):
                     writer.delete_by_term("filename", idx_filename)
                     logger.info(f"'{idx_filename}' removed from index")
                 # Update modified
-                elif (
+                elif clean or (
                     datetime.fromtimestamp(os.path.getmtime(idx_filepath))
                     != idx_note["last_modified"]
                 ):

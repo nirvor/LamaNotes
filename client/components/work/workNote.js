@@ -1,3 +1,5 @@
+import { normalizeTagName as normalizeRetrievalTag } from "../../tagPolicy.js";
+
 const workNoteSelector = "[data-lamanotes-note-kind='work']";
 const markdownTemplateSelector = "template[data-lamanotes-work-markdown]";
 
@@ -213,7 +215,7 @@ function createSmallTextEdit(markdown = "", selectionRange = {}) {
 }
 
 function normalizeTagName(tag = "") {
-  return tag.replace(/^#/, "").trim().toLowerCase();
+  return normalizeRetrievalTag(tag);
 }
 
 function sortWorkTags(tags = []) {
