@@ -7,6 +7,7 @@
       :task-checkboxes-disabled="taskCheckboxesDisabled"
       :task-checkbox-toggle-handler="taskCheckboxToggleHandler"
       :task-item-add-handler="taskItemAddHandler"
+      :task-section-edit-handler="taskSectionEditHandler"
       class="toast-viewer min-w-0 max-w-full pb-4"
       @rendered="$emit('rendered')"
     />
@@ -24,6 +25,7 @@ const props = defineProps({
   noteTitle: String,
   taskCheckboxToggleHandler: Function,
   taskItemAddHandler: Function,
+  taskSectionEditHandler: Function,
   taskCheckboxesDisabled: Boolean,
 });
 defineEmits(["rendered"]);

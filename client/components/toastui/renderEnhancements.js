@@ -9,12 +9,15 @@ import {
   mdiMagnifyPlusOutline,
   mdiOpenInNew,
   mdiPlus,
-  mdiEyeCheckOutline,
+  mdiEyeOutline,
+  mdiEyeOffOutline,
+  mdiPencilOutline,
   mdiTag,
 } from "@mdi/js";
 import { writePlainTextToClipboard } from "../../clipboard.js";
 import { isSystemTag } from "../../systemTags.js";
 import { recordTagUse } from "../../tagUsage.js";
+import { readChecklistSection } from "../../checklistSections.js";
 
 const codeBlockWrapperClass = "lamanotes-code-block-wrapper";
 const codeCopyButtonClass = "lamanotes-code-copy-button";
@@ -1418,10 +1421,13 @@ function setTaskCheckboxesBusy(rootElement, isBusy, taskListOptions) {
   rootElement.lamanotesTasksBusy = isBusy;
   rootElement
     .querySelectorAll(
-      ".lamanotes-checklist-tools button, .lamanotes-checklist-entry input, .lamanotes-checklist-entry button",
+      ".lamanotes-checklist-group [data-lamanotes-mutation], .lamanotes-checklist-entry input, .lamanotes-checklist-editor textarea",
     )
     .forEach((control) => {
-      control.disabled = isBusy;
+      control.disabled =
+        isBusy ||
+        !!taskListOptions.disabled ||
+        control.dataset.lamanotesUnavailable === "true";
     });
   rootElement.querySelectorAll(`.${taskCheckboxClass}`).forEach((checkbox) => {
     checkbox.disabled = isBusy || !!taskListOptions.disabled;
@@ -1522,173 +1528,495 @@ function ensureTaskCheckbox(taskItem) {
 }
 
 export function resetChecklistGroups(rootElement) {
-  rootElement
-    ?.querySelectorAll(".lamanotes-checklist-group")
+  [...(rootElement?.querySelectorAll(".lamanotes-checklist-group") || [])]
+    .reverse()
     .forEach((group) => {
       const heading = group.querySelector(
         ":scope > .lamanotes-checklist-heading > :is(h2,h3,h4,h5,h6,p)",
       );
-      const list = group.querySelector(":scope > ul, :scope > ol");
-      group.replaceWith(...[heading, list].filter(Boolean));
+      const content = group.querySelector(
+        ":scope > .lamanotes-checklist-content",
+      );
+      group.replaceWith(
+        ...[heading, ...(content?.childNodes || [])].filter(Boolean),
+      );
     });
 }
 
-export function enhanceTaskListCheckboxes(rootElement, taskListOptions = {}) {
-  if (!rootElement) {
-    return;
-  }
-  resetChecklistGroups(rootElement);
-
-  const taskItems = rootElement.querySelectorAll(
-    ".toastui-editor-contents li.task-list-item",
+function checklistLabel(element) {
+  if (element?.matches("h2,h3,h4,h5,h6")) return true;
+  const bold = element?.matches("p")
+    ? element.querySelector(":scope > strong:only-child")
+    : null;
+  return (
+    !!bold &&
+    element.textContent.length < 100 &&
+    element.textContent.trim() === bold.textContent.trim()
   );
+}
 
-  taskItems.forEach((taskItem, index) => {
-    const checkbox = ensureTaskCheckbox(taskItem);
-    decorateTaskCheckbox(checkbox, index, rootElement, taskListOptions);
+function checklistError(error) {
+  return error?.response?.status === 409 ||
+    /conflict/i.test(error?.message || "")
+    ? "This section changed elsewhere. Your text is kept. Reload the note before retrying."
+    : "Could not save. Your text is kept. Try again.";
+}
+
+function sectionDraftStorage(rootElement, noteTitle, key) {
+  if (!noteTitle) return null;
+  try {
+    return {
+      storage: rootElement.ownerDocument.defaultView.sessionStorage,
+      key: `lamanotes.section-draft.v1:${encodeURIComponent(noteTitle)}:${key}`,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function loadSectionDraft(storage, section) {
+  if (!storage) return null;
+  try {
+    const draft = JSON.parse(storage.storage.getItem(storage.key));
+    if (
+      draft?.heading !== (section.heading || null) ||
+      typeof draft.markdown !== "string" ||
+      typeof draft.originalMarkdown !== "string" ||
+      draft.markdown.length > 100000 ||
+      draft.originalMarkdown.length > 100000
+    )
+      return null;
+    return {
+      ...draft,
+      open: true,
+      error: typeof draft.error === "string" ? draft.error.slice(0, 300) : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveSectionDraft(storage, section, state) {
+  if (
+    !storage ||
+    state.markdown.length > 100000 ||
+    state.originalMarkdown.length > 100000
+  )
+    return;
+  try {
+    storage.storage.setItem(
+      storage.key,
+      JSON.stringify({
+        markdown: state.markdown,
+        originalMarkdown: state.originalMarkdown,
+        heading: section.heading || null,
+        error: state.error,
+      }),
+    );
+  } catch {
+    // The in-memory draft remains usable when storage is unavailable.
+  }
+}
+
+function clearSectionDraft(storage) {
+  try {
+    storage?.storage.removeItem(storage.key);
+  } catch {
+    /* Optional browser storage. */
+  }
+}
+
+function checklistSections(content, knownSections) {
+  const headings = [...content.querySelectorAll("h2,h3,h4,h5,h6,p")].filter(
+    (heading) =>
+      checklistLabel(heading) &&
+      !heading.closest("li,blockquote,table,.lamanotes-note-lead"),
+  );
+  const taskLists = [...content.querySelectorAll("ul,ol")].filter(
+    (list) =>
+      list.querySelector("li.task-list-item") &&
+      !list.parentElement.closest("ul,ol"),
+  );
+  const parents = new Set(taskLists.map((list) => list.parentElement));
+  const sections = [];
+  const grouped = new Set();
+  headings.forEach((heading, headingIndex) => {
+    const nodes = [];
+    for (let node = heading.nextSibling; node; node = node.nextSibling) {
+      if (
+        node.nodeType === 1 &&
+        (checklistLabel(node) ||
+          node.matches(
+            "h1,hr,.lamanotes-bottom-tags,.lamanotes-bottom-tags-source",
+          ))
+      )
+        break;
+      nodes.push(node);
+    }
+    const lists = taskLists.filter((list) =>
+      nodes.some((node) => node === list || node.contains?.(list)),
+    );
+    const empty = nodes.every(
+      (node) =>
+        !node.textContent.trim() &&
+        !node.querySelector?.("img,input,iframe,video,audio,table,svg"),
+    );
+    const knownKey = `${headingIndex}:${heading.textContent.trim()}`;
+    if (
+      !lists.length &&
+      !(
+        empty &&
+        (parents.has(heading.parentElement) || knownSections.has(knownKey))
+      )
+    )
+      return;
+    knownSections.add(knownKey);
+    lists.forEach((list) => grouped.add(list));
+    sections.push({
+      heading,
+      nodes,
+      section: {
+        headingIndex,
+        heading: heading.textContent.replace(/\s+/g, " ").trim(),
+      },
+    });
   });
+  taskLists
+    .filter((list) => !grouped.has(list))
+    .forEach((list) => {
+      sections.push({
+        nodes: [list],
+        section: {
+          taskIndex: Number(
+            list.querySelector(`.${taskCheckboxClass}`).dataset
+              .lamanotesTaskIndex,
+          ),
+        },
+      });
+    });
+  return sections;
+}
+
+function addChecklistEntry(
+  group,
+  tools,
+  content,
+  section,
+  key,
+  rootElement,
+  options,
+) {
+  if (!options.onAdd || options.disabled) return;
+  const add = createIconButton({
+    className: "lamanotes-format-button",
+    label: "Add checklist item",
+    path: mdiPlus,
+  });
+  add.dataset.lamanotesMutation = "true";
+  const form = document.createElement("form");
+  form.className = "lamanotes-checklist-entry";
+  form.hidden = true;
+  const input = document.createElement("input");
+  input.type = "text";
+  input.placeholder = "New item";
+  input.setAttribute("aria-label", "New checklist item");
+  input.maxLength = 1000;
+  const submit = createIconButton({
+    className: "lamanotes-format-button",
+    label: "Add item",
+    path: mdiCheck,
+  });
+  submit.dataset.lamanotesMutation = "true";
+  submit.type = "submit";
+  const error = document.createElement("p");
+  error.className = "lamanotes-checklist-error";
+  error.setAttribute("role", "alert");
+  error.hidden = true;
+  form.append(input, submit, error);
+  add.addEventListener("click", () => {
+    form.hidden = !form.hidden;
+    if (!form.hidden) input.focus();
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      form.hidden = true;
+      add.focus();
+    }
+  });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!input.value.trim() || input.disabled || rootElement.lamanotesTasksBusy)
+      return;
+    const checkboxes = content.querySelectorAll(`.${taskCheckboxClass}`);
+    const lastCheckbox = checkboxes[checkboxes.length - 1];
+    const afterIndex = lastCheckbox
+      ? Number(lastCheckbox.dataset.lamanotesTaskIndex)
+      : null;
+    setTaskCheckboxesBusy(rootElement, true, options);
+    error.hidden = true;
+    try {
+      await options.onAdd({ afterIndex, text: input.value, section });
+      input.value = "";
+      form.hidden = true;
+      requestAnimationFrame(() =>
+        rootElement
+          .querySelector(
+            `[data-lamanotes-section-key='${key}'] [aria-label='Add checklist item']`,
+          )
+          ?.focus(),
+      );
+    } catch (failure) {
+      error.textContent = checklistError(failure);
+      error.hidden = false;
+      requestAnimationFrame(() => input.focus());
+    } finally {
+      setTaskCheckboxesBusy(rootElement, false, options);
+    }
+  });
+  tools.append(add);
+  group.append(form);
+}
+
+function addChecklistEditor(
+  group,
+  tools,
+  content,
+  section,
+  key,
+  rootElement,
+  options,
+  source,
+) {
+  if (!options.onEdit || options.disabled) return;
+  const original = readChecklistSection(source, section, {
+    format: options.format || "html",
+  });
+  const edit = createIconButton({
+    className: "lamanotes-format-button",
+    label: "Edit section",
+    path: mdiPencilOutline,
+  });
+  edit.dataset.lamanotesMutation = "true";
+  edit.dataset.lamanotesUnavailable = String(!original);
+  edit.disabled = !original;
+  if (!original) edit.title = "Open the full editor to change this section";
+  tools.append(edit);
+  if (!original) return;
+  const drafts = (rootElement.lamanotesSectionDrafts ||= new Map());
+  const storage = sectionDraftStorage(rootElement, options.noteTitle, key);
+  const state = drafts.get(key) ||
+    loadSectionDraft(storage, section) || {
+      markdown: original.markdown,
+      originalMarkdown: original.markdown,
+      open: false,
+      error: "",
+    };
+  if (state.open) drafts.set(key, state);
+  const form = document.createElement("form");
+  form.className = "lamanotes-checklist-editor";
+  form.hidden = !state.open;
+  const input = document.createElement("textarea");
+  input.value = state.markdown;
+  input.rows = Math.min(10, Math.max(3, input.value.split("\n").length + 1));
+  input.maxLength = 100000;
+  input.setAttribute(
+    "aria-label",
+    `Edit ${section.heading || "checklist section"}`,
+  );
+  input.placeholder = "- [ ] New item";
+  const actions = document.createElement("div");
+  actions.className = "lamanotes-checklist-editor-actions";
+  const save = document.createElement("button");
+  save.type = "submit";
+  save.className = "lamanotes-checklist-text-button";
+  save.dataset.lamanotesMutation = "true";
+  save.textContent = "Save";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "lamanotes-checklist-text-button";
+  cancel.dataset.lamanotesMutation = "true";
+  cancel.textContent = "Cancel";
+  const error = document.createElement("p");
+  error.className = "lamanotes-checklist-error";
+  error.setAttribute("role", "alert");
+  error.hidden = !state.error;
+  error.textContent = state.error;
+  actions.append(save, cancel);
+  form.append(input, actions, error);
+  const close = () => {
+    state.open = false;
+    state.error = "";
+    state.markdown = state.originalMarkdown;
+    drafts.delete(key);
+    clearSectionDraft(storage);
+    form.hidden = true;
+    content.hidden = rootElement.lamanotesHiddenTaskLists?.has(key) || false;
+    edit.setAttribute("aria-expanded", "false");
+    edit.focus();
+  };
+  edit.setAttribute("aria-expanded", String(state.open));
+  edit.addEventListener("click", () => {
+    if (state.open) {
+      close();
+      return;
+    }
+    state.open = true;
+    drafts.set(key, state);
+    saveSectionDraft(storage, section, state);
+    input.value = state.markdown;
+    form.hidden = false;
+    content.hidden = true;
+    edit.setAttribute("aria-expanded", "true");
+    input.focus();
+  });
+  input.addEventListener("input", () => {
+    state.markdown = input.value;
+    saveSectionDraft(storage, section, state);
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !rootElement.lamanotesTasksBusy) {
+      event.stopPropagation();
+      close();
+    }
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  });
+  cancel.addEventListener("click", close);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (rootElement.lamanotesTasksBusy || input.disabled) return;
+    state.markdown = input.value;
+    state.error = "";
+    error.hidden = true;
+    setTaskCheckboxesBusy(rootElement, true, options);
+    try {
+      await options.onEdit({
+        section,
+        markdown: input.value,
+        originalMarkdown: state.originalMarkdown,
+      });
+      drafts.delete(key);
+      clearSectionDraft(storage);
+      state.open = false;
+      form.hidden = true;
+      content.hidden = rootElement.lamanotesHiddenTaskLists?.has(key) || false;
+      requestAnimationFrame(() =>
+        rootElement
+          .querySelector(
+            `[data-lamanotes-section-key='${key}'] [aria-label='Edit section']`,
+          )
+          ?.focus(),
+      );
+    } catch (failure) {
+      state.error = checklistError(failure);
+      saveSectionDraft(storage, section, state);
+      error.textContent = state.error;
+      error.hidden = false;
+      requestAnimationFrame(() => input.focus());
+    } finally {
+      setTaskCheckboxesBusy(rootElement, false, options);
+    }
+  });
+  if (state.open) content.hidden = true;
+  group.append(form);
+}
+
+export function enhanceTaskListCheckboxes(rootElement, taskListOptions = {}) {
+  if (!rootElement) return;
+  resetChecklistGroups(rootElement);
+  const contentRoot = rootElement.querySelector(".toastui-editor-contents");
+  if (!contentRoot) return;
+  const source = taskListOptions.source ?? contentRoot.innerHTML;
+  const taskItems = contentRoot.querySelectorAll("li.task-list-item");
+  taskItems.forEach((item, index) =>
+    decorateTaskCheckbox(
+      ensureTaskCheckbox(item),
+      index,
+      rootElement,
+      taskListOptions,
+    ),
+  );
   rootElement
     .querySelectorAll(".lamanotes-checklist-tools")
     .forEach((element) => element.remove());
-  const lists = [...new Set([...taskItems].map((item) => item.parentElement))];
   const hiddenLists = (rootElement.lamanotesHiddenTaskLists ||= new Set());
-  lists.forEach((list, listIndex) => {
-    const items = [...list.children].filter((item) =>
-      item.matches("li.task-list-item"),
-    );
-    const tools = document.createElement("div");
-    tools.className = "lamanotes-checklist-tools";
-    tools.dataset.lamanotesChecklistIndex = String(listIndex);
-    tools.setAttribute("role", "group");
-    tools.setAttribute("aria-label", "Checklist actions");
-    let entryForm = null;
-    list.classList.toggle(
-      "lamanotes-hide-completed",
-      hiddenLists.has(listIndex),
-    );
-    if (items.some((item) => item.classList.contains("lamanotes-task-done"))) {
+  const knownSections = (rootElement.lamanotesChecklistSections ||= new Set());
+  checklistSections(contentRoot, knownSections).forEach(
+    ({ heading, nodes, section }) => {
+      const key = Number.isInteger(section.headingIndex)
+        ? `heading-${section.headingIndex}`
+        : `task-${section.taskIndex}`;
+      const group = document.createElement("div");
+      group.className = "lamanotes-checklist-group";
+      group.dataset.lamanotesSectionKey = key;
+      (heading || nodes[0]).before(group);
+      const row = document.createElement("div");
+      row.className = "lamanotes-checklist-heading";
+      const tools = document.createElement("div");
+      tools.className = "lamanotes-checklist-tools";
+      tools.setAttribute("role", "group");
+      tools.setAttribute(
+        "aria-label",
+        `${section.heading || "Checklist"} actions`,
+      );
+      if (heading) row.append(heading);
+      row.append(tools);
+      const content = document.createElement("div");
+      content.className = "lamanotes-checklist-content";
+      content.id = `lamanotes-section-${++taskControlSequence}`;
+      content.append(...nodes);
+      content.hidden = hiddenLists.has(key);
+      group.append(row, content);
+      addChecklistEntry(
+        group,
+        tools,
+        content,
+        section,
+        key,
+        rootElement,
+        taskListOptions,
+      );
+      addChecklistEditor(
+        group,
+        tools,
+        content,
+        section,
+        key,
+        rootElement,
+        taskListOptions,
+        source,
+      );
       const toggle = createIconButton({
         className: "lamanotes-format-button",
-        label: "Hide completed items",
-        path: mdiEyeCheckOutline,
+        label: "Hide section content",
+        path: mdiEyeOffOutline,
       });
+      toggle.setAttribute("aria-controls", content.id);
       const updateToggle = () => {
-        const hidden = hiddenLists.has(listIndex);
-        list.classList.toggle("lamanotes-hide-completed", hidden);
-        toggle.setAttribute("aria-pressed", String(hidden));
+        const hidden = hiddenLists.has(key);
+        const editing = rootElement.lamanotesSectionDrafts?.get(key)?.open;
+        content.hidden = hidden || !!editing;
+        toggle.setAttribute("aria-expanded", String(!hidden));
         toggle.setAttribute(
           "aria-label",
-          hidden ? "Show completed items" : "Hide completed items",
+          hidden ? "Show section content" : "Hide section content",
         );
         toggle.title = toggle.getAttribute("aria-label");
+        toggle.replaceChildren(
+          createIcon(hidden ? mdiEyeOutline : mdiEyeOffOutline),
+        );
       };
       toggle.addEventListener("click", () => {
-        hiddenLists.has(listIndex)
-          ? hiddenLists.delete(listIndex)
-          : hiddenLists.add(listIndex);
+        hiddenLists.has(key) ? hiddenLists.delete(key) : hiddenLists.add(key);
         updateToggle();
       });
       updateToggle();
       tools.append(toggle);
-    }
-    if (taskListOptions.onAdd && !taskListOptions.disabled) {
-      const add = createIconButton({
-        className: "lamanotes-format-button",
-        label: "Add checklist item",
-        path: mdiPlus,
-      });
-      const form = document.createElement("form");
-      form.className = "lamanotes-checklist-entry";
-      form.hidden = true;
-      const input = document.createElement("input");
-      input.type = "text";
-      input.placeholder = "New item";
-      input.setAttribute("aria-label", "New checklist item");
-      input.maxLength = 1000;
-      const submit = createIconButton({
-        className: "lamanotes-format-button",
-        label: "Add item",
-        path: mdiCheck,
-      });
-      submit.type = "submit";
-      form.append(input, submit);
-      add.addEventListener("click", () => {
-        form.hidden = !form.hidden;
-        if (!form.hidden) input.focus();
-      });
-      input.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") {
-          event.stopPropagation();
-          form.hidden = true;
-          add.focus();
-        }
-      });
-      form.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        if (
-          !input.value.trim() ||
-          input.disabled ||
-          rootElement.lamanotesTasksBusy
-        )
-          return;
-        const lastCheckbox = items
-          .at(-1)
-          ?.querySelector("input.lamanotes-task-checkbox");
-        setTaskCheckboxesBusy(rootElement, true, taskListOptions);
-        try {
-          await taskListOptions.onAdd({
-            afterIndex: Number(lastCheckbox?.dataset.lamanotesTaskIndex),
-            text: input.value,
-          });
-          input.value = "";
-          form.hidden = true;
-          requestAnimationFrame(() => {
-            if (
-              rootElement.isConnected &&
-              (document.activeElement === input ||
-                document.activeElement === document.body)
-            ) {
-              rootElement
-                .querySelector(
-                  `[data-lamanotes-checklist-index="${listIndex}"] [aria-label="Add checklist item"]`,
-                )
-                ?.focus();
-            }
-          });
-        } catch {
-          requestAnimationFrame(() => input.focus());
-        } finally {
-          setTaskCheckboxesBusy(rootElement, false, taskListOptions);
-        }
-      });
-      tools.append(add);
-      entryForm = form;
-    }
-    if (tools.childElementCount) {
-      const previous = list.previousElementSibling;
-      const boldLabel = previous?.matches("p")
-        ? previous.querySelector(":scope > strong:only-child")
-        : null;
-      const isLabel =
-        boldLabel &&
-        previous.textContent.length < 100 &&
-        previous.textContent.trim() === boldLabel.textContent.trim();
-      const heading =
-        previous?.matches("h2,h3,h4,h5,h6") || isLabel ? previous : null;
-      const group = document.createElement("div");
-      group.className = "lamanotes-checklist-group";
-      list.before(group);
-      if (heading) {
-        const row = document.createElement("div");
-        row.className = "lamanotes-checklist-heading";
-        row.append(heading, tools);
-        group.append(row, list);
-      } else {
-        group.append(list, tools);
-      }
-      if (entryForm) group.append(entryForm);
-    }
-  });
+    },
+  );
   if (rootElement.lamanotesTasksBusy)
     setTaskCheckboxesBusy(rootElement, true, taskListOptions);
 }

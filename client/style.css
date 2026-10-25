@@ -360,13 +360,13 @@ body.lamanotes-native-text-drag-active::after {
 }
 .lamanotes-checklist-group {
   min-width: 0;
-  margin-block: 0.65rem;
+  margin-block: 0.25rem 0.55rem;
 }
 .lamanotes-checklist-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.25rem 0.75rem;
+  justify-content: flex-start;
+  gap: 0.2rem 0.45rem;
   min-width: 0;
 }
 .toastui-editor-contents
@@ -381,24 +381,69 @@ body.lamanotes-native-text-drag-active::after {
   line-height: 1.4;
   color: rgb(var(--theme-heading));
 }
-.toastui-editor-contents .lamanotes-checklist-group > :is(ul, ol) {
-  margin: 0.1rem 0 0.3rem;
+.toastui-editor-contents .lamanotes-checklist-content > :is(ul, ol) {
+  margin: 0 0 0.1rem;
 }
-.toastui-editor-contents
-  .lamanotes-checklist-group
-  > .lamanotes-checklist-tools {
-  justify-content: flex-end;
+.toastui-editor-contents .lamanotes-checklist-content li.task-list-item,
+.toastui-editor-contents .lamanotes-checklist-content li.task-list-item > p {
+  margin-block: 0;
 }
 .lamanotes-checklist-group > .lamanotes-checklist-entry {
-  margin-top: 0.35rem;
+  margin-top: 0.2rem;
   max-width: none;
 }
 .lamanotes-checklist-entry {
   flex: 1 1 12rem;
+  flex-wrap: wrap;
   max-width: 28rem;
 }
-.lamanotes-checklist-entry[hidden] {
+.lamanotes-checklist-entry[hidden],
+.lamanotes-checklist-content[hidden],
+.lamanotes-checklist-editor[hidden],
+.lamanotes-checklist-error[hidden] {
   display: none;
+}
+.lamanotes-checklist-editor {
+  margin-block: 0.15rem 0.35rem;
+}
+.lamanotes-checklist-editor textarea {
+  display: block;
+  width: 100%;
+  min-height: 5.5rem;
+  resize: vertical;
+  padding: 0.35rem 0.45rem;
+  font: inherit;
+  line-height: 1.45;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--theme-background));
+  border: 1px solid rgb(var(--theme-border));
+  border-radius: var(--ln-radius-control);
+}
+.lamanotes-checklist-editor textarea:focus-visible,
+.lamanotes-checklist-text-button:focus-visible {
+  outline: 2px solid rgb(var(--theme-brand));
+  outline-offset: 1px;
+}
+.lamanotes-checklist-editor-actions {
+  display: flex;
+  gap: 0.3rem;
+  margin-top: 0.2rem;
+}
+.lamanotes-checklist-text-button {
+  min-height: 1.85rem;
+  padding-inline: 0.5rem;
+  border-radius: var(--ln-radius-control);
+  color: rgb(var(--theme-heading));
+}
+.lamanotes-checklist-text-button:hover {
+  background: rgb(var(--theme-background-elevated));
+}
+.toastui-editor-contents .lamanotes-checklist-error {
+  flex: 1 0 100%;
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: rgb(var(--theme-text-muted));
 }
 .lamanotes-task-hit-target {
   display: none;
@@ -409,13 +454,17 @@ body.lamanotes-native-text-drag-active::after {
 .toastui-editor-contents li.task-list-item.lamanotes-task-done > p {
   color: inherit;
 }
-.toastui-editor-contents .lamanotes-hide-completed > li.lamanotes-task-done {
-  display: none;
-}
 @media (pointer: coarse) {
   .lamanotes-format-button {
     width: var(--ln-touch-target, 42px);
     height: var(--ln-touch-target, 42px);
+  }
+  .lamanotes-checklist-text-button {
+    min-height: 42px;
+    min-width: 42px;
+  }
+  .lamanotes-checklist-editor textarea {
+    font-size: 16px;
   }
   .toastui-editor-contents li.task-list-item {
     position: relative;
