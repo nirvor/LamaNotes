@@ -253,10 +253,7 @@ def create_router(service, auth):
         return store.renew_capability(capability_id, data.expires_in)
 
     @router.post("/integrations/focus/refresh")
-    def refresh_focus_integration(data: FocusSourceRefresh, request: Request, response: Response, _=Depends(owner)):
-        origin = request.headers.get("origin")
-        if origin and origin != service.public_origin:
-            raise HTTPException(403, "Open this connection in LamaNotes.")
+    def refresh_focus_integration(data: FocusSourceRefresh, response: Response, _=Depends(owner)):
         from .focus_source import refresh_focus_source
         response.headers["Cache-Control"] = "no-store"
         return store.envelope(**refresh_focus_source(store))

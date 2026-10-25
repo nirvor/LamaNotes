@@ -96,7 +96,9 @@ distribute tokens, and an owner credential must never enter a model workspace.
 ### Exact Quicknotes service lease
 
 POST `/integrations/focus/refresh` accepts only `{}` and an authenticated owner
-session. A supplied Origin must match the Notes public origin. It reads the
+session, using the same owner authentication as capability renewal. The Windows
+client may forward its local loopback Origin. Private capabilities and legacy
+service credentials cannot call this operation. It reads the
 server's fixed `.private/focus-quicknotes.json` binding, containing noteId and
 capabilityId. It never accepts a caller-selected note, capability, scope or
 duration. The response uses `Cache-Control: no-store` and returns connected,

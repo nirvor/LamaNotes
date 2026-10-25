@@ -106,17 +106,20 @@ class FocusNoteLeaseTests(unittest.TestCase):
         self.assertTrue(self.refresh().json()["renewed"])
         self.assertEqual(self.client.get(self.prefix + "/notes/" + self.note_id, headers=reader).status_code, 200)
 
-    def test_owner_auth_and_same_origin_are_required(self):
+    def test_owner_auth_is_required_including_windows_loopback_origin(self):
         selected = self.capability()
         self.bind(selected)
         before = self.store.capability(selected["capabilityId"])
         reader = {"Authorization": "Bearer " + selected["token"]}
-        self.assertEqual(self.refresh(headers=reader).status_code, 403)
+        loopback = {"Origin": "http://127.0.0.1:41987"}
+        self.assertEqual(self.refresh(headers={**reader, **loopback}).status_code, 403)
         self.assertEqual(self.refresh(headers={"Authorization": "Bearer legacy-service"}).status_code, 403)
-        self.assertEqual(self.client.post(self.prefix + "/integrations/focus/refresh", json={}).status_code, 401)
-        self.assertEqual(self.refresh(headers={**self.owner, "Origin": "https://another.test"}).status_code, 403)
+        self.assertEqual(self.client.post(self.prefix + "/integrations/focus/refresh", headers=loopback, json={}).status_code, 401)
         self.assertEqual(self.refresh(body={"noteId": self.note_ids[1]}).status_code, 422)
         self.assertEqual(self.store.capability(selected["capabilityId"]), before)
+        response = self.refresh(headers={**self.owner, **loopback})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["connected"] and response.json()["renewed"])
 
     def test_revoked_capability_or_enrollment_never_revives(self):
         selected = self.capability()
