@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import test_private_api
 from android_updates import update_router
+from notes.models import NoteUpdate
 
 
 class ShareIntakeTests(unittest.TestCase):
@@ -25,6 +26,10 @@ class ShareIntakeTests(unittest.TestCase):
         response = self.post('/research-intakes/consume', {'ticket': ticket}, headers)
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()['parent']['noteId'], self.note['noteId'])
+        self.assertIsNone(response.json()['parent']['researchId'])
+        self.assertEqual(response.json()['selectedNote'], {
+            key: self.note[key] for key in ('noteId', 'version', 'title')
+        })
         self.assertEqual(self.post('/research-intakes/consume', {'ticket': ticket}, headers).status_code, 200)
         self.assertEqual(self.get('/notes/' + self.note['noteId'], headers).status_code, 200)
         other_headers, _ = self.cap(['notes:read', 'references:read', 'capabilities:delegate'], note_ids=[])
@@ -54,6 +59,29 @@ class ShareIntakeTests(unittest.TestCase):
         self.assertEqual(self.get('/notes/'+self.note['noteId'],verifier).status_code,403)
         saved = json.loads(self.stored_capability(grant['capabilityId'])['payload'])
         self.assertNotIn('notes:read',saved['scopes'])
+
+    def test_intake_title_uses_the_same_current_note_version(self):
+        headers, _ = self.cap(['notes:read', 'references:read', 'capabilities:delegate'], note_ids=[])
+        ticket = self.post('/research-intakes', {
+            'noteId': self.note['noteId'], 'expectedVersion': self.note['version'],
+        }).json()['ticket']
+        self.notes.update(self.note['title'], NoteUpdate(
+            new_title='Renamed selected fixture', new_content='<p>Updated fixture</p>',
+        ))
+        stale = self.post('/research-intakes/consume', {'ticket': ticket}, headers)
+        self.assertEqual(stale.status_code, 409, stale.text)
+        self.assertNotIn('selectedNote', stale.json())
+        current = self.service.read_note(None, self.note['noteId'])
+        ticket = self.post('/research-intakes', {
+            'noteId': current['noteId'], 'expectedVersion': current['version'],
+        }).json()['ticket']
+        response = self.post('/research-intakes/consume', {'ticket': ticket}, headers)
+        self.assertEqual(response.status_code, 200, response.text)
+        selected = response.json()['selectedNote']
+        self.assertEqual(selected, {key: current[key] for key in ('noteId', 'version', 'title')})
+        self.assertEqual(selected['version'], response.json()['parent']['version'])
+        self.assertNotEqual(selected['version'], self.note['version'])
+        self.assertNotIn('content', response.json())
 
 
 def test_android_feed_does_not_serve_missing_corrupt_or_path_escaped_packages():

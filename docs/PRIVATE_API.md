@@ -179,6 +179,11 @@ Unavailable and forbidden objects both return 404; stale references return 409.
 
 ### Selected Research context
 
+The existing `/research-intakes/consume` response includes `selectedNote` with
+noteId/version/title alongside its unchanged `parent`. Both come from the same
+current, version-checked selection. This gives the Research UI an exact source
+label for ordinary notes whose researchId is null. It adds no Library read.
+
 `POST /references/context` accepts the same `{parent,sources}` selection as
 `/references/check`, with at least one selected note or capture. It returns
 `{parent,sources}` with the common envelope. The parent contains

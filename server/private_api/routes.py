@@ -129,8 +129,11 @@ def create_router(service, auth):
                 db.execute('UPDATE capabilities SET payload=? WHERE id=?', (json.dumps(grant),identifier))
             db.execute("UPDATE research_intakes SET consumed_by=? WHERE digest=?",
                        (actor["capabilityId"], digest))
-        return {"parent": {"noteId": note["noteId"], "version": note["version"],
-                           "researchId": note.get("researchId")}}
+        return {
+            "parent": {"noteId": note["noteId"], "version": note["version"],
+                       "researchId": note.get("researchId")},
+            "selectedNote": {key: note[key] for key in ("noteId", "version", "title")},
+        }
 
     @router.post("/reader-session")
     def reader_session(
