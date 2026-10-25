@@ -192,7 +192,8 @@ onBeforeUnmount(() =>
 .lamanotes-home {
   position: relative;
   display: flex;
-  min-height: calc(100vh - 4rem);
+  min-height: 0;
+  flex: 1 0 auto;
   justify-content: center;
   isolation: isolate;
 }
