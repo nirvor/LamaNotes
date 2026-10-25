@@ -483,3 +483,82 @@ test("successful section save clears its stored draft and storage failure does n
   assert.equal(document.activeElement.tagName, "TEXTAREA");
   assert.equal(document.activeElement.disabled, false);
 });
+
+test("semantic sibling sections include the empty section in the same article only", () => {
+  const names = [
+    "Extra",
+    "Lebensmittel",
+    "Obst & Gemüse",
+    "Konserven",
+    "Kühlschrank",
+    "Haushaltsmittel",
+  ];
+  render(
+    `<article>${names.map((name, index) => `<section><h3>${name}</h3>${index < 5 ? `<ul>${task(`Item ${index}`)}</ul>` : ""}</section>`).join("")}</article><article><section><h3>Unrelated empty article</h3></section></article>`,
+  );
+  const originalSections = [
+    ...root.querySelectorAll("article:first-child > section"),
+  ];
+  enhanceTaskListCheckboxes(root, options);
+  const groups = root.querySelectorAll(".lamanotes-checklist-group");
+  assert.equal(groups.length, 6);
+  assert.deepEqual(
+    [...groups].map((group) => group.querySelector("h3").textContent),
+    names,
+  );
+  for (const group of groups) {
+    assert.equal(
+      group.querySelectorAll(".lamanotes-checklist-heading button").length,
+      3,
+    );
+    assert.equal(
+      group.querySelector('[aria-label="Edit section"]').disabled,
+      false,
+    );
+  }
+  assert.deepEqual(
+    [...root.querySelectorAll("article:first-child > section")],
+    originalSections,
+  );
+  assert.equal(
+    root.querySelector("article:last-child .lamanotes-checklist-group"),
+    null,
+  );
+});
+
+test("Edit and eye collapse keep a section draft, while only Cancel discards it", () => {
+  const html = `<h5>Produce</h5><ul>${task("Apples")}</ul>`;
+  render(html);
+  const storedOptions = { ...options, noteTitle: "Shopping" };
+  enhanceTaskListCheckboxes(root, storedOptions);
+  const edit = root.querySelector('[aria-label="Edit section"]');
+  edit.click();
+  const input = document.activeElement;
+  input.value = "- [ ] Keep my draft";
+  input.dispatchEvent(new dom.window.Event("input"));
+  edit.click();
+  assert.equal(root.querySelector(".lamanotes-checklist-editor").hidden, true);
+  const stored = JSON.parse(
+    dom.window.sessionStorage.getItem(dom.window.sessionStorage.key(0)),
+  );
+  assert.equal(stored.markdown, "- [ ] Keep my draft");
+  assert.equal(stored.originalMarkdown, "- [ ] Apples");
+  assert.equal(stored.open, false);
+  root.replaceWith(document.createElement("main"));
+  root = document.querySelector("main");
+  root.innerHTML = '<div class="toastui-editor-contents">' + html + "</div>";
+  enhanceTaskListCheckboxes(root, storedOptions);
+  assert.equal(root.querySelector(".lamanotes-checklist-editor").hidden, true);
+  root.querySelector('[aria-label="Edit section"]').click();
+  assert.equal(document.activeElement.value, "- [ ] Keep my draft");
+  root.querySelector('[aria-label="Hide section content"]').click();
+  assert.equal(root.querySelector(".lamanotes-checklist-editor").hidden, true);
+  assert.equal(root.querySelector(".lamanotes-checklist-content").hidden, true);
+  root.querySelector('[aria-label="Edit section"]').click();
+  assert.equal(document.activeElement.value, "- [ ] Keep my draft");
+  document.activeElement
+    .closest("form")
+    .querySelector('button[type="button"]')
+    .click();
+  assert.equal(dom.window.sessionStorage.length, 0);
+});

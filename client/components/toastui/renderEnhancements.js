@@ -1588,7 +1588,7 @@ function loadSectionDraft(storage, section) {
       return null;
     return {
       ...draft,
-      open: true,
+      open: draft.open !== false,
       error: typeof draft.error === "string" ? draft.error.slice(0, 300) : "",
     };
   } catch {
@@ -1611,6 +1611,7 @@ function saveSectionDraft(storage, section, state) {
         originalMarkdown: state.originalMarkdown,
         heading: section.heading || null,
         error: state.error,
+        open: state.open,
       }),
     );
   } catch {
@@ -1637,7 +1638,18 @@ function checklistSections(content, knownSections) {
       list.querySelector("li.task-list-item") &&
       !list.parentElement.closest("ul,ol"),
   );
-  const parents = new Set(taskLists.map((list) => list.parentElement));
+  const region = (element) => {
+    for (
+      let parent = element.parentElement;
+      parent && parent !== content;
+      parent = parent.parentElement
+    ) {
+      if (parent.matches("article,main,[data-lamanotes-component='work-body']"))
+        return parent;
+    }
+    return content;
+  };
+  const regions = new Set(taskLists.map(region));
   const sections = [];
   const grouped = new Set();
   headings.forEach((heading, headingIndex) => {
@@ -1664,10 +1676,7 @@ function checklistSections(content, knownSections) {
     const knownKey = `${headingIndex}:${heading.textContent.trim()}`;
     if (
       !lists.length &&
-      !(
-        empty &&
-        (parents.has(heading.parentElement) || knownSections.has(knownKey))
-      )
+      !(empty && (regions.has(region(heading)) || knownSections.has(knownKey)))
     )
       return;
     knownSections.add(knownKey);
@@ -1844,7 +1853,17 @@ function addChecklistEditor(
   error.textContent = state.error;
   actions.append(save, cancel);
   form.append(input, actions, error);
-  const close = () => {
+  const hide = (restoreFocus = true) => {
+    state.markdown = input.value;
+    state.open = false;
+    drafts.set(key, state);
+    saveSectionDraft(storage, section, state);
+    form.hidden = true;
+    content.hidden = rootElement.lamanotesHiddenTaskLists?.has(key) || false;
+    edit.setAttribute("aria-expanded", "false");
+    if (restoreFocus) edit.focus();
+  };
+  const cancelDraft = () => {
     state.open = false;
     state.error = "";
     state.markdown = state.originalMarkdown;
@@ -1858,7 +1877,7 @@ function addChecklistEditor(
   edit.setAttribute("aria-expanded", String(state.open));
   edit.addEventListener("click", () => {
     if (state.open) {
-      close();
+      hide();
       return;
     }
     state.open = true;
@@ -1877,14 +1896,17 @@ function addChecklistEditor(
   input.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !rootElement.lamanotesTasksBusy) {
       event.stopPropagation();
-      close();
+      hide();
     }
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       form.requestSubmit();
     }
   });
-  cancel.addEventListener("click", close);
+  cancel.addEventListener("click", cancelDraft);
+  group.lamanotesHideSectionEditor = () => {
+    if (state.open) hide(false);
+  };
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (rootElement.lamanotesTasksBusy || input.disabled) return;
@@ -2011,6 +2033,13 @@ export function enhanceTaskListCheckboxes(rootElement, taskListOptions = {}) {
       };
       toggle.addEventListener("click", () => {
         hiddenLists.has(key) ? hiddenLists.delete(key) : hiddenLists.add(key);
+        if (hiddenLists.has(key)) {
+          group.lamanotesHideSectionEditor?.();
+          const entry = group.querySelector(
+            ":scope > .lamanotes-checklist-entry",
+          );
+          if (entry) entry.hidden = true;
+        }
         updateToggle();
       });
       updateToggle();

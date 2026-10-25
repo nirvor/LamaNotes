@@ -370,19 +370,23 @@ body.lamanotes-native-text-drag-active::after {
   min-width: 0;
 }
 .toastui-editor-contents
-  .lamanotes-checklist-heading
+  .lamanotes-checklist-group
+  > .lamanotes-checklist-heading
   > :is(h2, h3, h4, h5, h6, p) {
   min-width: 0;
   margin: 0;
+  padding: 0;
+  border: 0;
   overflow-wrap: anywhere;
-}
-.toastui-editor-contents .lamanotes-checklist-heading > :is(h4, h5, h6, p) {
-  font-size: 0.93rem;
+  font-size: 0.92rem;
   line-height: 1.4;
   color: rgb(var(--theme-heading));
 }
-.toastui-editor-contents .lamanotes-checklist-content > :is(ul, ol) {
-  margin: 0 0 0.1rem;
+.toastui-editor-contents
+  .lamanotes-checklist-group
+  > .lamanotes-checklist-content
+  > :is(ul, ol) {
+  margin: 0;
 }
 .toastui-editor-contents .lamanotes-checklist-content li.task-list-item,
 .toastui-editor-contents .lamanotes-checklist-content li.task-list-item > p {
