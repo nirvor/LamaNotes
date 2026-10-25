@@ -1,7 +1,7 @@
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from helpers import CustomBaseModel
 
@@ -100,6 +100,30 @@ class ReferenceCheck(StrictModel):
     sources: list[CaptureReference] = Field(
         default_factory=list, max_length=30
     )
+
+
+class ReferenceContext(ReferenceCheck):
+    @model_validator(mode="after")
+    def selected_references(self):
+        if not self.parent and not self.sources:
+            raise ValueError("Select a note or source.")
+        if len({source.capture_id for source in self.sources}) != len(
+            self.sources
+        ):
+            raise ValueError("Select each source once.")
+        return self
+
+
+class ReferenceContent(StrictModel):
+    parent: ParentReference | None = None
+    source: CaptureReference | None = None
+    asset_id: AssetId
+
+    @model_validator(mode="after")
+    def one_reference(self):
+        if (self.parent is None) == (self.source is None):
+            raise ValueError("Select one note or source for the asset.")
+        return self
 
 
 class ResearchReference(StrictModel):

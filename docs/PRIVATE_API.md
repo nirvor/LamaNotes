@@ -177,6 +177,40 @@ That manifest is sorted by assetId and contains exactly assetId, sha256, role,
 sourceAssetId (null for originals). A job-bound result must match that job.
 Unavailable and forbidden objects both return 404; stale references return 409.
 
+### Selected Research context
+
+`POST /references/context` accepts the same `{parent,sources}` selection as
+`/references/check`, with at least one selected note or capture. It returns
+`{parent,sources}` with the common envelope. The parent contains
+noteId/version/researchId/title/url/content/format and `assets`. Each source
+contains captureId/sha256/kind/text/sourceUrl/provenance and `assets`. Asset
+metadata contains assetId/sha256/mediaType/size/width/height/role/sourceAssetId.
+`size` is the byte count. File hashes are verified against stored bytes.
+
+These content routes require an active delegated capability with
+`references:read`, a non-null jobId and parentId. Each requested note or capture
+must be explicitly listed in that capability's noteIds/captureIds. Creator,
+ancestor and same-job peer access alone do not qualify. Owner sessions,
+non-delegated roots and jobless tokens cannot use these routes. The Research
+server delegates only the saved job selection for 60 seconds, keeps the token
+server-side and revokes it after use. Related notes can be requested separately
+under the same selected capability. A selection can be a subset of its grants.
+Ordinary selected notes may have a null researchId.
+
+`POST /references/content` accepts exactly one `parent` or `source` plus
+`assetId`. The parent uses noteId/version/researchId, the source uses
+captureId/sha256. The asset must be attached to that exact selected reference.
+The response contains the verified bytes as an attachment with its media type
+and a controlled asset-ID filename. It never follows a source URL or returns
+credentials. The usual notes, captures, search and assets routes retain their
+existing scope requirements.
+
+Text context is limited to 2 MiB total UTF-8 note content and capture text.
+Each asset is limited to 20 MiB. Oversize selections return 413 without silent
+truncation. Changed versions, capture hashes or stored asset bytes return 409.
+Empty/duplicate source selections and extra fields return 422. Private responses
+remain `no-store`. Byte responses also use `nosniff` and a sandbox CSP.
+
 ## Captures and source-preserving assets
 
 POST `/captures` (idempotent) accepts:

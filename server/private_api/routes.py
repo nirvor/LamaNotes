@@ -34,6 +34,8 @@ from .models import (
     PrivateNoteCreate,
     PrivateNoteUpdate,
     ReferenceCheck,
+    ReferenceContent,
+    ReferenceContext,
     ResearchReference,
     ReaderSession,
     ResearchIntake,
@@ -443,6 +445,45 @@ def create_router(service, auth):
         note = matches[0]
         return store.envelope(
             **{key: note[key] for key in ("noteId", "version", "researchId")}
+        )
+
+    @router.post("/references/context")
+    def selected_context(
+        data: ReferenceContext, actor=Depends(scope("references:read"))
+    ):
+        from .references import reference_context
+
+        return reference_context(service, actor, data)
+
+    @router.post("/references/content")
+    def selected_content(
+        data: ReferenceContent, actor=Depends(scope("references:read"))
+    ):
+        from .references import reference_content
+
+        asset, content = reference_content(service, actor, data)
+        extension = {
+            "application/pdf": ".pdf",
+            "text/plain": ".txt",
+            "image/png": ".png",
+            "image/jpeg": ".jpg",
+            "image/webp": ".webp",
+            "image/gif": ".gif",
+            "audio/ogg": ".ogg",
+            "audio/mpeg": ".mp3",
+            "audio/flac": ".flac",
+            "audio/wav": ".wav",
+            "audio/mp4": ".m4a",
+        }.get(asset["mediaType"], "")
+        return Response(
+            content,
+            media_type=asset["mediaType"],
+            headers={
+                "Cache-Control": "no-store",
+                "Content-Disposition": f'attachment; filename="{data.asset_id}{extension}"',
+                "Content-Security-Policy": "default-src 'none'; sandbox",
+                "X-Content-Type-Options": "nosniff",
+            },
         )
 
     @router.post("/references/result")
