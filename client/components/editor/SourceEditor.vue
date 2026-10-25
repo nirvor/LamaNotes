@@ -47,6 +47,7 @@
       :class="{
         'lamanotes-source-editor-wrap': wrap,
         'lamanotes-source-editor-no-gutter': !showLineNumbers,
+        'lamanotes-source-editor-prose': prose,
       }"
     ></div>
     <div
@@ -169,6 +170,7 @@ const props = defineProps({
   structuredPaste: Boolean,
   sessionState: Object,
   formatting: { type: Boolean, default: true },
+  prose: Boolean,
 });
 
 const emit = defineEmits(["update:modelValue", "change", "keydown", "ready"]);
@@ -556,6 +558,9 @@ function editorExtensions() {
     EditorView.contentAttributes.of({
       "aria-label": props.ariaLabel,
       spellcheck: props.language === "markdown" || props.language === "text",
+      ...(props.prose
+        ? { autocapitalize: "sentences", autocorrect: "on" }
+        : {}),
     }),
     EditorView.updateListener.of((update) => {
       if (
@@ -1237,6 +1242,19 @@ defineExpose({
 
 .lamanotes-source-editor-no-gutter :deep(.cm-gutters) {
   display: none;
+}
+
+.lamanotes-source-editor-prose :deep(.cm-editor) {
+  font-size: 0.95rem;
+}
+.lamanotes-source-editor-prose :deep(.cm-scroller) {
+  font-family: "Poppins", system-ui, sans-serif;
+  line-height: 1.5;
+}
+@media (pointer: coarse), (hover: none) {
+  .lamanotes-source-editor-prose :deep(.cm-editor) {
+    font-size: 16px;
+  }
 }
 
 @media (max-width: 440px) {

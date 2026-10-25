@@ -5,10 +5,33 @@ from unittest.mock import patch
 
 from notes.errors import ResearchNoteConflictError
 from notes.file_system.file_system import FileSystemNotes
-from notes.models import ResearchNoteUpdate
+from notes.models import Note, ResearchNoteUpdate
 
 
 class HtmlTagExtractionTests(unittest.TestCase):
+    def test_quicknotes_text_mode_keeps_context_readable_without_source_duplicates(self):
+        content = """<!doctype html><html lang="de"><head>
+<meta name="lamanotes-note-id" content="ln-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">
+<meta name="lamanotes-tags" content="private,pinned">
+<meta name="lamanotes-editor" content="markdown"><title>Quicknotes</title>
+</head><body><article class="lamanote lamanote-article" data-lamanotes-editor="markdown">
+<h1>Quicknotes</h1><section class="lamanote-text-body">
+<p>Unterwegs eine Idee festhalten.</p><ul><li><input type="checkbox">Brief ansehen</li></ul>
+<p>#private</p></section><template data-lamanotes-text-markdown>
+Unterwegs eine Idee festhalten.\n\n- [ ] Brief ansehen\n\n#private
+</template></article></body></html>"""
+
+        context = FileSystemNotes._context_from_note(
+            Note(title="Quicknotes", content=content, last_modified=1, format="html")
+        )
+
+        self.assertEqual(context.tags, ["pinned", "private"])
+        self.assertEqual(context.text.count("Unterwegs eine Idee festhalten."), 1)
+        self.assertEqual(context.text.count("Brief ansehen"), 1)
+        self.assertIn("Unterwegs eine Idee festhalten.", context.llm_text)
+        self.assertNotIn("data-lamanotes", context.text)
+        self.assertNotEqual(context.note_kind, "work")
+
     def test_inline_hashtag_mentions_are_not_html_tags(self):
         content = """<!doctype html>
 <html>

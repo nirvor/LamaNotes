@@ -134,12 +134,18 @@
       @pointerup="noteContentPointerUpHandler"
     >
       <ToastViewer
-        v-if="!editMode && !isHtmlFormat"
-        :initialValue="note.content"
+        v-if="!editMode && (!isHtmlFormat || isTextNote)"
+        :initialValue="
+          isTextNote
+            ? extractTextMarkdown(note.content, note.title)
+            : note.content
+        "
+        :enhance-note-lead="!isTextNote"
         :note-title="note.title"
         :task-checkboxes-disabled="!canModify"
         :task-checkbox-toggle-handler="toggleTaskCheckbox"
         :task-item-add-handler="addTaskItem"
+        :task-section-edit-handler="editTaskSection"
         class="toast-viewer min-w-0 max-w-full pb-4"
       />
       <WorkNoteViewer
@@ -149,6 +155,7 @@
         :task-checkboxes-disabled="!canModify"
         :task-checkbox-toggle-handler="toggleTaskCheckbox"
         :task-item-add-handler="addTaskItem"
+        :task-section-edit-handler="editTaskSection"
       />
       <HtmlViewer
         v-else-if="!editMode && isHtmlFormat && !isWorkNote"
@@ -157,6 +164,7 @@
         :task-checkboxes-disabled="!canModify"
         :task-checkbox-toggle-handler="toggleTaskCheckbox"
         :task-item-add-handler="addTaskItem"
+        :task-section-edit-handler="editTaskSection"
         class="toast-viewer min-w-0 max-w-full pb-4"
       />
       <SourceEditor
@@ -190,6 +198,18 @@
         @keydown="keydownHandler"
         @ready="editorReadyHandler"
         @set-kind="setNewNoteKind"
+      />
+      <TextNoteEditor
+        v-else-if="editMode && editorFormat === 'html' && editorKind === 'text'"
+        :key="editorKey"
+        ref="contentEditor"
+        :session-state="editorMemory"
+        :initial-value="editorInitialValue"
+        :note-title="newTitle"
+        :add-image-blob-hook="addImageBlobHook"
+        @change="editorContentChangedHandler"
+        @keydown="keydownHandler"
+        @ready="editorReadyHandler"
       />
       <HtmlEditor
         v-else-if="
@@ -276,6 +296,16 @@ import {
 import { authTypes } from "../constants.js";
 import { useDocumentSession } from "../documents/documentSession.js";
 import { appendMarkdownTask, toggleMarkdownTask } from "../checklists.js";
+import {
+  appendChecklistSectionItem,
+  readChecklistSection,
+  replaceChecklistSection,
+} from "../checklistSections.js";
+import {
+  buildTextNoteHtml,
+  extractTextMarkdown,
+  isTextNoteHtml,
+} from "../components/text/textNote.js";
 import { createVpsNoteStorageAdapter } from "../documents/storageAdapters.js";
 import { useDocumentFind } from "../documentFind.js";
 import { desktopShell, setDesktopWindowTitle } from "../desktopShell.js";
@@ -318,6 +348,9 @@ const WorkNoteEditor = defineAsyncComponent(
 const WorkNoteViewer = defineAsyncComponent(
   () => import("../components/work/WorkNoteViewer.vue"),
 );
+const TextNoteEditor = defineAsyncComponent(
+  () => import("../components/text/TextNoteEditor.vue"),
+);
 
 const props = defineProps({
   title: String,
@@ -330,6 +363,9 @@ const canModify = computed(
 const isHtmlFormat = computed(() => (note.value.format || "html") === "html");
 const isWorkNote = computed(
   () => isHtmlFormat.value && isWorkNoteHtml(note.value.content || ""),
+);
+const isTextNote = computed(
+  () => isHtmlFormat.value && isTextNoteHtml(note.value.content || ""),
 );
 const isWideDashboardNote = computed(
   () =>
@@ -348,6 +384,7 @@ const noteLayoutKind = computed(() => {
   if (isWorkNote.value) {
     return "work";
   }
+  if (isTextNote.value) return "markdown";
   if (isHtmlFormat.value) {
     return "article";
   }
@@ -416,7 +453,8 @@ const canAutomateNote = computed(
   () =>
     editMode.value &&
     (editorFormat.value === "markdown" ||
-      (editorFormat.value === "html" && editorKind.value === "work")),
+      (editorFormat.value === "html" &&
+        ["work", "text"].includes(editorKind.value))),
 );
 const automationLanguage = computed(() =>
   canAutomateNote.value ? "markdown" : "text",
@@ -614,9 +652,10 @@ function setEditMode() {
     : note.value.title;
   editorFormat.value = note.value.format || "html";
   if (editorFormat.value === "html") {
-    editorKind.value =
-      isWorkNoteHtml(note.value.content || "") ||
-      isChecklistNoteHtml(note.value.content || "")
+    editorKind.value = isTextNoteHtml(note.value.content || "")
+      ? "text"
+      : isWorkNoteHtml(note.value.content || "") ||
+          isChecklistNoteHtml(note.value.content || "")
         ? "work"
         : isNewNote.value
           ? loadNewNoteKind()
@@ -644,6 +683,14 @@ function focusEditor() {
 function getInitialEditorValue() {
   const draftContent = documentSession.loadDraft();
   const content = draftContent != null ? draftContent : note.value.content;
+  if (editorFormat.value === "html" && editorKind.value === "text") {
+    try {
+      return extractTextMarkdown(content, note.value.title);
+    } catch {
+      editorKind.value = "article";
+      return content;
+    }
+  }
   if (editorFormat.value === "html" && editorKind.value === "work") {
     if (isWorkNoteHtml(content)) {
       return extractWorkMarkdown(content);
@@ -788,11 +835,22 @@ async function toggleTaskCheckbox({ index, checked }) {
     throw new Error("Task checkbox changes are not available here.");
   }
 
-  const newContent = isWorkNote.value
-    ? updateTaskCheckboxWorkHtml(note.value.content || "", index, checked)
-    : isHtmlFormat.value
-      ? updateTaskCheckboxHtml(note.value.content || "", index, checked)
-      : updateTaskCheckboxMarkdown(note.value.content || "", index, checked);
+  const newContent = isTextNote.value
+    ? (() => {
+        const updated = toggleMarkdownTask(
+          extractTextMarkdown(note.value.content, note.value.title),
+          index,
+          checked,
+        );
+        return updated == null
+          ? null
+          : buildTextNoteHtml(note.value.title, updated, note.value.content);
+      })()
+    : isWorkNote.value
+      ? updateTaskCheckboxWorkHtml(note.value.content || "", index, checked)
+      : isHtmlFormat.value
+        ? updateTaskCheckboxHtml(note.value.content || "", index, checked)
+        : updateTaskCheckboxMarkdown(note.value.content || "", index, checked);
 
   if (newContent == null) {
     toast.add(
@@ -886,21 +944,86 @@ async function currentNoteVersion() {
   return latest.version;
 }
 
-async function addTaskItem({ afterIndex, text }) {
+function checklistSource() {
+  const content = note.value.content || "";
+  return isTextNote.value
+    ? {
+        content: extractTextMarkdown(content, note.value.title),
+        format: "markdown",
+        serialize: (updated) =>
+          buildTextNoteHtml(note.value.title, updated, content),
+      }
+    : {
+        content,
+        format: note.value.format || "html",
+        serialize: (updated) => updated,
+      };
+}
+
+async function editTaskSection({ section, markdown, originalMarkdown }) {
+  if (!canModify.value || editMode.value)
+    throw new Error("Section editing is not available here.");
+  const source = checklistSource();
+  const current = readChecklistSection(source.content, section, source);
+  if (!current || current.markdown !== originalMarkdown) {
+    throw {
+      response: { status: 409 },
+      message: "This section changed elsewhere.",
+    };
+  }
+  const updated = replaceChecklistSection(
+    source.content,
+    section,
+    markdown,
+    source,
+  );
+  if (updated == null) throw new Error("Checklist source not found.");
+  note.value = await updateNote(
+    note.value.title,
+    note.value.title,
+    source.serialize(updated),
+    note.value.format || "html",
+    await currentNoteVersion(),
+  );
+}
+
+async function addTaskItem({ afterIndex, text, section }) {
   if (!canModify.value || editMode.value) return;
+  if (section) {
+    const source = checklistSource();
+    const updated = appendChecklistSectionItem(
+      source.content,
+      section,
+      text,
+      source,
+    );
+    if (updated == null) throw new Error("Checklist source not found.");
+    note.value = await updateNote(
+      note.value.title,
+      note.value.title,
+      source.serialize(updated),
+      note.value.format || "html",
+      await currentNoteVersion(),
+    );
+    return;
+  }
   const original = note.value.content || "";
   let content;
-  if (isWorkNote.value || !isHtmlFormat.value) {
-    const markdown = isWorkNote.value
-      ? extractWorkMarkdown(original)
-      : original;
+  if (isWorkNote.value || isTextNote.value || !isHtmlFormat.value) {
+    const markdown = isTextNote.value
+      ? extractTextMarkdown(original, note.value.title)
+      : isWorkNote.value
+        ? extractWorkMarkdown(original)
+        : original;
     const updated = appendMarkdownTask(markdown, afterIndex, text);
     if (updated == null) throw new Error("Checklist source not found.");
-    content = isWorkNote.value
-      ? buildWorkNoteHtml(note.value.title, updated, {
-          systemTags: getLamaNotesMetaTags(original).filter(isSystemTag),
-        })
-      : updated;
+    content = isTextNote.value
+      ? buildTextNoteHtml(note.value.title, updated, original)
+      : isWorkNote.value
+        ? buildWorkNoteHtml(note.value.title, updated, {
+            systemTags: getLamaNotesMetaTags(original).filter(isSystemTag),
+          })
+        : updated;
   } else {
     const doc = new DOMParser().parseFromString(original, "text/html");
     const item = doc.body.querySelectorAll("li.task-list-item")[afterIndex];
@@ -1572,9 +1695,11 @@ function normalizeCopiedText(text) {
 }
 
 function getMarkdownSource() {
-  return isWorkNote.value
-    ? extractWorkMarkdown(getNoteSourceContent())
-    : getNoteSourceContent();
+  return isTextNote.value
+    ? extractTextMarkdown(getNoteSourceContent(), note.value.title)
+    : isWorkNote.value
+      ? extractWorkMarkdown(getNoteSourceContent())
+      : getNoteSourceContent();
 }
 
 function getDefaultCopyKind() {
@@ -1589,7 +1714,7 @@ function getCopyLabel(kind) {
     return "HTML copied ✓";
   }
   if (kind === "source") {
-    return isHtmlFormat.value && !isWorkNote.value
+    return isHtmlFormat.value && !isWorkNote.value && !isTextNote.value
       ? "Source copied ✓"
       : "Markdown copied ✓";
   }
@@ -1615,7 +1740,10 @@ function getCopyPayload(kind = "default") {
   }
   if (copyKind === "source") {
     return {
-      type: isWorkNote.value || !isHtmlFormat.value ? "markdown" : "text",
+      type:
+        isWorkNote.value || isTextNote.value || !isHtmlFormat.value
+          ? "markdown"
+          : "text",
       content: getMarkdownSource(),
     };
   }
@@ -1634,13 +1762,19 @@ function getCopyMenuItems() {
   const items = [
     {
       label:
-        isWorkNote.value || !isHtmlFormat.value ? "Copy Markdown" : "Copy Text",
+        isWorkNote.value || isTextNote.value || !isHtmlFormat.value
+          ? "Copy Markdown"
+          : "Copy Text",
       icon:
-        isWorkNote.value || !isHtmlFormat.value
+        isWorkNote.value || isTextNote.value || !isHtmlFormat.value
           ? mdiCodeTags
           : mdiTextBoxOutline,
       command: () =>
-        copyNote(isWorkNote.value || !isHtmlFormat.value ? "source" : "text"),
+        copyNote(
+          isWorkNote.value || isTextNote.value || !isHtmlFormat.value
+            ? "source"
+            : "text",
+        ),
     },
   ];
 
@@ -1822,6 +1956,20 @@ function getEditorContent() {
 
   if (editorFormat.value === "markdown") {
     return contentEditor.value.getMarkdown();
+  }
+
+  if (editorKind.value === "text") {
+    const markdown = contentEditor.value.getMarkdown();
+    if (
+      newTitle.value === note.value.title &&
+      markdown === extractTextMarkdown(note.value.content, note.value.title)
+    )
+      return note.value.content;
+    return buildTextNoteHtml(
+      newTitle.value || note.value.title,
+      markdown,
+      note.value.content,
+    );
   }
 
   if (editorKind.value === "work") {

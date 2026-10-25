@@ -17,10 +17,13 @@ The document-title copper accent remains a reading convention, not a second
 application brand. Product controls use English. User content keeps its language.
 
 Short checklist sections group their label, list and local actions without a
-visible box. Hide-completed and Add sit beside the section label, while the
-entry form appears directly under its own list. Preserve item order, heading
-semantics, keyboard focus and note bodies. No progress counters or list
-administration controls are added.
+visible box. Add, Edit and Hide/Show content sit directly beside the section
+label. Entry and section-edit forms stay within their own section. Use compact,
+uniform heading sizes and list spacing, while preserving coarse-pointer targets.
+Collapsing a section is local display state. Editing only updates that section,
+with a retained draft and version check. Preserve item order, heading semantics,
+keyboard focus and note bodies. No progress counters or list administration
+controls are added.
 
 ## V2 is still LamaNotes
 
@@ -45,6 +48,12 @@ handling never depend on a tag.
   visible replacement tag.
 - Work notes remain HTML snapshots with editable Markdown source. Legacy
   Markdown stays compatible and is not mass-migrated.
+- Quicknotes uses a plain Markdown writing surface. Its legacy scratch-note
+  wrapper is adapted on open without a storage write. The first changed save
+  keeps its HTML file, stable identity and head metadata, with rendered content
+  and a canonical Markdown template. Preserve existing prose, including old
+  helper text. This mode is structural, not tied to the title or a tag, and
+  does not apply to rich articles or Research notes.
 - The historical server/API `noteKind` name is a storage compatibility
   contract. The client presentation kind for non-Work HTML is `article`.
 
@@ -410,9 +419,9 @@ The shared source editor keeps one compact icon toolbar, with labels/tooltips
 and keyboard equivalents. Link entry appears only when requested. Formatting
 retains the selected text, so applying or removing a style is repeatable.
 Work/HTML previews replace the editor rather than stacking a second view.
-Completed checklist rows use the existing muted-text token. Hide-completed and
-add-item controls belong to the list, not the global toolbar. No completion
-counter, progress card or automatic sorting is added.
+Completed checklist rows use the existing muted-text token. Section add, edit
+and collapse controls belong beside their label, not the global toolbar.
+No completion counter, progress card or automatic sorting is added.
 
 Before release, render at least:
 
