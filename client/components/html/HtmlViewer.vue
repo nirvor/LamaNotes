@@ -1,5 +1,9 @@
 <template>
-  <div ref="viewerElement" class="lamanotes-html-viewer">
+  <div
+    ref="viewerElement"
+    class="lamanotes-html-viewer"
+    @click="openNativeReaderLink"
+  >
     <div
       class="toastui-editor-contents lamanotes-html-contents"
       v-html="html"
@@ -9,6 +13,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { enhanceReaderLinks, openNativeReaderLink } from "../../readerLinks.js";
 
 let renderEnhancementsPromise = null;
 const renderedHtmlCache = new Map();
@@ -27,18 +32,23 @@ const viewerElement = ref();
 const emit = defineEmits(["rendered"]);
 let enhancementRun = 0;
 
-const html = computed(() => cachedRenderableHtml(props.initialValue || ""));
+const html = computed(() =>
+  cachedRenderableHtml(props.initialValue || "", props.noteTitle),
+);
 
-function cachedRenderableHtml(value) {
-  if (renderedHtmlCache.has(value)) {
-    const cached = renderedHtmlCache.get(value);
-    renderedHtmlCache.delete(value);
-    renderedHtmlCache.set(value, cached);
+function cachedRenderableHtml(value, noteTitle) {
+  const page = new URL(window.location.href);
+  page.hash = "";
+  const key = page.href + "\0" + (noteTitle || "") + "\0" + value;
+  if (renderedHtmlCache.has(key)) {
+    const cached = renderedHtmlCache.get(key);
+    renderedHtmlCache.delete(key);
+    renderedHtmlCache.set(key, cached);
     return cached;
   }
 
-  const rendered = renderSafeHtml(value);
-  renderedHtmlCache.set(value, rendered);
+  const rendered = renderSafeHtml(value, page.href);
+  renderedHtmlCache.set(key, rendered);
   if (renderedHtmlCache.size > renderedHtmlCacheLimit) {
     renderedHtmlCache.delete(renderedHtmlCache.keys().next().value);
   }
@@ -53,7 +63,7 @@ function loadRenderEnhancements() {
   return renderEnhancementsPromise;
 }
 
-function renderSafeHtml(value) {
+function renderSafeHtml(value, documentUrl) {
   const documentValue = new DOMParser().parseFromString(value, "text/html");
   const body = documentValue.body;
 
@@ -79,6 +89,7 @@ function renderSafeHtml(value) {
     });
   });
 
+  enhanceReaderLinks(body, documentUrl);
   return body.innerHTML;
 }
 
