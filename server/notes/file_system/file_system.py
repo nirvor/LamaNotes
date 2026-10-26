@@ -12,7 +12,7 @@ from html.parser import HTMLParser
 from typing import Iterable, List, Literal, Set, Tuple
 
 import whoosh
-from bs4 import BeautifulSoup, NavigableString
+from bs4 import BeautifulSoup
 from whoosh import writing
 from whoosh.analysis import CharsetFilter, StemmingAnalyzer
 from whoosh.fields import DATETIME, ID, KEYWORD, TEXT, SchemaClass
@@ -26,7 +26,7 @@ from whoosh.support.charset import accent_map
 
 from helpers import get_env, is_valid_filename
 from notes.identity import preserve_note_id, read_note_id
-from notes.tag_policy import split_tag_list
+from notes.tag_policy import TOPIC_ID_RE, replace_tag_metadata, split_tag_list
 from logger import logger
 from publications.metadata import (
     PUBLICATION_FILE_LOCK,
@@ -527,7 +527,7 @@ class NoteSemanticParser(HTMLParser):
                 self.meta_description = description
         elif name in RESEARCH_TOPIC_META_NAMES:
             topic = attrs_dict.get("content", "").strip().casefold()
-            if RESEARCH_TOPIC_TAG_RE.fullmatch(topic):
+            if TOPIC_ID_RE.fullmatch(topic):
                 self.primary_research_topic = topic
         elif name in RESEARCH_ID_META_NAMES:
             research_id = attrs_dict.get("content", "").strip().casefold()
@@ -697,7 +697,7 @@ class FileSystemNotes(BaseNotes):
             )
 
     def update_research_note(self, data: ResearchNoteUpdate) -> NoteIndexEntry:
-        """Safely update the title and one primary r-* topic."""
+        """Safely update the title and one explicit Research topic ID."""
         with PUBLICATION_FILE_LOCK:
             context = self._resolve_research_note(data)
             filepath = self._existing_path_from_title(context.title)
@@ -891,7 +891,9 @@ class FileSystemNotes(BaseNotes):
                 )
 
         context = self.get_context(data.current_title)
-        if context.note_kind != "research" or "research" not in context.tags:
+        if context.note_kind != "research" or not (
+            "research" in context.tags or context.research_id or context.primary_research_topic
+        ):
             raise ResearchNoteContractError(
                 "The selected file is not a Research Note."
             )
@@ -909,26 +911,21 @@ class FileSystemNotes(BaseNotes):
         new_title: str,
         research_topic: str,
     ) -> str:
-        soup = BeautifulSoup(content, "html.parser")
+        previous = cls._context_from_note(Note(title=new_title, content=content, last_modified=1))
+        target_tags = {tag for tag in previous.tags if not RESEARCH_TOPIC_TAG_RE.fullmatch(tag)} | {"research"}
+        try:
+            rewritten = replace_tag_metadata(
+                content, target_tags, expected_tags=previous.tags,
+                research_topic=research_topic, expected_primary_topic=previous.primary_research_topic,
+            ).content
+        except ValueError as exc:
+            raise ResearchNoteContractError(str(exc)) from exc
+        soup = BeautifulSoup(rewritten, "html.parser")
         body = soup.body
         if body is None:
             raise ResearchNoteContractError(
                 "The Research Note needs an HTML body."
             )
-
-        _, meta_tags, visible_tags = cls._html_to_text_and_meta_tags(content)
-        meta_tags = {
-            tag
-            for tag in meta_tags
-            if tag != "research" and not tag.startswith("r-")
-        }
-        visible_tags = {
-            tag
-            for tag in visible_tags
-            if tag != "research" and not tag.startswith("r-")
-        }
-        next_meta_tags = sorted(meta_tags) + ["research", research_topic]
-        next_visible_tags = sorted(visible_tags) + ["research", research_topic]
 
         if soup.title is not None:
             soup.title.string = new_title
@@ -937,42 +934,6 @@ class FileSystemNotes(BaseNotes):
             first_heading.clear()
             first_heading.append(new_title)
 
-        cls._set_html_meta(
-            soup,
-            TAG_META_NAMES,
-            "lamanotes-tags",
-            ",".join(next_meta_tags),
-        )
-        cls._set_html_meta(
-            soup,
-            RESEARCH_TOPIC_META_NAMES,
-            "lamanotes-research-topic",
-            research_topic,
-        )
-
-        emptied_parents = []
-        for node in soup.find_all(string=VISIBLE_RESEARCH_TAG_RE):
-            if not isinstance(node, NavigableString):
-                continue
-            parent = node.parent
-            if parent and parent.name in {"script", "style", "title"}:
-                continue
-            cleaned = VISIBLE_RESEARCH_TAG_RE.sub("", str(node))
-            node.replace_with(cleaned)
-            if parent and all(parent is not item for item in emptied_parents):
-                emptied_parents.append(parent)
-        for parent in emptied_parents:
-            if (
-                parent.name in {"p", "footer"}
-                and not parent.get_text(strip=True)
-                and not parent.find(True)
-            ):
-                parent.decompose()
-
-        tag_line = soup.new_tag("p")
-        tag_line["class"] = ["lamanotes-research-tags"]
-        tag_line.string = " ".join(f"#{tag}" for tag in next_visible_tags)
-        body.append(tag_line)
         return str(soup)
 
     @staticmethod
@@ -1022,18 +983,11 @@ class FileSystemNotes(BaseNotes):
         visible_topics = {
             tag for tag in visible_tags if RESEARCH_TOPIC_TAG_RE.fullmatch(tag)
         }
-        visible_tokens = [
-            token.casefold().lstrip("#")
-            for token in VISIBLE_RESEARCH_TAG_RE.findall(parser.text)
-        ]
         if (
             parser.primary_research_topic != research_topic
             or "research" not in meta_tags
-            or meta_topics != {research_topic}
-            or "research" not in visible_tags
-            or visible_topics != {research_topic}
-            or visible_tokens.count("research") != 1
-            or visible_tokens.count(research_topic) != 1
+            or meta_topics
+            or visible_topics
         ):
             raise ResearchNoteContractError(
                 "The Research Note tags could not be normalized safely."
@@ -1236,13 +1190,16 @@ class FileSystemNotes(BaseNotes):
         else:
             context = cls._markdown_context_from_note(note)
 
-        research_topics = cls._research_topics(context.tags)
-        primary_topic = (
-            context.primary_research_topic
-            if context.primary_research_topic in research_topics
-            else research_topics[0] if len(research_topics) == 1 else None
+        is_research = context.note_kind != "work" and bool(
+            "research" in context.tags or context.research_id or context.primary_research_topic
         )
-        is_research = "research" in context.tags
+        research_topics = (
+            [context.primary_research_topic] if context.primary_research_topic
+            else cls._research_topics(context.tags)
+        ) if is_research else []
+        primary_topic = context.primary_research_topic if is_research else None
+        if primary_topic is None and len(research_topics) == 1:
+            primary_topic = research_topics[0]
         context = context.model_copy(
             update={
                 "research_topics": research_topics,
@@ -1320,7 +1277,7 @@ class FileSystemNotes(BaseNotes):
             lines.append(f"Research ID: {context.research_id}")
         if context.primary_research_topic:
             lines.append(
-                f"Primary Research Topic: #{context.primary_research_topic}"
+                f"Primary Research Topic: {context.primary_research_topic}"
             )
         if context.research_type:
             lines.append(f"Research Type: {context.research_type}")

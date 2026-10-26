@@ -13,12 +13,16 @@ fallback when there is no such row. Hidden `pinned` metadata survives a visible
 row change, but stale topic metadata must not reappear through the semantic
 index. Search, the semantic index and the tag list use the same extracted tags.
 
-## Workflow and topic tags
+## Retrieval tags and Research topics
 
-- `private`, `work` and `infra` remain ordinary retrieval labels.
-- `research` identifies Research retrieval. Valid `r-*` tags are its topic
-  facets, with the existing optional primary-topic metadata. A topic tag alone
-  does not make a note Research.
+- The curated Library labels are `research`, `shared`, `work`, `gaming`,
+  `health`, `rezepte`, `stamsried`, `lamahiking`, `lamax` and `lamabot`.
+  Manual notes can still receive another useful tag later.
+- `research` retrieves Research notes. Their topic ID lives independently in
+  `lamanotes-research-topic` metadata. Existing opaque `r-*` IDs stay compatible
+  but are no longer retrieval tags. Readers prefer explicit topic metadata and
+  fall back to legacy `r-*` tags for older notes. A valid Research ID or explicit
+  topic also preserves Research semantics, while Work notes remain excluded.
 - `shared` retrieves source material saved through the Android share intake.
   It is provenance, not a second folder or a capability grant.
 - Pinning belongs to the star action. The hidden compatibility token `pinned`
@@ -44,14 +48,16 @@ includes the format marker. Include current note/Research IDs when available.
 
 ```json
 {
-  "schema": 1,
+  "schema": 2,
   "notes": [
     {
       "filename": "Example.html",
       "sourceSha256": "<64 lowercase hex characters>",
       "researchId": "lr-<32 lowercase hex characters>",
-      "expectedPrimaryTopic": "r-acceptance",
-      "replacements": {"r-acceptance": "r-methods"}
+      "expectedTags": ["private", "research", "r-methods", "pinned"],
+      "tags": ["research"],
+      "expectedPrimaryTopic": "r-methods",
+      "researchTopic": "r-methods"
     }
   ]
 }
@@ -64,10 +70,12 @@ python -m notes.tag_cleanup --directory <Library> --changes <private-plan.json>
 ```
 
 The preview reports tags, hashes and changed span counts, without note bodies.
-The transformer edits only the selected tokens in tag metadata, existing
-primary-topic metadata and tag-only HTML text. All other source bytes, including
-titles, prose, URLs, media, identity and Research provenance, stay exact. It
-rejects disagreement between primary-topic metadata and the tag rows.
+Schema 2 replaces the exact audited tag set, preserves hidden pinning and writes
+the planned topic explicitly. It updates tag-only HTML rows and tag-only lines
+in canonical Work/text Markdown sources together with tag metadata. All other
+source bytes, including titles, prose, URLs, media, identity and Research
+provenance, stay exact. Source hashes, tag sets and previous primary topics are
+guards. Schema 1 remains available for older replacement-only plans.
 
 An approved `--apply` belongs in the coordinated release window after the named
 backup, with the note writer stopped. Run as the note-file owner. All entries

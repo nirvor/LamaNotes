@@ -145,6 +145,43 @@ class LiveTagTests(unittest.TestCase):
 
 
 class ResearchTopicFacetTests(unittest.TestCase):
+    def test_explicit_topic_ids_are_independent_of_retrieval_tags_and_prefix(self):
+        for topic in ("r-agent-tools", "agent-tools"):
+            content = (
+                '<html><head><meta name="lamanotes-tags" content="research,lamax">'
+                f'<meta name="lamanotes-research-topic" content="{topic}">'
+                '<meta name="lamanotes-research-id" content="lr-0123456789abcdef0123456789abcdef">'
+                '<meta name="lamanotes-research-origin" content="codex">'
+                '</head><body><p>#research #lamax</p></body></html>'
+            )
+            context = FileSystemNotes._context_from_note(Note(title="Topic", content=content, last_modified=1))
+            entry = FileSystemNotes._index_entry_from_context(context)
+            self.assertEqual(context.tags, ["lamax", "research"])
+            self.assertEqual(entry.research_topics, [topic])
+            self.assertEqual(entry.primary_research_topic, topic)
+            self.assertEqual(entry.research_origin, "codex")
+
+    def test_explicit_metadata_identifies_research_without_a_tag_and_never_exposes_work(self):
+        content = (
+            '<html><head><meta name="lamanotes-tags" content="lamabot">'
+            '<meta name="lamanotes-research-topic" content="r-robotics">'
+            '<meta name="lamanotes-research-id" content="lr-0123456789abcdef0123456789abcdef">'
+            '<meta name="lamanotes-research-type" content="practical">'
+            '<meta name="lamanotes-research-freshness" content="1-week">'
+            '</head><body><p>#lamabot</p></body></html>'
+        )
+        context = FileSystemNotes._context_from_note(Note(title="Topic", content=content, last_modified=1))
+        self.assertEqual(context.primary_research_topic, "r-robotics")
+        self.assertEqual(context.research_type, "practical")
+        work = content.replace('<meta name="lamanotes-tags"', '<meta name="lamanotes-note-kind" content="work"><meta name="lamanotes-tags"')
+        context = FileSystemNotes._context_from_note(Note(title="Work", content=work, last_modified=1))
+        self.assertEqual(context.note_kind, "work")
+        self.assertEqual(context.research_topics, [])
+        self.assertIsNone(context.primary_research_topic)
+        self.assertIsNone(context.research_id)
+        self.assertIsNone(context.research_type)
+        self.assertIsNone(context.research_freshness)
+
     def test_index_exposes_stable_research_provenance(self):
         with tempfile.TemporaryDirectory() as directory:
             Path(directory, "provenance.html").write_text(
@@ -361,13 +398,12 @@ class ResearchNoteUpdateTests(unittest.TestCase):
                 r'name="lamanotes-public-slug"\s*/>',
             )
             self.assertEqual(content.count("#research"), 1)
-            self.assertEqual(content.count("#r-new-topic"), 1)
+            self.assertEqual(content.count("#r-new-topic"), 0)
             self.assertNotIn("#r-old-topic", content)
             self.assertNotIn("#r-extra-topic", content)
             self.assertRegex(
                 content,
-                r'<p class="lamanotes-research-tags">'
-                r"#research #r-new-topic</p>\s*</body>",
+                r"<p>#research</p>",
             )
 
     def test_legacy_note_without_research_id_can_be_updated_by_version(self):
@@ -422,7 +458,27 @@ class ResearchNoteUpdateTests(unittest.TestCase):
             self.assertEqual(updated.primary_research_topic, "r-current")
             self.assertEqual(updated.research_topics, ["r-current"])
             self.assertEqual(content.count("#research"), 1)
-            self.assertEqual(content.count("#r-current"), 1)
+            self.assertEqual(content.count("#r-current"), 0)
+
+    def test_topic_edit_preserves_curated_tags_and_literal_topic_mentions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory, "Curated.html")
+            source.write_text(
+                '<html><head><meta name="lamanotes-tags" content="research,gaming,pinned">'
+                '<meta name="lamanotes-research-topic" content="r-games">'
+                '</head><body><h1>Curated</h1><p>Keep #r-games in prose.</p>'
+                '<p>#research #gaming</p></body></html>', encoding="utf-8",
+            )
+            notes = object.__new__(FileSystemNotes)
+            notes.storage_path = directory
+            updated = notes.update_research_note(ResearchNoteUpdate(
+                currentTitle="Curated", newTitle="Curated", primaryResearchTopic="games",
+                expectedLastModified=source.stat().st_mtime,
+            ))
+            self.assertEqual(updated.tags, ["gaming", "pinned", "research"])
+            self.assertEqual(updated.primary_research_topic, "games")
+            self.assertIn("Keep #r-games in prose.", source.read_text(encoding="utf-8"))
+            self.assertNotIn("#games", source.read_text(encoding="utf-8"))
 
     def test_stale_version_is_rejected_without_modifying_the_note(self):
         with tempfile.TemporaryDirectory() as directory:

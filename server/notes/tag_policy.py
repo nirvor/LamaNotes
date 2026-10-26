@@ -6,6 +6,7 @@ import re
 
 TAG_RE = re.compile(r"[a-z0-9_-]+", re.IGNORECASE)
 TOPIC_RE = re.compile(r"r-[a-z0-9]+(?:-[a-z0-9]+)*")
+TOPIC_ID_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 TAG_META_NAMES = {"lamanotes-tags", "flatnotes-tags"}
 TOPIC_META_NAMES = {"lamanotes-research-topic", "flatnotes-research-topic"}
 TECHNICAL_SUGGESTION_TAGS = frozenset({"r-acceptance", "r-fixture", "design-reference", "publisher-demo"})
@@ -40,6 +41,9 @@ class _TagDocument(HTMLParser):
         self.tag_text_spans = set()
         self.candidates = []
         self.skip_depth = 0
+        self.head_end = None
+        self.canonical_sources = []
+        self.source_candidate = None
         self.feed(content)
         self.close()
 
@@ -48,9 +52,16 @@ class _TagDocument(HTMLParser):
         return self.line_offsets[line - 1] + column
 
     def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if self.source_candidate:
+            self.source_candidate["nested"] = True
+            if tag == self.source_candidate["tag"]:
+                self.source_candidate["depth"] += 1
+        elif ((tag == "template" and {"data-lamanotes-work-markdown", "data-lamanotes-text-markdown"} & attributes.keys())
+              or "data-lamanotes-work-source" in attributes):
+            self.source_candidate = {"tag": tag, "start": self.source_offset() + len(self.get_starttag_text()), "depth": 1, "nested": False}
         if tag in {"script", "style", "template"}:
             self.skip_depth += 1
-        attributes = dict(attrs)
         if tag == "meta":
             self.metadata.append((str(attributes.get("name", "")).lower(), attributes.get("content", ""), self.source_offset(), self.get_starttag_text()))
         if not self.skip_depth and tag in {"div", "p", "footer"}:
@@ -62,6 +73,13 @@ class _TagDocument(HTMLParser):
             self.handle_endtag(tag)
 
     def handle_endtag(self, tag):
+        if tag == "head":
+            self.head_end = self.source_offset()
+        if self.source_candidate and tag == self.source_candidate["tag"]:
+            self.source_candidate["depth"] -= 1
+            if not self.source_candidate["depth"]:
+                self.canonical_sources.append((self.source_candidate["start"], self.source_offset(), self.source_candidate["nested"]))
+                self.source_candidate = None
         if tag in {"script", "style", "template"} and self.skip_depth:
             self.skip_depth -= 1
             return
@@ -177,3 +195,123 @@ def _replace_tokens(value, mapping, *, allow_bare=False):
     prefix = "#?" if allow_bare else "#"
     pattern = re.compile(r"(?<![a-zA-Z0-9_-])(" + prefix + r")(" + "|".join(re.escape(key) for key in sorted(mapping, key=len, reverse=True)) + r")(?![a-zA-Z0-9_-])", re.IGNORECASE)
     return pattern.sub(lambda match: match.group(1) + mapping[match.group(2).lower()], value)
+
+
+def replace_tag_metadata(content, tags, *, expected_tags, research_topic=None, expected_primary_topic=None):
+    """Replace an audited tag set and explicit topic without reserializing HTML."""
+    def valid_tags(values):
+        if not isinstance(values, (list, tuple, set, frozenset)):
+            raise ValueError("Use an explicit tag list.")
+        normalized = {normalize_tag_name(value) for value in values}
+        if "" in normalized:
+            raise ValueError("The tag plan contains an invalid tag.")
+        return normalized
+
+    before = _TagDocument(content)
+    if before.tags != valid_tags(expected_tags):
+        raise ValueError("The tag set changed after the audit.")
+    if len(before.primary_topics) > 1:
+        raise ValueError("Conflicting primary Research topic metadata needs review.")
+    target = valid_tags(tags)
+    if "pinned" in target and "pinned" not in before.tags:
+        raise ValueError("A tag cleanup must preserve existing pinning.")
+    target.update(before.tags & {"pinned"})
+    if research_topic is not None and not TOPIC_ID_RE.fullmatch(research_topic):
+        raise ValueError("The Research topic ID is invalid.")
+    if before.source_candidate:
+        raise ValueError("The canonical Markdown source is not closed.")
+
+    from .file_system.file_system import FileSystemNotes
+    from .models import Note
+    previous_context = FileSystemNotes._context_from_note(Note(title="", content=content, last_modified=1))
+    if previous_context.primary_research_topic != expected_primary_topic:
+        raise ValueError("The primary Research topic changed after the audit.")
+    if previous_context.research_topics and research_topic is None:
+        raise ValueError("Keep the Research topic explicitly when removing topic tags.")
+    patches = {}
+    inserted = []
+    found_tags = found_topic = False
+    for name, value, start, raw in before.metadata:
+        if name not in TAG_META_NAMES | TOPIC_META_NAMES:
+            continue
+        attribute = re.search(r"(?<![\w:-])content\s*=\s*(['\"])(.*?)\1", raw, re.IGNORECASE | re.DOTALL)
+        if not attribute:
+            raise ValueError("Quoted tag metadata is required for a surgical edit.")
+        original = attribute.group(2)
+        if name in TAG_META_NAMES:
+            found_tags = True
+            if not re.fullmatch(r"[\s,#a-zA-Z0-9_-]*", original):
+                raise ValueError("Tag metadata with other syntax needs manual review.")
+            replacement = ",".join(sorted(target))
+        else:
+            found_topic = True
+            replacement = research_topic or ""
+        if replacement != original:
+            patches[(start + attribute.start(2), start + attribute.end(2))] = replacement
+    if not found_tags and (target or before.tag_text_spans):
+        inserted.append('<meta name="lamanotes-tags" content="' + ",".join(sorted(target)) + '">')
+    if research_topic and not found_topic:
+        inserted.append('<meta name="lamanotes-research-topic" content="' + research_topic + '">')
+    if inserted:
+        if before.head_end is None:
+            raise ValueError("An HTML head is required to add guarded metadata.")
+        patches[(before.head_end, before.head_end)] = "".join(inserted)
+
+    visible = " ".join("#" + tag for tag in sorted(target - {"pinned"}))
+    first = True
+    for start, end in sorted(before.tag_text_spans):
+        original = content[start:end]
+        if not original.strip():
+            continue
+        replacement = re.sub(r"\S(?:[\s\S]*\S)?", visible if first else "", original, count=1)
+        first = False
+        if replacement != original:
+            patches[(start, end)] = replacement
+    for start, end, nested in before.canonical_sources:
+        if nested:
+            raise ValueError("Canonical Markdown with nested HTML needs manual review.")
+        patches.update(_canonical_tag_patches(content[start:end], start, visible))
+
+    ordered = sorted(patches)
+    if any(left[1] > right[0] for left, right in zip(ordered, ordered[1:])):
+        raise ValueError("Overlapping tag markup needs manual review.")
+    updated = content
+    for start, end in reversed(ordered):
+        updated = updated[:start] + patches[(start, end)] + updated[end:]
+    after = _TagDocument(updated)
+    if FileSystemNotes._extract_tags(content)[1] != before.tags or FileSystemNotes._extract_tags(updated)[1] != target:
+        raise ValueError("The tag markup needs review with the normal note parser.")
+    protected = {name for name, _, _, _ in before.metadata} - TAG_META_NAMES - TOPIC_META_NAMES
+    if before.identities(protected) != after.identities(protected):
+        raise ValueError("A tag cleanup must preserve identity and provenance metadata.")
+    context = FileSystemNotes._context_from_note(Note(title="", content=updated, last_modified=1))
+    if context.primary_research_topic != research_topic:
+        raise ValueError("The explicit Research topic could not be preserved.")
+    return TagRewrite(updated, tuple(sorted(before.tags)), tuple(sorted(target)), tuple((start, end, patches[(start, end)]) for start, end in ordered))
+
+
+def _canonical_tag_patches(source, start, visible):
+    patches = {}
+    fence = None
+    first = True
+    offset = start
+    for line in source.splitlines(keepends=True):
+        text = unescape(line.rstrip("\r\n"))
+        delimiter = re.match(r"^\s{0,3}(`{3,}|~{3,})", text)
+        if delimiter:
+            marker = delimiter.group(1)
+            if fence is None:
+                fence = marker
+            elif marker[0] == fence[0] and len(marker) >= len(fence):
+                fence = None
+        elif fence is None and re.fullmatch(r"\s*(?:#[a-zA-Z0-9_-]+\s*)+", text):
+            original = line.rstrip("\r\n")
+            replacement = re.sub(r"\S(?:[\s\S]*\S)?", visible if first else "", original, count=1)
+            first = False
+            if replacement != original:
+                patches[(offset, offset + len(original))] = replacement
+        offset += len(line)
+    if first and visible:
+        newline = "\r\n" if "\r\n" in source else "\n"
+        patches[(start + len(source), start + len(source))] = newline + newline + visible
+    return patches

@@ -76,8 +76,8 @@ class NoteUpdate(CustomBaseModel):
 
 def normalize_research_topic(value: str) -> str:
     topic = str(value or "").strip().casefold().lstrip("#")
-    if not re.fullmatch(r"r-[a-z0-9]+(?:-[a-z0-9]+)*", topic):
-        raise ValueError("primary research topic must be a valid r-* tag")
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", topic):
+        raise ValueError("primary research topic must be a valid topic ID")
     return topic
 
 
@@ -95,7 +95,7 @@ class ResearchNoteUpdate(CustomBaseModel):
     primary_research_topic: Annotated[
         str,
         AfterValidator(normalize_research_topic),
-    ] = Field(min_length=3, max_length=48)
+    ] = Field(min_length=1, max_length=48)
     expected_last_modified: float = Field(gt=0)
     research_id: Optional[str] = Field(None, max_length=35)
 

@@ -7,7 +7,8 @@ from pathlib import Path
 
 from notes.file_system.file_system import FileSystemNotes, IndexSchema, INDEX_SCHEMA_VERSION
 from notes.tag_cleanup import run
-from notes.tag_policy import normalize_tag_name, rewrite_tag_metadata
+from notes.models import Note
+from notes.tag_policy import normalize_tag_name, replace_tag_metadata, rewrite_tag_metadata
 
 
 def research_html(topic="r-acceptance"):
@@ -24,6 +25,75 @@ def research_html(topic="r-acceptance"):
 
 
 class TagPolicyTests(unittest.TestCase):
+    def test_exact_set_cleanup_preserves_prose_figures_identity_and_topic(self):
+        original = research_html().replace(
+            '</head>', '<meta name="lamanotes-research-origin" content="codex"><meta name="custom-data" content="keep &amp; exact"></head>'
+        ).replace('<script>', '<figure><img src="attachments/original.svg" alt="Data"></figure><script>')
+        result = replace_tag_metadata(original, ["research", "gaming"],
+                                      expected_tags=["private", "research", "r-acceptance", "pinned"],
+                                      research_topic="r-acceptance", expected_primary_topic="r-acceptance")
+        self.assertEqual(result.tags, ("gaming", "pinned", "research"))
+        self.assertIn('<p>This prose mentions #r-acceptance and keeps https://example.test/r-acceptance.</p>', result.content)
+        self.assertIn('<script>const x="#r-acceptance";</script>', result.content)
+        self.assertIn('<figure><img src="attachments/original.svg" alt="Data"></figure>', result.content)
+        self.assertIn('<meta name="custom-data" content="keep &amp; exact">', result.content)
+        self.assertIn("<meta name='lamanotes-research-topic' content='r-acceptance'>", result.content)
+        rebuilt = original
+        for start, end, replacement in reversed(result.changed_spans):
+            rebuilt = rebuilt[:start] + replacement + rebuilt[end:]
+        self.assertEqual(result.content, rebuilt)
+        self.assertTrue(result.content.startswith("\ufeff<!DOCTYPE html>\r\n"))
+        context = FileSystemNotes._context_from_note(Note(title="Retained", content=result.content, last_modified=1))
+        self.assertEqual(context.research_id, "lr-0123456789abcdef0123456789abcdef")
+        self.assertEqual(context.research_origin, "codex")
+        self.assertEqual(context.primary_research_topic, "r-acceptance")
+
+    def test_exact_set_adds_explicit_topic_and_updates_both_canonical_sources_only_on_tag_lines(self):
+        for marker in ("data-lamanotes-work-markdown", "data-lamanotes-text-markdown"):
+            source = '<html><head><meta name="lamanotes-tags" content="research,private,r-food,pinned"></head><body><p>#research #private #r-food</p>'
+            source += f'<template {marker}>Keep #private in prose.\r\n\r\n```text\r\n#private\r\n```\r\n\r\n\\#private\r\n\r\n#private #research #r-food\r\n</template></body></html>'
+            result = replace_tag_metadata(source, ["research", "rezepte"],
+                                          expected_tags=["research", "private", "r-food", "pinned"],
+                                          research_topic="r-food", expected_primary_topic="r-food")
+            self.assertIn('<meta name="lamanotes-research-topic" content="r-food">', result.content)
+            self.assertIn('Keep #private in prose.\r\n\r\n```text\r\n#private\r\n```\r\n\r\n\\#private\r\n\r\n#research #rezepte\r\n</template>', result.content)
+            self.assertEqual(FileSystemNotes._extract_tags(result.content)[1], {"research", "rezepte", "pinned"})
+
+    def test_removing_last_visible_and_canonical_tags_does_not_resurrect_stale_metadata(self):
+        source = '<html><head><meta name="flatnotes-tags" content="private,old,pinned"></head><body><p>Keep my text.</p><p>#private</p><template data-lamanotes-text-markdown>Keep my text.\n\n#private</template></body></html>'
+        result = replace_tag_metadata(source, [], expected_tags=["private", "pinned"])
+        self.assertEqual(result.tags, ("pinned",))
+        self.assertIn('<meta name="flatnotes-tags" content="pinned">', result.content)
+        self.assertIn('>Keep my text.\n\n</template>', result.content)
+        self.assertEqual(FileSystemNotes._extract_tags(result.content)[1], {"pinned"})
+
+    def test_new_retrieval_tags_are_kept_in_a_canonical_source_without_existing_tag_lines(self):
+        source = '<html><head><meta name="lamanotes-tags" content="private,pinned"></head><body><p>Keep my text.</p><template data-lamanotes-text-markdown>Keep my text.</template></body></html>'
+        result = replace_tag_metadata(source, ["lamax"], expected_tags=["private", "pinned"])
+        self.assertIn('>Keep my text.\n\n#lamax</template>', result.content)
+        self.assertEqual(FileSystemNotes._extract_tags(result.content)[1], {"lamax", "pinned"})
+
+    def test_exact_set_rejects_changed_tags_topic_loss_and_new_pinning(self):
+        with self.assertRaisesRegex(ValueError, "tag set"):
+            replace_tag_metadata(research_html(), ["research"], expected_tags=["research"], research_topic="r-acceptance", expected_primary_topic="r-acceptance")
+        with self.assertRaisesRegex(ValueError, "Keep the Research topic"):
+            replace_tag_metadata(research_html(), ["research"], expected_tags=["private", "research", "r-acceptance", "pinned"], expected_primary_topic="r-acceptance")
+        with self.assertRaisesRegex(ValueError, "pinning"):
+            replace_tag_metadata('<html><head><meta name="lamanotes-tags" content="work"></head><body><p>#work</p></body></html>', ["work", "pinned"], expected_tags=["work"])
+
+    def test_schema_two_exact_set_preview_and_guarded_apply(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory, "Exact.html")
+            raw = research_html().encode("utf-8")
+            path.write_bytes(raw)
+            plan = {"schema": 2, "notes": [{"filename": path.name, "sourceSha256": hashlib.sha256(raw).hexdigest(),
+                    "expectedTags": ["private", "research", "r-acceptance", "pinned"], "tags": ["research", "gaming"],
+                    "researchTopic": "r-acceptance", "expectedPrimaryTopic": "r-acceptance"}]}
+            preview = run(directory, plan)
+            self.assertEqual(preview["schema"], 2)
+            self.assertEqual(path.read_bytes(), raw)
+            run(directory, plan, apply=True)
+            self.assertEqual(FileSystemNotes._extract_tags(path.read_text(encoding="utf-8"))[1], {"research", "gaming", "pinned"})
     def test_tag_identity_trims_before_hash_and_deduplicates_existing_metadata(self):
         self.assertEqual(normalize_tag_name("  #ReSeArCh  "), "research")
         self.assertEqual(normalize_tag_name("two words"), "")

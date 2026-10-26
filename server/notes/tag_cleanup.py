@@ -8,14 +8,14 @@ import re
 import stat
 import tempfile
 
-from .tag_policy import _TagDocument, rewrite_tag_metadata
+from .tag_policy import _TagDocument, replace_tag_metadata, rewrite_tag_metadata
 
 
 def prepare(directory, changes):
     root = Path(directory).resolve(strict=True)
     rows = changes.get("notes", [])
-    if changes.get("schema") != 1 or not isinstance(rows, list) or len(rows) > 200:
-        raise ValueError("Use an explicit schema 1 metadata plan.")
+    if changes.get("schema") not in {1, 2} or not isinstance(rows, list) or len(rows) > 200:
+        raise ValueError("Use an explicit schema 1 or 2 metadata plan.")
     prepared = []
     seen = set()
     for row in rows:
@@ -35,7 +35,13 @@ def prepare(directory, changes):
         for field, names in (("researchId", {"lamanotes-research-id", "flatnotes-research-id"}), ("noteId", {"lamanotes-note-id", "flatnotes-note-id"})):
             if field in row and {value for _, value in document.identities(names)} != {row[field]}:
                 raise ValueError("The planned note identity changed: " + filename)
-        result = rewrite_tag_metadata(content, row["replacements"], expected_primary_topic=row.get("expectedPrimaryTopic"))
+        if changes["schema"] == 2:
+            if not {"expectedTags", "tags", "expectedPrimaryTopic", "researchTopic"} <= row.keys():
+                raise ValueError("An exact-set plan needs tag and Research topic guards.")
+            result = replace_tag_metadata(content, row["tags"], expected_tags=row["expectedTags"],
+                                          research_topic=row["researchTopic"], expected_primary_topic=row["expectedPrimaryTopic"])
+        else:
+            result = rewrite_tag_metadata(content, row["replacements"], expected_primary_topic=row.get("expectedPrimaryTopic"))
         prepared.append((path, raw, result.content.encode("utf-8"), result))
     return prepared
 
@@ -75,7 +81,7 @@ def run(directory, changes, *, apply=False):
                 atomic_replace(path, raw, updated)
         if any(raw != updated for _, raw, updated, _ in prepared):
             rebuild_index(directory)
-    return {"schema": 1, "applied": apply, "changedNotes": sum(raw != updated for _, raw, updated, _ in prepared),
+    return {"schema": changes["schema"], "applied": apply, "changedNotes": sum(raw != updated for _, raw, updated, _ in prepared),
             "preservesModificationTimes": True, "indexRebuilt": apply and any(raw != updated for _, raw, updated, _ in prepared),
             "notes": [{"filename": path.name, "sourceSha256": hashlib.sha256(raw).hexdigest(),
                        "resultSha256": hashlib.sha256(updated).hexdigest(), "previousTags": list(result.previous_tags),
