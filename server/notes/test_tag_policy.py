@@ -25,6 +25,14 @@ def research_html(topic="r-acceptance"):
 
 
 class TagPolicyTests(unittest.TestCase):
+    def test_headless_shared_fragment_keeps_its_tag_row_without_adding_a_document_shell(self):
+        source = '<article><p>Keep the source and attachment.</p><p>#shared</p></article>'
+        result = replace_tag_metadata(source, ["shared"], expected_tags=["shared"])
+        self.assertEqual(result.content, source)
+        self.assertEqual(result.changed_spans, ())
+        renamed = replace_tag_metadata(source, ["lamax"], expected_tags=["shared"])
+        self.assertEqual(renamed.content, source.replace('#shared', '#lamax'))
+
     def test_exact_set_cleanup_preserves_prose_figures_identity_and_topic(self):
         original = research_html().replace(
             '</head>', '<meta name="lamanotes-research-origin" content="codex"><meta name="custom-data" content="keep &amp; exact"></head>'

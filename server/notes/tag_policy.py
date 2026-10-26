@@ -248,7 +248,7 @@ def replace_tag_metadata(content, tags, *, expected_tags, research_topic=None, e
             replacement = research_topic or ""
         if replacement != original:
             patches[(start + attribute.start(2), start + attribute.end(2))] = replacement
-    if not found_tags and (target or before.tag_text_spans):
+    if not found_tags and (target or before.tag_text_spans) and (before.head_end is not None or not before.tag_text_spans):
         inserted.append('<meta name="lamanotes-tags" content="' + ",".join(sorted(target)) + '">')
     if research_topic and not found_topic:
         inserted.append('<meta name="lamanotes-research-topic" content="' + research_topic + '">')
