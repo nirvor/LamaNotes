@@ -1,13 +1,64 @@
-self.addEventListener("install", () => {
-  self.skipWaiting();
+const shellCachePrefix = "lamanotes-shell-";
+const shellVersion = "__LAMANOTES_SHELL_VERSION__";
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    (async () => {
+      const response = await fetch("/offline-shell.json", {
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Offline shell unavailable");
+      const manifest = await response.json();
+      if (
+        manifest.version !== shellVersion ||
+        !Array.isArray(manifest.resources)
+      )
+        throw new Error("Invalid offline shell");
+      const cache = await caches.open(shellCachePrefix + manifest.version);
+      await cache.addAll(manifest.resources);
+      await self.skipWaiting();
+    })(),
+  );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      const current = shellCachePrefix + shellVersion;
+      for (const name of await caches.keys()) {
+        if (name.startsWith(shellCachePrefix) && name !== current)
+          await caches.delete(name);
+      }
+      await self.clients.claim();
+    })(),
+  );
 });
 
 self.addEventListener("fetch", (event) => {
   const target = new URL(event.request.url);
+  if (
+    event.request.method === "GET" &&
+    target.origin === self.location.origin
+  ) {
+    if (
+      event.request.mode === "navigate" &&
+      !target.pathname.startsWith("/api/")
+    ) {
+      event.respondWith(navigateWithOfflineHome(event.request));
+      return;
+    }
+    if (
+      target.pathname.startsWith("/assets/") ||
+      /\.(?:woff2?|ttf)$/.test(target.pathname)
+    ) {
+      event.respondWith(
+        caches
+          .match(event.request)
+          .then((cached) => cached || fetch(event.request)),
+      );
+      return;
+    }
+  }
   if (
     event.request.method !== "POST" ||
     target.origin !== self.location.origin ||
@@ -16,6 +67,24 @@ self.addEventListener("fetch", (event) => {
     return;
   event.respondWith(holdSharedSelection(event.request));
 });
+
+async function navigateWithOfflineHome(request) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3500);
+  try {
+    const response = await fetch(request, { signal: controller.signal });
+    if (response.ok || response.status < 500) return response;
+  } catch {
+    // The cached home keeps quick capture available without a connection.
+  } finally {
+    clearTimeout(timeout);
+  }
+  const shell = await caches.match("/index.html");
+  if (!shell) return Response.error();
+  if (new URL(request.url).pathname !== "/")
+    return Response.redirect(new URL("/", self.location.origin).href, 303);
+  return shell;
+}
 
 async function holdSharedSelection(request) {
   try {

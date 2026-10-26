@@ -72,6 +72,10 @@ import { openNewNote } from "./newNoteNavigation.js";
 import { reportNativeReady } from "./nativeTelemetry.js";
 import { scheduleIdleWork } from "./performanceScheduling.js";
 import router from "./router.js";
+import {
+  startQuicknotesCapture,
+  stopQuicknotesCapture,
+} from "./quicknotesRuntime.js";
 
 const SearchModal = defineAsyncComponent(
   () => import("./partials/SearchModal.vue"),
@@ -120,6 +124,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  stopQuicknotesCapture();
   window.removeEventListener("keydown", globalShortcutHandler);
   cancelDeferredConfig?.();
   cancelIndexWarmup?.();
@@ -146,7 +151,7 @@ function loadInitialConfig() {
   const localFirst =
     desktopShell.enabled &&
     (route.name === "openFile" || window.location.pathname === "/open-file");
-  const warmConfig = desktopShell.enabled ? getCachedConfig() : null;
+  const warmConfig = getCachedConfig();
   if (warmConfig || localFirst) {
     globalStore.config = warmConfig || desktopFallbackConfig;
     markAppLoaded();
@@ -219,6 +224,15 @@ function markAppLoaded() {
 const showNavBar = computed(() => {
   return route.name !== "login";
 });
+
+watch(
+  () => globalStore.config.authType,
+  (type) => {
+    if (type && type !== "read_only") startQuicknotesCapture();
+    else if (type === "read_only") stopQuicknotesCapture();
+  },
+  { immediate: true },
+);
 
 const isNoteRoute = computed(
   () => route.name === "note" || route.name === "new",

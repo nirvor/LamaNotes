@@ -5,7 +5,7 @@ import test from "node:test";
 const apiSource = await readFile(new URL("./api.js", import.meta.url), "utf8");
 
 test("authenticated startup coalesces safe config and body-free index", () => {
-  assert.match(apiSource, /\.get\("api\/bootstrap"\)/);
+  assert.match(apiSource, /\.get\("api\/bootstrap"[,)]/);
   assert.match(apiSource, /applyBootstrap\(response\.data\)/);
   assert.match(
     apiSource,

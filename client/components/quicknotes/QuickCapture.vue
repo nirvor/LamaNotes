@@ -23,6 +23,7 @@
         aria-keyshortcuts="Control+Enter Meta+Enter"
         placeholder="Capture a thought..."
         spellcheck="true"
+        maxlength="10000"
         @input="$emit('update:modelValue', $event.target.value)"
         @focus="focused = true"
         @blur="focused = false"

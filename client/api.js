@@ -25,8 +25,11 @@ import router from "./router.js";
 import { createFocusQuicknotesRefresher } from "./focusIntegration.js";
 
 const api = axios.create();
-export const refreshFocusQuicknotesIntegration = createFocusQuicknotesRefresher(() =>
-  api.post("api/private/v1/integrations/focus/refresh", {}).then((response) => response.data),
+export const refreshFocusQuicknotesIntegration = createFocusQuicknotesRefresher(
+  () =>
+    api
+      .post("api/private/v1/integrations/focus/refresh", {})
+      .then((response) => response.data),
 );
 let configCache = null;
 const noteCache = new Map();
@@ -34,6 +37,21 @@ const searchCache = new Map();
 let cacheGeneration = 0;
 let semanticIndexCache = null;
 let tagCache = null;
+
+export async function getQuicknotesTarget() {
+  return (await api.get("api/quicknotes", { timeout: 6500 })).data;
+}
+
+export async function appendQuicknoteEntry(entry) {
+  const result = (
+    await api.post("api/quicknotes/entries", entry, { timeout: 10000 })
+  ).data;
+  noteCache.delete(result.title);
+  removeWarmNote(result.title);
+  clearIndexCaches();
+  void getSemanticIndex({ force: true }).catch(() => {});
+  return result;
+}
 let configRequest = null;
 let bootstrapRequest = null;
 let semanticIndexRequest = null;
@@ -204,7 +222,7 @@ export async function authCheck() {
 
   const requestGeneration = cacheGeneration;
   const request = api
-    .get("api/bootstrap")
+    .get("api/bootstrap", { timeout: 5000 })
     .then((response) => {
       if (requestGeneration === cacheGeneration) {
         applyBootstrap(response.data);

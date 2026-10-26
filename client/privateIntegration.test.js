@@ -95,8 +95,9 @@ test("share target requires local service-worker preview before explicit API imp
   });
   assert.equal(intercepted, false);
   assert.ok(source.includes("indexedDB.open"));
-  assert.ok(!source.includes("fetch("));
-  assert.ok(!source.includes("cache.put"));
+  const intake = source.slice(source.indexOf("async function holdSharedSelection"));
+  assert.ok(!intake.includes("fetch("));
+  assert.ok(!intake.includes("cache.put"));
 });
 
 test("capture UI never imports on file selection or mount", () => {

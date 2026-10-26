@@ -25,6 +25,16 @@ with a retained draft and version check. Preserve item order, heading semantics,
 keyboard focus and note bodies. No progress counters or list administration
 controls are added.
 
+Home quick capture sits above search as one quiet writing field. A tap expands
+it without opening the full editor. Keep 16px writing text, a44px Send target
+and no automatic keyboard on arrival. Confirm local persistence before clearing
+input. Offline entries retain their original Quicknotes ID and retry receipt.
+The small status line distinguishes device storage from a confirmed Library
+save. The cached static Home shell supports reopening offline, with no API or
+private note responses in the service-worker cache. Reconnect or reopening the
+app retries pending entries through the existing owner session. Background
+capture does not create notes, pair a new source or broaden LamaHiwi access.
+
 ## V2 is still LamaNotes
 
 Design Study V2 is a careful continuation of V1, not a rebrand. V1 already

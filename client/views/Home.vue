@@ -9,6 +9,16 @@
       fetchpriority="low"
     />
     <div class="lamanotes-home-inner">
+      <QuickCapture
+        v-if="globalStore.config.authType !== 'read_only'"
+        :model-value="capture.draft"
+        :busy="capture.busy"
+        :pending-count="capture.pendingCount"
+        :status="capture.status"
+        :message="capture.message"
+        @update:model-value="quickCapture.editDraft"
+        @submit="quickCapture.submit"
+      />
       <SearchInput
         :auto-focus="homeSearchAutoFocus"
         prominent-tag-cloud
@@ -122,6 +132,11 @@ import { isSystemTag } from "../systemTags.js";
 import { useToast } from "../toastStore.js";
 import SearchInput from "../partials/SearchInput.vue";
 import homeMarkUrl from "../assets/brand/lamanotes-home-mark.webp";
+import QuickCapture from "../components/quicknotes/QuickCapture.vue";
+import {
+  quicknotesCapture as quickCapture,
+  quicknotesCaptureState as capture,
+} from "../quicknotesRuntime.js";
 
 const globalStore = useGlobalStore();
 const homeSearchAutoFocus = shouldAutoFocusSearch(window);
@@ -180,12 +195,12 @@ onMounted(() => {
   );
   init();
 });
-onBeforeUnmount(() =>
+onBeforeUnmount(() => {
   window.removeEventListener(
     libraryIndexUpdatedEvent,
     semanticIndexUpdatedHandler,
-  ),
-);
+  );
+});
 </script>
 
 <style scoped>

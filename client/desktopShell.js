@@ -52,9 +52,6 @@ export function markCloudOffline() {
 }
 
 export function isCloudNetworkError(error) {
-  if (!desktopShell.enabled) {
-    return false;
-  }
   return (
     !error?.response ||
     error.response.headers?.["x-lamanotes-upstream"] === "offline" ||
