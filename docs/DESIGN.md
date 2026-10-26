@@ -52,8 +52,15 @@ handling never depend on a tag.
 - The Library remains flat. Tags are retrieval metadata, not folders.
 - Workspace files keep their original local path. "Keep as note" creates an
   independent Library snapshot, not a second sync relationship.
-- `research` is an exact normal tag. `r-*` tags are topic facets. Neither is a
+- `research` is an exact normal tag. Research topics live in explicit document
+  metadata and API fields, independently of retrieval tags. Existing opaque
+  `r-*` topic IDs remain compatible without appearing as tags. Neither is a
   CSS switch.
+- The maintained Library topics are `gaming`, `health`, `rezepte`, `stamsried`,
+  `lamahiking`, `lamax` and `lamabot`, alongside `research`, `shared` and `work`.
+  Automated Research authors use this small vocabulary. Manual tags remain
+  editable, including a deliberate future addition. Do not turn every entity,
+  source name, app implementation detail or Research topic into another tag.
 - The hidden `pinned` state belongs to the star action. Do not expose it as a
   visible replacement tag.
 - Work notes remain HTML snapshots with editable Markdown source. Legacy

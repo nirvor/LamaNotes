@@ -28,10 +28,10 @@ index. Search, the semantic index and the tag list use the same extracted tags.
 - Pinning belongs to the star action. The hidden compatibility token `pinned`
   stays available to existing saved queries without becoming a visible topic.
 
-The home suggestions omit exact technical labels `r-acceptance`, `r-fixture`,
-`design-reference` and `publisher-demo`. Typed search and All tags still include
-them. The six design-reference notes remain useful reference material. They
-are not deleted or silently treated as current personal Research.
+The curated cleanup removes obsolete test and design labels from the stored
+tags. Their reference notes remain intact. If a legacy technical label is
+encountered later, typed search and All tags remain available for inspection
+without promoting it in Home suggestions.
 
 The home screen uses `client/tagPolicy.js` for suggestion eligibility. Tag
 frequency or recent use can determine ordering, never font size or boldness.

@@ -26,7 +26,8 @@ test("research article keeps research metadata explicit", () => {
   assert.match(article, /class="lamanote-section-eyebrow"/);
   assert.match(article, /class="lamanote-result"/);
   assert.match(article, /class="lamanote-tags"/);
-  assert.match(article, /#research #r-topic/);
+  assert.match(article, /#research<\/p>/);
+  assert.doesNotMatch(article, /#r-topic/);
   assert.doesNotMatch(article, /class="lamanote-summary"/);
   assert.doesNotMatch(article, /#private/);
 });
@@ -111,7 +112,7 @@ test("placeholder checks are narrow and non-blocking", () => {
 
   assert.deepEqual(
     warnings.map(({ id }) => id),
-    ["example-media", "research-topic", "scaffold-copy"],
+    ["example-media", "scaffold-copy"],
   );
   assert.deepEqual(
     findHtmlPlaceholderWarnings(`

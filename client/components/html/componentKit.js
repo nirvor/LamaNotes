@@ -64,7 +64,7 @@ export const htmlComponentSnippets = [
     <p class="lamanote-result-note">Name the condition, reservation, or next action which changes this result.</p>
   </section>
 
-  <p class="lamanote-tags">#research #r-topic</p>
+  <p class="lamanote-tags">#research</p>
 </article>
 `,
   },

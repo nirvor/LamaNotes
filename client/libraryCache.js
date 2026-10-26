@@ -1,5 +1,5 @@
 const cacheKey = "lamanotes:library-cache:v1";
-const cacheVersion = 1;
+const cacheVersion = 2;
 const maxCachedNotes = 4;
 const maxCachedNoteCharacters = 600_000;
 const maxCacheAgeMs = 30 * 24 * 60 * 60 * 1000;
