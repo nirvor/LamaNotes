@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { JSDOM } from "jsdom";
 
 import {
   buildWorkNoteHtml,
@@ -31,6 +32,71 @@ test("work notes render small Markdown text without opening raw HTML", () => {
   assert.match(rendered, /<small><strong>Paused\/stopped<\/strong><\/small>/);
   assert.match(rendered, /&lt;script&gt;unsafe&lt;\/script&gt;/);
   assert.doesNotMatch(rendered, /<script>/);
+});
+
+test("backslash-escaped ASCII punctuation renders as literal text", () => {
+  const punctuation = Array.from({ length: 94 }, (_, index) =>
+    String.fromCharCode(index + 33),
+  )
+    .filter((character) => !/[a-zA-Z0-9]/.test(character))
+    .join("");
+  const markdown = [...punctuation]
+    .map((character) => `\\${character}`)
+    .join("");
+  const paragraph = new JSDOM(
+    renderMarkdownToHtml(markdown),
+  ).window.document.querySelector("p");
+
+  assert.equal(paragraph.textContent, punctuation);
+  assert.equal(paragraph.children.length, 0);
+});
+
+test("escaped capture syntax stays literal beside ordinary Markdown", () => {
+  const rendered = renderMarkdownToHtml(
+    String.raw`\#tag \*bold\* \[link\]\(https\:\/\/example\.org\) \<small\>text\<\/small\> and **real bold**`,
+  );
+  const paragraph = new JSDOM(rendered).window.document.querySelector("p");
+
+  assert.equal(
+    paragraph.textContent,
+    "#tag *bold* [link](https://example.org) <small>text</small> and real bold",
+  );
+  assert.equal(paragraph.querySelector("strong").textContent, "real bold");
+  assert.equal(paragraph.querySelectorAll("em,a,small").length, 0);
+});
+
+test("inline and fenced code retain escapes and literal small tags", () => {
+  const source = [
+    "Literal `\\*bold\\* <small>#tag</small> $&` and <small>\\*small\\*</small>.",
+    "",
+    "```text",
+    "\\*bold\\* <small>#tag</small>  ",
+    "next line",
+    "```",
+  ].join("\n");
+  const doc = new JSDOM(renderMarkdownToHtml(source)).window.document;
+
+  assert.equal(
+    doc.querySelector("p code").textContent,
+    "\\*bold\\* <small>#tag</small> $&",
+  );
+  assert.equal(doc.querySelector("p small").textContent, "*small*");
+  assert.equal(
+    doc.querySelector("pre code").textContent,
+    "\\*bold\\* <small>#tag</small>  \nnext line",
+  );
+  assert.equal(doc.querySelectorAll("code small,code em,pre br").length, 0);
+});
+
+test("two trailing spaces keep hard line breaks outside code", () => {
+  assert.equal(
+    renderMarkdownToHtml("First  \nSecond\nThird  \n**Fourth**"),
+    "<p>First<br>\nSecond Third<br>\n<strong>Fourth</strong></p>",
+  );
+  assert.equal(
+    renderMarkdownToHtml("A `code  \ntext`  \nB"),
+    "<p>A <code>code  \ntext</code><br>\nB</p>",
+  );
 });
 
 test("legacy HTML checklists are eligible for the simple work editor", () => {

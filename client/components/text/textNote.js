@@ -15,6 +15,10 @@ const tagsIn = (value) =>
     normalizeTagName(match[1]),
   );
 
+export function escapePlainMarkdown(value = "") {
+  return tidy(value).replace(/[!-/:-@[-`{-~]/g, "\\$&");
+}
+
 function metadataTags(documentValue) {
   return [
     ...documentValue.querySelectorAll(
@@ -107,6 +111,18 @@ function blocks(root, title) {
     }
     if (node.nodeType !== 1) continue;
     const tag = node.tagName;
+    if (tag === "P" && node.hasAttribute("data-lamanotes-quicknote-entry")) {
+      const timestamp = node.querySelector(":scope > small");
+      const text = node.querySelector(
+        ":scope > span[data-lamanotes-quicknote-text]",
+      );
+      if (timestamp && text) {
+        result.push(
+          `<small>${inline(timestamp).trim()}</small>  \n${escapePlainMarkdown(text.textContent).replace(/\n/g, "  \n")}`,
+        );
+        continue;
+      }
+    }
     if (/^H[1-6]$/.test(tag)) {
       const text = inline(node).trim();
       if (!(tag === "H1" && text === title))

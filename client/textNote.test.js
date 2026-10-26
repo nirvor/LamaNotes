@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import {
   buildTextNoteHtml,
+  escapePlainMarkdown,
   extractTextMarkdown,
   isTextNoteHtml,
   normalizeTextMarkdown,
@@ -132,6 +133,94 @@ test("HTML-looking typed content stays literal and no template is closed by user
     1,
   );
   assert.equal(extractTextMarkdown(html), source);
+});
+
+test("plain capture text escapes all Markdown punctuation and normalizes newlines", () => {
+  assert.equal(
+    escapePlainMarkdown(
+      "#tag\r\n*bold* [link](https://example.org) <small>text</small> \\*",
+    ),
+    "\\#tag\n\\*bold\\* \\[link\\]\\(https\\:\\/\\/example\\.org\\) \\<small\\>text\\<\\/small\\> \\\\\\*",
+  );
+});
+
+test("canonical plain captures roundtrip as literal lines without creating tags", () => {
+  const text =
+    "#tag\n*bold*\n[link](https://example.org/a)\n<small>text</small>\n\\*literal\\*";
+  const addition = `<small>26 Oct 2026, 08:30</small>  \n${escapePlainMarkdown(text).replace(/\n/g, "  \n")}`;
+  const markdown = `Existing text.\n\n#private\n\n${addition}`;
+  const html = buildTextNoteHtml("Quicknotes", markdown, legacy);
+  const doc = parse(html);
+  const capture = [...doc.querySelectorAll(".lamanote-text-body p")].at(-1);
+
+  assert.equal(extractTextMarkdown(html), markdown);
+  assert.equal(capture.textContent, `26 Oct 2026, 08:30\n${text}`);
+  assert.equal(capture.querySelectorAll("br").length, 5);
+  assert.equal(capture.querySelectorAll("a,strong,em,code,script").length, 0);
+  assert.equal(capture.querySelectorAll("small").length, 1);
+  assert.equal(
+    doc.querySelector("meta[name='lamanotes-tags']").content,
+    "private,pinned",
+  );
+});
+
+test("legacy appended captures retain literal text, identity and idempotency metadata", () => {
+  const text =
+    "#tag\n*bold*\n[link](https://example.org/a)\n<small>text</small>\n\\*literal\\*";
+  const doc = parse(legacy);
+  const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const marker = doc.createElement("meta");
+  marker.name = "lamanotes-quicknote-entry";
+  marker.content = `${id}:${"a".repeat(64)}`;
+  doc.head.append(marker);
+  const entry = doc.createElement("p");
+  entry.dataset.lamanotesQuicknoteEntry = id;
+  const timestamp = doc.createElement("small");
+  timestamp.textContent = "26 Oct 2026, 08:30";
+  const capturedText = doc.createElement("span");
+  capturedText.dataset.lamanotesQuicknoteText = "";
+  capturedText.style.whiteSpace = "pre-wrap";
+  capturedText.textContent = text;
+  entry.append(timestamp, doc.createElement("br"), capturedText);
+  doc.querySelector("article").append(entry);
+
+  const adapted = extractTextMarkdown(
+    doc.documentElement.outerHTML,
+    "Quicknotes",
+  );
+  const addition = `<small>26 Oct 2026, 08:30</small>  \n${escapePlainMarkdown(text).replace(/\n/g, "  \n")}`;
+  assert.equal(adapted.endsWith(addition), true);
+  assert.match(adapted, /Unterwegs eine \*\*Idee\*\*/);
+  const saved = buildTextNoteHtml(
+    "Quicknotes",
+    adapted,
+    doc.documentElement.outerHTML,
+  );
+  const savedDoc = parse(saved);
+  const capture = [...savedDoc.querySelectorAll(".lamanote-text-body p")].at(
+    -1,
+  );
+
+  assert.equal(extractTextMarkdown(saved), adapted);
+  assert.equal(capture.textContent, `26 Oct 2026, 08:30\n${text}`);
+  assert.equal(capture.querySelectorAll("br").length, 5);
+  assert.equal(capture.querySelectorAll("a,strong,em,code,script").length, 0);
+  assert.equal(
+    savedDoc.querySelector("meta[name='lamanotes-quicknote-entry']").content,
+    marker.content,
+  );
+  assert.equal(
+    savedDoc.querySelector("meta[name='lamanotes-note-id']").content,
+    "ln-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  );
+  assert.equal(
+    savedDoc.querySelector("meta[name='custom-origin']").content,
+    "preserve me",
+  );
+  assert.equal(
+    savedDoc.querySelector("meta[name='lamanotes-tags']").content,
+    "private,pinned",
+  );
 });
 
 test("check states and nested list text survive the legacy adapter", () => {

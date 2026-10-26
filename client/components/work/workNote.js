@@ -433,19 +433,29 @@ function setWorkMarkdownTag(markdown = "", tag = "", enabled = true) {
 }
 
 function renderInlineMarkdown(value = "") {
-  const smallSpans = [];
-  let text = String(value).replace(/<small>(.*?)<\/small>/gi, (_, content) => {
-    const index = smallSpans.length;
-    smallSpans.push(`<small>${renderInlineMarkdown(content)}</small>`);
-    return `@@LAMANOTES_SMALL_${index}@@`;
-  });
+  const protectedSpans = [];
+  let text = String(value);
+  let tokenPrefix = "\u0000LAMANOTES";
+  while (text.includes(tokenPrefix)) tokenPrefix += "_";
+  const protect = (html) => {
+    const index = protectedSpans.length;
+    protectedSpans.push(html);
+    return `${tokenPrefix}${index}\u0000`;
+  };
 
-  const codeSpans = [];
-  text = text.replace(/`([^`]+)`/g, (_, code) => {
-    const index = codeSpans.length;
-    codeSpans.push(`<code>${escapeHtml(code)}</code>`);
-    return `@@LAMANOTES_CODE_${index}@@`;
-  });
+  text = text
+    .replace(/\\([!-/:-@[-`{-~])|`([^`]+)`/g, (_, escaped, code) =>
+      protect(
+        code === undefined
+          ? escapeHtml(escaped)
+          : `<code>${escapeHtml(code)}</code>`,
+      ),
+    )
+    .replace(/<small>(.*?)<\/small>/gi, (_, content) =>
+      protect(`<small>${renderInlineMarkdown(content)}</small>`),
+    )
+    .replace(/ {2,}\n/g, () => protect("<br>\n"))
+    .replace(/\n/g, " ");
 
   text = escapeHtml(text)
     .replace(
@@ -461,12 +471,12 @@ function renderInlineMarkdown(value = "") {
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>");
 
-  codeSpans.forEach((replacement, index) => {
-    text = text.replace(`@@LAMANOTES_CODE_${index}@@`, replacement);
-  });
-  smallSpans.forEach((replacement, index) => {
-    text = text.replace(`@@LAMANOTES_SMALL_${index}@@`, replacement);
-  });
+  for (let index = protectedSpans.length - 1; index >= 0; index -= 1) {
+    text = text.replaceAll(
+      `${tokenPrefix}${index}\u0000`,
+      () => protectedSpans[index],
+    );
+  }
 
   return text;
 }
@@ -532,11 +542,13 @@ function renderMarkdownToHtml(markdown = "") {
       !/^\s*`{3,}/.test(lines[index]) &&
       !/^\s*---+\s*$/.test(lines[index])
     ) {
-      paragraph.push(lines[index].trim());
+      paragraph.push(lines[index]);
       index += 1;
     }
     if (paragraph.length) {
-      blocks.push(`<p>${renderInlineMarkdown(paragraph.join(" "))}</p>`);
+      blocks.push(
+        `<p>${renderInlineMarkdown(paragraph.join("\n").trim())}</p>`,
+      );
     }
   };
 
