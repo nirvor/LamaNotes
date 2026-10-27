@@ -16,6 +16,11 @@ or shadow. Maps, photo stages and documents keep their useful content layout.
 The document-title copper accent remains a reading convention, not a second
 application brand. Product controls use English. User content keeps its language.
 
+The Windows host resolves its root and app minimum height through the available
+parent height. Do not use a separate viewport minimum for that native shell,
+which can introduce rounding overflow at scaled window sizes. Short content
+must fit without a surplus scrollbar, while long notes keep document scrolling.
+
 Short checklist sections group their label, list and local actions without a
 visible box. Add, Edit and Hide/Show content sit directly beside the section
 label. Entry and section-edit forms stay within their own section. Use compact,
