@@ -104,11 +104,11 @@ class _Document(HTMLParser):
                 del self.stack[index:]
                 return
 
-    def capture_markers(self, entry_id):
+    def capture_markers(self, entry_id, name=ENTRY_META):
         values = []
         for node in self.nodes:
             attrs = node["attrs"]
-            if node["tag"] == "meta" and attrs.get("name") == ENTRY_META:
+            if node["tag"] == "meta" and attrs.get("name") == name:
                 value = attrs.get("content", "")
                 if value.split(":", 1)[0] == entry_id:
                     values.append(value)
@@ -126,14 +126,19 @@ def timestamp(captured_at):
 
 
 def append_content(content, entry, digest):
-    document = _Document(content)
-    templates = [node for node in document.nodes if node["tag"] == "template"
-                 and "data-lamanotes-text-markdown" in node["attrs"]]
     stamp = timestamp(entry.captured_at)
     visible = (f'<p data-lamanotes-quicknote-entry="{entry.entry_id}">'
                f'<small>{stamp}</small><br>'
                '<span data-lamanotes-quicknote-text style="white-space:pre-wrap">'
                + escape(entry.text, quote=False) + "</span></p>")
+    markdown = f"<small>{stamp}</small>  \n" + literal_markdown(entry.text)
+    return append_fragments(content, entry.entry_id, digest, visible, markdown)
+
+
+def append_fragments(content, entry_id, digest, visible, markdown, *, marker_name=ENTRY_META, shared=False):
+    document = _Document(content)
+    templates = [node for node in document.nodes if node["tag"] == "template"
+                 and "data-lamanotes-text-markdown" in node["attrs"]]
     patches = []
     if templates:
         bodies = [node for node in document.nodes
@@ -144,7 +149,7 @@ def append_content(content, entry, digest):
         if any(node["parent"] is template for node in document.nodes):
             problem("quicknotes-format", "Open Quicknotes in its editor before adding writing here.")
         previous = unescape(content[template["inner"]:template["close"]])
-        addition = ("\n\n" if previous else "") + f"<small>{stamp}</small>  \n" + literal_markdown(entry.text)
+        addition = ("\n\n" if previous else "") + markdown
         patches.extend([(template["close"], escape(addition, quote=False)),
                         (bodies[0]["close"], visible)])
     else:
@@ -154,15 +159,22 @@ def append_content(content, entry, digest):
             problem("quicknotes-format", "Open Quicknotes in its writing editor first.")
         root = roots[0]
         legacy = BeautifulSoup(content[root["start"]:root["end"]], "html.parser")
+        for fragment in legacy.select("section[data-lamanotes-share-entry]"):
+            if len(fragment.select(":scope > template[data-lamanotes-share-markdown]")) == 1:
+                fragment.decompose()
         kicker = legacy.select_one(".flatnote-kicker,.lamanote-kicker")
         if not kicker or kicker.get_text(strip=True).lower() != "pinned scratch note" or legacy.select_one(
                 "audio,canvas,figure,iframe,img,math,object,pre,script,style,svg,table,template,video"):
             problem("quicknotes-format", "Open Quicknotes in its writing editor first.")
+        if shared:
+            visible = (f'<section data-lamanotes-share-entry="{entry_id}">' + visible
+                       + '<template data-lamanotes-share-markdown>' + escape(markdown, quote=False)
+                       + '</template></section>')
         patches.append((root["close"], visible))
     heads = [node for node in document.nodes if node["tag"] == "head"]
     if heads and (len(heads) != 1 or heads[0]["close"] is None):
         problem("quicknotes-format", "Quicknotes needs its original editor.")
-    marker = f'<meta name="{ENTRY_META}" content="{entry.entry_id}:{digest}">'
+    marker = f'<meta name="{marker_name}" content="{entry_id}:{digest}">'
     patches.append((heads[0]["close"] if heads else 0, marker))
     for position, addition in sorted(patches, reverse=True):
         content = content[:position] + addition + content[position:]

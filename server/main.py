@@ -56,6 +56,7 @@ from private_api.middleware import PrivateRequestLimit
 from android_updates import update_router
 from quicknotes import create_router as create_quicknotes_router
 from share_import import create_router as create_share_import_router
+from share_quicknotes import create_router as create_share_quicknotes_router
 
 global_config = GlobalConfig()
 auth: BaseAuth = global_config.load_auth()
@@ -115,7 +116,7 @@ FONT_ASSET_RE = re.compile(
 async def add_static_cache_headers(request: Request, call_next):
     response = await call_next(request)
     path = request.url.path
-    if "/api/private/v1/" in path or "/api/quicknotes" in path or path.endswith(("/private-access", "/share-import")):
+    if "/api/private/v1/" in path or "/api/share-intake/v1/" in path or "/api/quicknotes" in path or path.endswith(("/private-access", "/share-import")):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Vary"] = "Authorization, Cookie"
 
@@ -668,6 +669,8 @@ app.add_middleware(PrivateRequestLimit)
 app.include_router(create_private_router(private_service, auth), prefix=global_config.path_prefix)
 app.include_router(create_share_import_router(private_service, auth,
                    read_only=global_config.auth_type == AuthType.READ_ONLY), prefix=global_config.path_prefix)
+app.include_router(create_share_quicknotes_router(private_service,
+                   enabled=bool(auth) and global_config.auth_type != AuthType.READ_ONLY), prefix=global_config.path_prefix)
 app.include_router(create_quicknotes_router(note_storage, private_service, auth,
                    read_only=global_config.auth_type == AuthType.READ_ONLY), prefix=global_config.path_prefix)
 app.include_router(router, prefix=global_config.path_prefix)

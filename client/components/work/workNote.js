@@ -15,6 +15,14 @@ function escapeAttribute(value = "") {
   return escapeHtml(value).replace(/'/g, "&#39;");
 }
 
+function unescapeHtml(value = "") {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
 function isFullHtmlDocument(value = "") {
   return /<(?:!doctype|html|head|body)\b/i.test(value);
 }
@@ -461,12 +469,12 @@ function renderInlineMarkdown(value = "") {
     .replace(
       /!\[([^\]]*)\]\(([^)\s]+)\)/g,
       (_, alt, src) =>
-        `<img src="${escapeAttribute(src)}" alt="${alt}" loading="lazy" decoding="async">`,
+        `<img src="${escapeAttribute(unescapeHtml(src))}" alt="${alt}" loading="lazy" decoding="async">`,
     )
     .replace(
       /\[([^\]]+)\]\(([^)\s]+)\)/g,
       (_, label, href) =>
-        `<a href="${escapeAttribute(href)}" rel="noopener noreferrer">${label}</a>`,
+        `<a href="${escapeAttribute(unescapeHtml(href))}" rel="noopener noreferrer">${label}</a>`,
     )
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>");

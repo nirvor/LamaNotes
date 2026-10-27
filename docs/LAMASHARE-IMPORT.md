@@ -1,5 +1,51 @@
 # LamaShare import
 
+## Direct Quicknotes action
+
+The native Notes destination now queues an explicit `quicknotes.append` action.
+It closes after local queue persistence. The Share backend calls only
+`http://lamanotes:8080/api/share-intake/v1/quicknotes` with `{ticket}`. This
+endpoint accepts only `lsq_` plus 43 base64url characters, internal Host
+`lamanotes`, no browser Origin, cookies or Authorization, and at most 1024 request
+bytes. Disable writing with the existing read-only/auth configuration. Block
+`/api/share-intake/v1/*` with 404 before the public Notes reverse proxy.
+
+Notes verifies that ticket at the fixed
+`http://nirvstart:8080/api/share/v1/quicknotes-export`. The strict response is
+`{intent:'quicknotes.append',operationId:UUID,item:ShareItem,fileToken:lse_,expiresAt}`.
+It authorizes this action and item only. Existing `lst_` Library tickets and
+owner-session endpoints keep their existing authority. No Notes service token,
+browser continuation, automatic Research run or new Library note is involved.
+
+The success receipt is
+`{operationId,itemId,appendId:operationId,version,assetCount,duplicate,saved:true}`.
+Version is 64 lowercase hex characters, assetCount is this item's original file
+count. Share must validate the complete receipt before acknowledging delivery.
+Retries keep their operationId and item payload, even with a refreshed ticket.
+
+The target comes only from the existing `.private/focus-quicknotes.json` binding.
+A durable receipt binds each pending operation to that stable note ID before
+downloading. A changed binding cannot redirect an unfinished action. Completed
+retries return their original receipt, including after later owner edits.
+Original files are bounded, MIME/signature/SHA checked and fsynced. Existing
+Capture and Asset storage retains the raw item and media. Quicknotes media and
+capture associations are extended by union, without changing capabilities.
+
+The shared file lock, SQLite immediate transaction and note expectedVersion
+protect append and normal editor writes in the existing single-worker server.
+An HTML metadata marker recovers an interruption between the atomic note save
+and receipt commit. No new database tables or object types are added. The
+existing receipts table gains `share-quicknotes-target` and
+`share-quicknotes-append` operations with JSON target/result metadata in
+object_id. Portable backup validation must preserve these opaque receipt values.
+
+Both the visible HTML and canonical Markdown receive the same entry, preceded
+by a horizontal rule. The Quicknotes viewer styles these rules as 4px double
+lines in the theme heading colour. Legacy scratch notes carry each new
+fragment's escaped Markdown until their next normal edit/save. Photos, links,
+literal text and separators survive that conversion. PDF/audio/plain files
+remain private named original-file links.
+
 `/share-import#ticket=lst_...` is an explicit Save to Notes handoff. The router
 removes the fragment before authentication and retains it in this tab's
 session storage for at most ten minutes. Google login returns to the clean

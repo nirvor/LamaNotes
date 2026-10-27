@@ -5,6 +5,7 @@ import {
   buildTextNoteHtml,
   escapePlainMarkdown,
   extractTextMarkdown,
+  hasSharedQuicknotes,
   isTextNoteHtml,
   normalizeTextMarkdown,
 } from "./components/text/textNote.js";
@@ -237,4 +238,73 @@ test("check states and nested list text survive the legacy adapter", () => {
     extractTextMarkdown(buildTextNoteHtml("Quicknotes", markdown, html)),
     markdown,
   );
+});
+
+test("shared photo, source link and double separator survive legacy edit and a second save", () => {
+  const doc = parse(legacy);
+  const marker = doc.createElement("meta");
+  marker.name = "lamanotes-share-quicknote";
+  marker.content = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:" + "b".repeat(64);
+  doc.head.append(marker);
+  const entry = doc.createElement("section");
+  entry.dataset.lamanotesShareEntry = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const asset = "/api/private/v1/assets/la-" + "a".repeat(32) + "/content";
+  const url = "https://example.org/a%28b%29?x=1&y=2";
+  const markdown = `---\n\n<small>27 Oct 2026, 07:45</small>\n\n\\#literal\n\n![PXL_\\[original\\].png](${asset})\n\n[Source](${url})`;
+  entry.innerHTML = `<hr class="lamanote-share-separator"><p><img src="${asset}" alt="PXL_[original].png"></p>`;
+  const source = doc.createElement("template");
+  source.dataset.lamanotesShareMarkdown = "";
+  source.innerHTML = markdown
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  entry.append(source);
+  doc.querySelector("article").append(entry);
+  const previous = doc.documentElement.outerHTML;
+  assert.equal(hasSharedQuicknotes(previous), true);
+  assert.equal(hasSharedQuicknotes(legacy), false);
+  assert.equal(
+    hasSharedQuicknotes("Text mentions lamanotes-share-quicknote"),
+    false,
+  );
+  assert.equal(isTextNoteHtml(previous), true);
+  const writing = extractTextMarkdown(previous, "Quicknotes");
+  assert.equal(writing.endsWith(markdown), true);
+  assert.match(writing, /Unterwegs eine \*\*Idee\*\*/);
+  let saved = buildTextNoteHtml("Quicknotes", writing, previous);
+  saved = buildTextNoteHtml("Quicknotes", extractTextMarkdown(saved), saved);
+  const output = parse(saved);
+  assert.equal(
+    output.querySelectorAll(".lamanote-quicknotes .lamanote-text-body hr")
+      .length,
+    1,
+  );
+  assert.equal(output.querySelectorAll(".lamanote-text-body img").length, 1);
+  assert.equal(
+    output.querySelector(".lamanote-text-body img").getAttribute("src"),
+    asset,
+  );
+  assert.equal(
+    output.querySelector(".lamanote-text-body img").alt,
+    "PXL_[original].png",
+  );
+  assert.equal(
+    [...output.querySelectorAll("a")].at(-1).getAttribute("href"),
+    url,
+  );
+  assert.equal(
+    output.querySelector("meta[name='lamanotes-share-quicknote']").content,
+    marker.content,
+  );
+  assert.equal(extractTextMarkdown(saved), writing);
+  assert.doesNotMatch(writing, /<section|<template|<img|<meta/);
+});
+
+test("media outside the generated share fragment keeps the original legacy editor", () => {
+  const broken = legacy.replace(
+    "</article>",
+    '<section data-lamanotes-share-entry="untrusted"><img src="/important.png"></section></article>',
+  );
+  assert.equal(isTextNoteHtml(broken), false);
+  assert.throws(() => extractTextMarkdown(broken), /original editor/);
 });

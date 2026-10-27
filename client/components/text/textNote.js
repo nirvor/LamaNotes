@@ -35,9 +35,20 @@ function legacyRoot(documentValue) {
     "article.flatnote-migrated,article.lamanote-migrated",
   );
   const kicker = root?.querySelector(".flatnote-kicker,.lamanote-kicker");
+  const original = root?.cloneNode(true);
+  original
+    ?.querySelectorAll("section[data-lamanotes-share-entry]")
+    .forEach((entry) => {
+      if (
+        entry.querySelectorAll(
+          ":scope > template[data-lamanotes-share-markdown]",
+        ).length === 1
+      )
+        entry.remove();
+    });
   return root &&
     /^Pinned Scratch Note$/i.test(kicker?.textContent.trim() || "") &&
-    !root.querySelector(unsupportedLegacy)
+    !original.querySelector(unsupportedLegacy)
     ? root
     : null;
 }
@@ -51,6 +62,15 @@ export function isTextNoteHtml(value = "") {
     ) &&
       documentValue.querySelector(sourceSelector)) ||
       legacyRoot(documentValue),
+  );
+}
+
+export function hasSharedQuicknotes(value = "") {
+  return (
+    value.includes("lamanotes-share-quicknote") &&
+    Boolean(
+      parse(value).head.querySelector("meta[name='lamanotes-share-quicknote']"),
+    )
   );
 }
 
@@ -111,6 +131,15 @@ function blocks(root, title) {
     }
     if (node.nodeType !== 1) continue;
     const tag = node.tagName;
+    if (tag === "SECTION" && node.hasAttribute("data-lamanotes-share-entry")) {
+      const source = node.querySelector(
+        ":scope > template[data-lamanotes-share-markdown]",
+      );
+      if (source) {
+        result.push(source.content.textContent || "");
+        continue;
+      }
+    }
     if (tag === "P" && node.hasAttribute("data-lamanotes-quicknote-entry")) {
       const timestamp = node.querySelector(":scope > small");
       const text = node.querySelector(
@@ -217,6 +246,10 @@ export function buildTextNoteHtml(title, markdown = "", previousContent = "") {
     meta.content = tags.join(",");
   const article = documentValue.createElement("article");
   article.className = "lamanote lamanote-article";
+  if (
+    documentValue.head.querySelector("meta[name='lamanotes-share-quicknote']")
+  )
+    article.classList.add("lamanote-quicknotes");
   article.dataset.lamanotesEditor = "markdown";
   const heading = documentValue.createElement("h1");
   heading.textContent = title;

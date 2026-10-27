@@ -9,9 +9,10 @@ class PrivateRequestLimit:
 
     async def __call__(self, scope, receive, send):
         path = scope.get("path", "")
-        if scope["type"] != "http" or "/api/private/v1/" not in path:
+        intake = "/api/share-intake/v1/" in path
+        if scope["type"] != "http" or ("/api/private/v1/" not in path and not intake):
             return await self.app(scope, receive, send)
-        limit = (21 if path.endswith("/assets") else 8) * 1024 * 1024
+        limit = 1024 if intake else (21 if path.endswith("/assets") else 8) * 1024 * 1024
         messages, size = [], 0
         while True:
             message = await receive()

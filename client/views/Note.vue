@@ -141,6 +141,10 @@
             : note.content
         "
         :enhance-note-lead="!isTextNote"
+        :class="{
+          'lamanotes-share-quicknotes':
+            isTextNote && hasSharedQuicknotes(note.content),
+        }"
         :note-title="note.title"
         :task-checkboxes-disabled="!canModify"
         :task-checkbox-toggle-handler="toggleTaskCheckbox"
@@ -304,6 +308,7 @@ import {
 import {
   buildTextNoteHtml,
   extractTextMarkdown,
+  hasSharedQuicknotes,
   isTextNoteHtml,
 } from "../components/text/textNote.js";
 import { createVpsNoteStorageAdapter } from "../documents/storageAdapters.js";
