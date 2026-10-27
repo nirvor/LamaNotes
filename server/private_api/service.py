@@ -418,7 +418,7 @@ class PrivateService:
     def create_asset(
         self, actor, data, supplied, role, source_id, receipt, key
     ):
-        if not data or len(data) > 20 * 1024 * 1024:
+        if (not data and supplied != "text/plain") or len(data) > 20 * 1024 * 1024:
             raise HTTPException(413, "Select a file up to 20 MB.")
         media = self.media_type(data, supplied)
         digest = hashlib.sha256(data).hexdigest()

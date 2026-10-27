@@ -7,6 +7,7 @@ import { desktopShell, setDesktopWindowTitle } from "./desktopShell.js";
 import { clearStoredToken, getStoredToken } from "./tokenStorage.js";
 import { scheduleIdleWork } from "./performanceScheduling.js";
 import { PRODUCT_NAME } from "./brand.js";
+import { retainShareTicket } from "./shareImport.js";
 
 const loadHomeView = () => import("./views/Home.vue");
 const loadNoteView = () => import("./views/Note.vue");
@@ -23,6 +24,11 @@ function parseSearchSort(sortBy) {
 const router = createRouter({
   history: createWebHistory(""),
   routes: [
+    {
+      path: "/share-import",
+      name: "shareImport",
+      component: () => import("./views/ShareImport.vue"),
+    },
     {
       path: "/n/:noteId/media",
       name: "noteMedia",
@@ -105,6 +111,10 @@ function prefetchHomeViews() {
 }
 
 router.beforeEach(async (to) => {
+  if (to.name === "shareImport" && to.hash) {
+    retainShareTicket(to.hash);
+    return { name: "shareImport", replace: true };
+  }
   if (authChecked || to.name === "login") {
     return;
   }
