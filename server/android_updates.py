@@ -7,6 +7,17 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
+ANDROID_PRODUCTS = {
+    "droid": {
+        "label": "LamaDroid", "package": "org.thuber.lamadroid",
+        "manifest": "LamaDroid-update.json", "route": "/api/android-client-update",
+    },
+    "share": {
+        "label": "LamaShare", "package": "org.thuber.lamashare",
+        "manifest": "LamaShare-update.json", "route": "/api/android-share-client-update",
+    },
+}
+
 
 def update_router(directory):
     router = APIRouter()
@@ -18,13 +29,26 @@ def update_router(directory):
             raise HTTPException(404, "Android updates are unavailable.")
         return Path(directory).resolve()
 
-    def release(request):
+    def release(request, product):
         root = private_root(request)
         try:
-            envelope = json.loads((root / "LamaDroid-update.json").read_text())
+            source = root / product["manifest"]
+            if source.is_symlink() or source.stat().st_size > 65536:
+                raise ValueError()
+            envelope = json.loads(source.read_text())
             manifest = json.loads(base64.b64decode(envelope["payload"], validate=True))
+            if not isinstance(envelope["signature"], str) or not envelope["signature"]:
+                raise ValueError()
+            if (manifest["schema"] != 1 or manifest["package"] != product["package"]
+                or manifest["downloadPath"] != product["route"] + "/download"
+                or not isinstance(manifest["versionName"], str)
+                or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", manifest["versionName"])
+                or type(manifest["versionCode"]) is not int or manifest["versionCode"] < 1
+                or type(manifest["size"]) is not int or not 1 <= manifest["size"] <= 32 * 1024 * 1024
+                or not isinstance(manifest["sha256"], str) or not re.fullmatch(r"[a-f0-9]{64}", manifest["sha256"])):
+                raise ValueError()
             filename = manifest["file"]
-            if not re.fullmatch(r"LamaDroid-[0-9]+\.[0-9]+\.[0-9]+\.apk", filename):
+            if filename != product["label"] + "-" + manifest["versionName"] + ".apk":
                 raise ValueError()
             package = root / filename
             if package.is_symlink() or not package.is_file() or package.stat().st_size != manifest["size"]:
@@ -35,17 +59,22 @@ def update_router(directory):
         except (OSError, ValueError, KeyError, TypeError):
             raise HTTPException(404, "No verified Android update is available.") from None
 
-    @router.get("/api/android-client-update", include_in_schema=False)
-    def metadata(request: Request):
-        envelope, _ = release(request)
-        return JSONResponse(envelope, headers={"Cache-Control": "no-store"})
+    def register_product(key, product):
+        def metadata(request: Request):
+            envelope, _ = release(request, product)
+            return JSONResponse(envelope, headers={"Cache-Control": "no-store"})
 
-    @router.get("/api/android-client-update/download", include_in_schema=False)
-    def download(request: Request):
-        _, package = release(request)
-        return FileResponse(package, filename=package.name,
-                            media_type="application/vnd.android.package-archive",
-                            headers={"Cache-Control": "no-store"})
+        def download(request: Request):
+            _, package = release(request, product)
+            return FileResponse(package, filename=package.name,
+                                media_type="application/vnd.android.package-archive",
+                                headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+
+        router.add_api_route(product["route"], metadata, name=f"android-{key}-metadata", include_in_schema=False)
+        router.add_api_route(product["route"] + "/download", download, name=f"android-{key}-download", include_in_schema=False)
+
+    for key, product in ANDROID_PRODUCTS.items():
+        register_product(key, product)
 
     def catalogue(request):
         root = private_root(request) / 'lamaui'

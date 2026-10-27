@@ -90,7 +90,9 @@ def test_android_feed_does_not_serve_missing_corrupt_or_path_escaped_packages():
         app = FastAPI(); app.include_router(update_router(folder)); client = TestClient(app)
         assert client.get('/api/android-client-update').status_code == 404
         apk = root/'LamaDroid-0.2.0.apk'; apk.write_bytes(b'synthetic fixture')
-        data = {'file':apk.name,'size':apk.stat().st_size,'sha256':hashlib.sha256(apk.read_bytes()).hexdigest()}
+        data = {'schema':1,'package':'org.thuber.lamadroid','versionName':'0.2.0','versionCode':2,
+                'downloadPath':'/api/android-client-update/download',
+                'file':apk.name,'size':apk.stat().st_size,'sha256':hashlib.sha256(apk.read_bytes()).hexdigest()}
         def manifest():
             (root/'LamaDroid-update.json').write_text(json.dumps({'payload':base64.b64encode(json.dumps(data).encode()).decode(),'signature':'fixture'}))
         manifest()
