@@ -16,7 +16,7 @@ API tokens and anonymous requests cannot use it. All responses are no-store.
 Notes uses only the fixed `http://nirvstart:8080` origin, POST
 `/api/share/v1/notes-export` and the validated opaque file routes below it.
 It forwards no browser cookies or owner token, follows no redirects and does
-not fetch the item's source URL. Export metadata is bounded to 1 MiB. Files
+not fetch the item's source URL. Export metadata is bounded to 2 MiB. Files
 are limited to ten and 20 MiB combined, checked against their exact declared
 size, SHA-256, response MIME and the existing Notes media signature check.
 No new long-lived credential or environment variable is required.

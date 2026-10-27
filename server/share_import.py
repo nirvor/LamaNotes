@@ -154,7 +154,7 @@ class ShareImporter:
             async with httpx.AsyncClient(transport=self.transport, trust_env=False, follow_redirects=False,
                     timeout=httpx.Timeout(30, connect=8), headers={"Accept-Encoding": "identity"}) as client:
                 raw, media = await bounded_response(client, "POST", "/api/share/v1/notes-export",
-                    limit=1024 * 1024, json={"ticket": ticket})
+                    limit=2 * 1024 * 1024, json={"ticket": ticket})
                 if media != "application/json":
                     fail(502, "LamaShare returned an invalid export.")
                 export = ShareExport.model_validate_json(raw)
