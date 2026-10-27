@@ -91,7 +91,7 @@ onMounted(save);
 .share-import header a {
   display: inline-flex;
   align-items: center;
-  min-height: 2.75rem;
+  min-height: 44px;
   padding-inline: 0.5rem;
   font-size: var(--ln-font-small);
 }
@@ -102,7 +102,7 @@ onMounted(save);
 .share-import button {
   display: inline-flex;
   align-items: center;
-  min-height: 2.75rem;
+  min-height: 44px;
   padding: 0.45rem 0.75rem;
   border: 1px solid rgb(var(--theme-border));
   border-radius: var(--ln-radius-control);
