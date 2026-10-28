@@ -132,7 +132,8 @@ class QuicknotesTests(unittest.TestCase):
         self.assertEqual(doc.select_one("[data-lamanotes-quicknote-text]").get_text(), text)
         canonical = doc.select_one("template[data-lamanotes-text-markdown]").decode_contents()
         canonical = unescape(canonical)
-        self.assertTrue(canonical.startswith("Previous writing.\n\n#private\n\n<small>26 Oct 2026, 08:30</small>  \n"))
+        self.assertTrue(canonical.startswith("<small>26 Oct 2026, 08:30</small>  \n"))
+        self.assertTrue(canonical.endswith("\n\nPrevious writing.\n\n#private"))
         self.assertIn(r"\#work" + "  \n" + r"\*bold\*", canonical)
         self.assertIn(r"\[link\]\(javascript\:alert\(1\)\)", canonical)
         self.assertEqual(doc.find("meta", {"name": "lamanotes-tags"})["content"], "pinned,private")
@@ -149,6 +150,26 @@ class QuicknotesTests(unittest.TestCase):
         self.assertEqual({key: value for key, value in replay.items() if key != "duplicate"},
                          {key: value for key, value in first.items() if key != "duplicate"})
         self.assertEqual(self.source(), source)
+
+    def test_newest_entry_precedes_older_writing_in_legacy_and_text_mode(self):
+        for content in (LEGACY, TEXT_MODE):
+            with self.subTest(text_mode=content == TEXT_MODE):
+                current = self.notes.get('Quicknotes')
+                self.notes.update(current.title, NoteUpdate(new_content=content, expected_version=current.version))
+                older = self.entry('Older thought', capturedAt='2026-10-27T07:30:00Z')
+                newer = self.entry('Newest thought', capturedAt='2026-10-28T07:30:00Z')
+                self.assertEqual(self.post(older).status_code, 200)
+                self.assertEqual(self.post(newer).status_code, 200)
+                doc = BeautifulSoup(self.source(), 'html.parser')
+                self.assertEqual([node.get_text() for node in doc.select('[data-lamanotes-quicknote-text]')],
+                                 ['Newest thought', 'Older thought'])
+                template = doc.select_one('template[data-lamanotes-text-markdown]')
+                if template:
+                    canonical = unescape(template.decode_contents())
+                    self.assertLess(canonical.index('Newest thought'), canonical.index('Older thought'))
+                before = self.source()
+                self.assertTrue(self.post(newer).json()['duplicate'])
+                self.assertEqual(self.source(), before)
 
     def test_marker_recovers_save_before_sqlite_receipt_and_payload_mismatch_is_a_conflict(self):
         entry = self.entry()

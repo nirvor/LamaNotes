@@ -149,9 +149,9 @@ def append_fragments(content, entry_id, digest, visible, markdown, *, marker_nam
         if any(node["parent"] is template for node in document.nodes):
             problem("quicknotes-format", "Open Quicknotes in its editor before adding writing here.")
         previous = unescape(content[template["inner"]:template["close"]])
-        addition = ("\n\n" if previous else "") + markdown
-        patches.extend([(template["close"], escape(addition, quote=False)),
-                        (bodies[0]["close"], visible)])
+        addition = markdown + ("\n\n" if previous else "")
+        patches.extend([(template["inner"], escape(addition, quote=False)),
+                        (bodies[0]["inner"], visible)])
     else:
         roots = [node for node in document.nodes if node["tag"] == "article"
                  and {"flatnote-migrated", "lamanote-migrated"} & set(node["attrs"].get("class", "").split())]
@@ -170,7 +170,10 @@ def append_fragments(content, entry_id, digest, visible, markdown, *, marker_nam
             visible = (f'<section data-lamanotes-share-entry="{entry_id}">' + visible
                        + '<template data-lamanotes-share-markdown>' + escape(markdown, quote=False)
                        + '</template></section>')
-        patches.append((root["close"], visible))
+        entries = [node for node in document.nodes if node["parent"] is root
+                   and ("data-lamanotes-quicknote-entry" in node["attrs"]
+                        or "data-lamanotes-share-entry" in node["attrs"])]
+        patches.append((entries[0]["start"] if entries else root["close"], visible))
     heads = [node for node in document.nodes if node["tag"] == "head"]
     if heads and (len(heads) != 1 or heads[0]["close"] is None):
         problem("quicknotes-format", "Quicknotes needs its original editor.")

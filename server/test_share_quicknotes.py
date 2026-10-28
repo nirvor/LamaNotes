@@ -108,7 +108,8 @@ class ShareQuicknotesTests(unittest.TestCase):
         self.assertNotIn('Previous writing', result.text)
         doc = BeautifulSoup(self.source(), 'html.parser')
         source = unescape(doc.select_one('template[data-lamanotes-text-markdown]').decode_contents())
-        self.assertTrue(source.startswith('Previous writing.\n\n#private\n\n<span id="quicknote-' + self.export['operationId']))
+        self.assertTrue(source.startswith('<span id="quicknote-' + self.export['operationId']))
+        self.assertTrue(source.endswith('\n\nPrevious writing.\n\n#private'))
         self.assertEqual(saved['noteId'], IDENTITY)
         self.assertEqual(saved['openUrl'], 'https://notes.thuber.org/n/' + IDENTITY + '?entry=' + self.export['operationId'])
         self.assertEqual(saved['editUrl'], saved['openUrl'] + '&edit=1')
@@ -258,6 +259,31 @@ class ShareQuicknotesTests(unittest.TestCase):
         self.assertEqual(self.post(self.make_client(enabled=False)).status_code, 403)
         self.assertEqual(self.post(json={'ticket':'lsq_'+'a'*43, 'noteId':IDENTITY}).status_code, 422)
         self.assertEqual(self.calls, [])
+
+    def test_shared_and_manual_entries_use_the_same_newest_first_order(self):
+        for content in (LEGACY, TEXT_MODE):
+            with self.subTest(text_mode=content == TEXT_MODE):
+                current = self.notes.get('Quicknotes')
+                self.notes.update(current.title, NoteUpdate(new_content=content, expected_version=current.version))
+                older = QuicknoteEntry(noteId=IDENTITY, entryId=str(uuid4()), text='Older manual thought',
+                    capturedAt='2026-10-27T07:30:00Z')
+                Quicknotes(self.notes, self.service).append(older)
+                self.export['operationId'] = str(uuid4())
+                self.item['text'] = 'Newer shared thought'
+                self.assertEqual(self.post().status_code, 200)
+                latest = QuicknoteEntry(noteId=IDENTITY, entryId=str(uuid4()), text='Newest manual thought',
+                    capturedAt='2026-10-28T09:30:00Z')
+                Quicknotes(self.notes, self.service).append(latest)
+                doc = BeautifulSoup(self.source(), 'html.parser')
+                body = doc.select_one('.lamanote-text-body,article')
+                visible = body.get_text()
+                self.assertLess(visible.index('Newest manual thought'), visible.index('Newer shared thought'))
+                self.assertLess(visible.index('Newer shared thought'), visible.index('Older manual thought'))
+                template = doc.select_one('template[data-lamanotes-text-markdown]')
+                if template:
+                    canonical = unescape(template.decode_contents())
+                    self.assertLess(canonical.index('Newest manual thought'), canonical.index('Newer shared thought'))
+                    self.assertLess(canonical.index('Newer shared thought'), canonical.index('Older manual thought'))
 
     def test_wrong_intent_expiry_hash_and_redirect_never_append(self):
         before = self.source()
