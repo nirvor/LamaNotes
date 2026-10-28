@@ -1,6 +1,7 @@
 import { renderMarkdownToHtml } from "../work/workNote.js";
 import { normalizeTagName } from "../../tagPolicy.js";
 import { isSystemTag } from "../../systemTags.js";
+import { sharedEntryAnchor } from "../../sharedEntry.js";
 
 const sourceSelector = "template[data-lamanotes-text-markdown]";
 const tagLine = /^\s*(?:#[a-zA-Z0-9][a-zA-Z0-9_-]*\s*)+$/;
@@ -136,7 +137,15 @@ function blocks(root, title) {
         ":scope > template[data-lamanotes-share-markdown]",
       );
       if (source) {
-        result.push(source.content.textContent || "");
+        const markdown = source.content.textContent || "";
+        const anchor = sharedEntryAnchor(
+          node.dataset.lamanotesShareEntry || "",
+        );
+        result.push(
+          anchor && !markdown.includes(anchor)
+            ? `${anchor}\n\n${markdown}`
+            : markdown,
+        );
         continue;
       }
     }

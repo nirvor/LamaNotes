@@ -327,6 +327,16 @@
   border-top: 4px double rgb(var(--theme-heading) / 0.78);
 }
 
+.toastui-editor-contents p:has(> span[data-lamanotes-share-anchor]:only-child) {
+  margin: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.toastui-editor-contents [id^="quicknote-"] {
+  scroll-margin-top: 4rem;
+}
+
 .ProseMirror {
   h1,
   .toastui-editor-md-heading1,

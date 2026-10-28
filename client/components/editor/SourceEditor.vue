@@ -148,6 +148,7 @@ import {
   watch,
 } from "vue";
 import FormattingTools from "./FormattingTools.vue";
+import { sharedAnchorRanges } from "../../sharedEntry.js";
 import { formattingEdit, safeEditorLink } from "./formatting.js";
 
 import {
@@ -171,6 +172,7 @@ const props = defineProps({
   sessionState: Object,
   formatting: { type: Boolean, default: true },
   prose: Boolean,
+  hideShareAnchors: Boolean,
 });
 
 const emit = defineEmits(["update:modelValue", "change", "keydown", "ready"]);
@@ -531,7 +533,23 @@ function wrappingExtension(value = props.wrap) {
 }
 
 function editorExtensions() {
+  const anchors = (state) =>
+    Decoration.set(
+      sharedAnchorRanges(state.doc.toString()).map((range) =>
+        Decoration.replace({ block: true }).range(range.from, range.to),
+      ),
+    );
+  const anchorField = StateField.define({
+    create: anchors,
+    update: (value, transaction) =>
+      transaction.docChanged ? anchors(transaction.state) : value,
+    provide: (field) => [
+      EditorView.decorations.from(field),
+      EditorView.atomicRanges.of((view) => view.state.field(field)),
+    ],
+  });
   return [
+    props.hideShareAnchors ? anchorField : [],
     lineNumbers(),
     highlightActiveLineGutter(),
     highlightSpecialChars(),
@@ -1044,7 +1062,7 @@ function getSearchText() {
   return getValue();
 }
 
-function selectSearchRange(from, to) {
+function selectSearchRange(from, to, { centerInPage = false } = {}) {
   if (!editorView) {
     return;
   }
@@ -1055,6 +1073,16 @@ function selectSearchRange(from, to) {
     selection: { anchor: start, head: end },
     effects: EditorView.scrollIntoView(start, { y: "center" }),
   });
+  if (centerInPage)
+    editorView.requestMeasure({
+      read: (view) => view.domAtPos(start).node,
+      write: (node) =>
+        requestAnimationFrame(() =>
+          (node.nodeType === 1 ? node : node.parentElement)
+            ?.closest(".cm-line")
+            ?.scrollIntoView({ block: "center" }),
+        ),
+    });
 }
 
 function getMarkdown() {

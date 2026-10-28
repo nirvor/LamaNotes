@@ -1,4 +1,5 @@
 import copy
+import base64
 import hashlib
 import json
 import logging
@@ -98,7 +99,7 @@ class ShareQuicknotesTests(unittest.TestCase):
         result = self.post()
         self.assertEqual(result.status_code, 200, result.text)
         saved = result.json()
-        self.assertEqual(set(saved), {'operationId','itemId','appendId','version','assetCount','duplicate','saved'})
+        self.assertEqual(set(saved), {'operationId','itemId','appendId','version','assetCount','duplicate','saved','noteId','openUrl','editUrl'})
         self.assertEqual(saved['appendId'], self.export['operationId'])
         self.assertTrue(saved['saved'])
         self.assertFalse(saved['duplicate'])
@@ -107,7 +108,10 @@ class ShareQuicknotesTests(unittest.TestCase):
         self.assertNotIn('Previous writing', result.text)
         doc = BeautifulSoup(self.source(), 'html.parser')
         source = unescape(doc.select_one('template[data-lamanotes-text-markdown]').decode_contents())
-        self.assertTrue(source.startswith('Previous writing.\n\n#private\n\n---\n\n'))
+        self.assertTrue(source.startswith('Previous writing.\n\n#private\n\n<span id="quicknote-' + self.export['operationId']))
+        self.assertEqual(saved['noteId'], IDENTITY)
+        self.assertEqual(saved['openUrl'], 'https://notes.thuber.org/n/' + IDENTITY + '?entry=' + self.export['operationId'])
+        self.assertEqual(saved['editUrl'], saved['openUrl'] + '&edit=1')
         self.assertIn(r'\#not\-a\-tag', source)
         self.assertIn('![PXL', source)
         self.assertIn('a%28b%29?x=1&y=2', source)
@@ -277,6 +281,39 @@ class ShareQuicknotesTests(unittest.TestCase):
         self.assertEqual(self.post().status_code, 409)
         self.assertEqual(self.source(), before)
         self.assertEqual(len(list(self.root.glob('*.html'))), 1)
+
+    def test_code_file_is_editable_as_inert_fenced_text_and_original_stays_exact(self):
+        self.data = b'print("hello")\r\n```\r\n<script>never run</script>\r\n'
+        self.item['files'][0].update(name='example.py', mime='text/plain', size=len(self.data), sha256=hashlib.sha256(self.data).hexdigest())
+        response = self.post()
+        self.assertEqual(response.status_code, 200, response.text)
+        doc = BeautifulSoup(self.source(), 'html.parser')
+        source = unescape(doc.select_one('template[data-lamanotes-text-markdown]').decode_contents())
+        self.assertIn('````python\nprint("hello")\n```\n<script>never run</script>\n\n````', source)
+        self.assertEqual(doc.select_one('pre > code').get_text(), self.data.decode().replace('\r\n','\n'))
+        self.assertFalse(doc.select('script'))
+        asset = self.service.store.objects('asset')[0]
+        self.assertEqual((self.service.store.assets / asset['id']).read_bytes(), self.data)
+
+    def test_video_originals_are_private_file_links_and_gif_keeps_its_image_path(self):
+        fixtures = [('video/mp4','clip.mp4',b'\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isommp42'),
+                    ('video/webm','clip.webm',b'\x1a\x45\xdf\xa3\x8b\x42\x82\x84webm\x18\x53\x80\x67'),
+                    ('image/gif','motion.gif',base64.b64decode('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='))]
+        for mime,name,data in fixtures:
+            with self.subTest(mime=mime):
+                self.export['operationId'] = str(uuid4())
+                self.data = data
+                self.item['files'][0].update(name=name,mime=mime,size=len(data),sha256=hashlib.sha256(data).hexdigest())
+                result = self.post()
+                self.assertEqual(result.status_code,200,result.text)
+                assets = self.service.store.objects('asset')
+                asset = next(asset for asset in assets if asset['payload']['sha256'] == hashlib.sha256(data).hexdigest())
+                self.assertEqual((self.service.store.assets/asset['id']).read_bytes(),data)
+                doc = BeautifulSoup(self.source(),'html.parser')
+                url = '/api/private/v1/assets/' + asset['id'] + '/content'
+                self.assertFalse(doc.select('video'))
+                self.assertTrue(doc.select_one(('img[src="' if mime=='image/gif' else 'a[href="') + url + '"]'))
+        self.assertEqual(len(list(self.root.glob('*.html'))),1)
 
     def test_text_link_only_and_empty_plain_file_keep_payloads_and_limits(self):
         self.item['files'] = []

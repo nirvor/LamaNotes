@@ -405,14 +405,16 @@ class PrivateService:
             return "image/webp"
         if data[:4] == b"RIFF" and data[8:12] == b"WAVE":
             return "audio/wav"
-        if supplied == "audio/mp4" and len(data) >= 16 and data[4:8] == b"ftyp":
-            return "audio/mp4"
+        if supplied in {"audio/mp4", "video/mp4"} and len(data) >= 16 and data[4:8] == b"ftyp":
+            return supplied
+        if supplied == "video/webm" and data.startswith(b'\x1a\x45\xdf\xa3') and b'webm' in data[:4096]:
+            return "video/webm"
         if supplied == "text/plain":
             data.decode("utf-8")
             return "text/plain"
         raise HTTPException(
             415,
-            "Use PNG, JPEG, WebP, GIF, PDF, plain text or supported audio.",
+            "Use PNG, JPEG, WebP, GIF, PDF, plain text, supported audio or MP4/WebM.",
         )
 
     def create_asset(

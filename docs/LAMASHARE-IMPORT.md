@@ -19,6 +19,12 @@ browser continuation, automatic Research run or new Library note is involved.
 
 The success receipt is
 `{operationId,itemId,appendId:operationId,version,assetCount,duplicate,saved:true}`.
+It also returns `noteId`, `openUrl` and `editUrl`, derived only from the stored
+Quicknotes binding. The links are
+`https://notes.thuber.org/n/{noteId}?entry={appendId}` and the same URL with
+`&edit=1`. These owner links contain no access ticket. Normal Google/session
+authentication still applies. Clients must accept both the old seven fields
+and the new ten fields during the coordinated update.
 Version is 64 lowercase hex characters, assetCount is this item's original file
 count. Share must validate the complete receipt before acknowledging delivery.
 Retries keep their operationId and item payload, even with a refreshed ticket.
@@ -45,6 +51,23 @@ lines in the theme heading colour. Legacy scratch notes carry each new
 fragment's escaped Markdown until their next normal edit/save. Photos, links,
 literal text and separators survive that conversion. PDF/audio/plain files
 remain private named original-file links.
+
+New entries carry a stable empty span anchor in HTML and Markdown. Only that
+system marker is hidden in the existing text editor, never anchor-looking
+source code inside fences. Entry links verify the note metadata and one exact
+anchor before positioning the existing viewer/editor. A deleted or ambiguous
+entry never silently opens a different location. Draft/conflict and read-only
+guards remain active. The stable-note redirect retains its query through the
+existing login. Legacy share fragments gain their anchor in the normal text
+adapter and persist it only on a normal owner save, without a Library migration.
+
+For an explicit Notes action, UTF-8 text/plain attachments are also included
+as editable fenced text, with an inert language hint inferred from the filename.
+The fence is longer than any original backtick run. Original bytes and the
+named attachment remain intact. Other media keep their existing presentation.
+MP4 and WebM use bounded, signature-checked private original attachments with
+their filename extensions. No video player is created. GIF keeps its existing
+image path. The ten-file and combined 20 MiB limits remain unchanged.
 
 `/share-import#ticket=lst_...` is an explicit Save to Notes handoff. The router
 removes the fragment before authentication and retains it in this tab's

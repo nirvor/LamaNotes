@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import re
 from html import escape
 from typing import Literal
 from urllib.parse import quote
@@ -58,10 +59,12 @@ def remember(db, operation, key, digest, value):
     db.execute("INSERT INTO receipts VALUES('owner',?,?,?,?)", (operation, key, digest, canonical(value)))
 
 
-def entry_fragments(item, assets):
+def entry_fragments(item, assets, entry_id=None, originals=None):
     stamp = timestamp(item.created_at)
-    visible = ['<hr class="lamanote-share-separator">', '<p><small>' + stamp + '</small></p>']
-    markdown = ["---", f"<small>{stamp}</small>"]
+    anchor = f' id="quicknote-{entry_id}"' if entry_id else ''
+    visible = [f'<hr class="lamanote-share-separator"{anchor}>', '<p><small>' + stamp + '</small></p>']
+    markdown = ([f'<span id="quicknote-{entry_id}" data-lamanotes-share-anchor></span>'] if entry_id else [])
+    markdown.extend(["---", f"<small>{stamp}</small>"])
     for text in (item.title, item.text, item.annotation):
         if text:
             normalized = text.replace("\r\n", "\n").replace("\r", "\n")
@@ -71,7 +74,7 @@ def entry_fragments(item, assets):
         url = quote(item.url, safe=":/?#[]@!$&'*+,;=%")
         visible.append('<p><a href="' + escape(url, quote=True) + '">' + escape(item.url) + '</a></p>')
         markdown.append('[' + literal_markdown(item.url) + '](' + url + ')')
-    for file, asset in zip(item.files, assets, strict=True):
+    for index, (file, asset) in enumerate(zip(item.files, assets, strict=True)):
         url = '/api/private/v1/assets/' + asset['assetId'] + '/content'
         name = escape(file.name, quote=True)
         if file.mime.startswith('image/'):
@@ -80,6 +83,13 @@ def entry_fragments(item, assets):
         else:
             visible.append(f'<p><a href="{url}" download>{name}</a></p>')
             markdown.append('[' + literal_markdown(file.name) + '](' + url + ')')
+            if file.mime == 'text/plain' and originals is not None:
+                text = originals[index].decode('utf-8').replace('\r\n', '\n').replace('\r', '\n')
+                language = {'py':'python','js':'javascript','ts':'typescript','ps1':'powershell',
+                            'json':'json','md':'markdown','sh':'bash','yml':'yaml','yaml':'yaml'}.get(file.name.rsplit('.',1)[-1].lower(), 'text')
+                fence = '`' * max(3, max((len(value) + 1 for value in re.findall(r'`+', text)), default=3))
+                markdown.append(fence + language + '\n' + text + '\n' + fence)
+                visible.append(f'<pre><code class="language-{language}">' + escape(text, quote=False) + '</code></pre>')
     return ''.join(visible), '\n\n'.join(markdown)
 
 
@@ -88,14 +98,18 @@ class QuicknotesIntake:
         self.service, self.transport = service, transport
         self.quicknotes = Quicknotes(service.notes, service)
 
+    def links(self, result, note_id, duplicate):
+        url = self.service.public_origin + '/n/' + note_id + '?entry=' + result['appendId']
+        return {**result, 'duplicate': duplicate, 'noteId': note_id, 'openUrl': url, 'editUrl': url + '&edit=1'}
+
     def bind(self, export):
         digest = fingerprint(export.payload())
         with PUBLICATION_FILE_LOCK, self.service.store.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             saved = receipt(db, RECEIPT, export.operation_id, digest)
-            if saved:
-                return {**saved, "duplicate": True}
             bound = receipt(db, BINDING, export.operation_id, digest)
+            if saved:
+                return self.links(saved, bound['noteId'], True)
             binding = self.service.store.root / 'focus-quicknotes.json'
             if not binding.is_file() or binding.is_symlink():
                 fail(409, "The existing Quicknotes binding is unavailable.")
@@ -163,7 +177,8 @@ class QuicknotesIntake:
                 db.execute('BEGIN IMMEDIATE')
                 saved = receipt(db, RECEIPT, export.operation_id, digest)
                 if saved:
-                    return {**saved, "duplicate": True}
+                    bound = receipt(db, BINDING, export.operation_id, digest)
+                    return self.links(saved, bound['noteId'], True)
                 bound = receipt(db, BINDING, export.operation_id, digest)
                 note_id, note = self.quicknotes.target()
                 if not bound or bound['noteId'] != note_id:
@@ -177,7 +192,7 @@ class QuicknotesIntake:
                     'captureIds': sorted(set(obj['payload'].get('captureIds', [])) | {capture['captureId']})}
                 db.execute('UPDATE objects SET payload=? WHERE id=?', (canonical(metadata), note_id))
                 if not markers:
-                    visible, markdown = entry_fragments(item, assets)
+                    visible, markdown = entry_fragments(item, assets, export.operation_id, files)
                     content = append_fragments(note.content, export.operation_id, digest, visible, markdown,
                                                marker_name=MARKER, shared=True)
                     try:
@@ -189,7 +204,7 @@ class QuicknotesIntake:
                           "appendId": export.operation_id, "version": note.version,
                           "assetCount": len(assets), "saved": True}
                 remember(db, RECEIPT, export.operation_id, digest, result)
-            return {**result, "duplicate": bool(markers)}
+            return self.links(result, note_id, bool(markers))
 
 
 class IntakeRoute(APIRoute):

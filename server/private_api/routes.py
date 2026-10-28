@@ -388,7 +388,7 @@ def create_router(service, auth):
         disposition = "inline" if media.startswith("image/") else "attachment"
         # Storage keys have no extension. The response filename takes priority
         # over an HTML download attribute, including for existing PDF assets.
-        filename = asset_id + ".pdf" if media == "application/pdf" else asset_id
+        filename = asset_id + {"application/pdf": ".pdf", "video/mp4": ".mp4", "video/webm": ".webm"}.get(media, "")
         return FileResponse(
             path,
             media_type=media,

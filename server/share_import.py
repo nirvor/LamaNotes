@@ -18,7 +18,8 @@ from publications.metadata import PUBLICATION_FILE_LOCK
 SHARE_ORIGIN = "http://nirvstart:8080"
 MAX_BYTES = 20 * 1024 * 1024
 MIMES = {"image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf",
-         "text/plain", "audio/wav", "audio/ogg", "audio/mpeg", "audio/flac", "audio/mp4"}
+         "text/plain", "audio/wav", "audio/ogg", "audio/mpeg", "audio/flac", "audio/mp4",
+         "video/mp4", "video/webm"}
 OPAQUE = r"^[A-Za-z0-9_-]{32}$"
 NO_STORE = {"Cache-Control": "no-store", "Vary": "Authorization, Cookie"}
 

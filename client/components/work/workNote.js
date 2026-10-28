@@ -459,6 +459,13 @@ function renderInlineMarkdown(value = "") {
           : `<code>${escapeHtml(code)}</code>`,
       ),
     )
+    .replace(
+      /<span id="quicknote-([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})" data-lamanotes-share-anchor><\/span>/g,
+      (_, id) =>
+        protect(
+          `<span id="quicknote-${id}" data-lamanotes-share-anchor></span>`,
+        ),
+    )
     .replace(/<small>(.*?)<\/small>/gi, (_, content) =>
       protect(`<small>${renderInlineMarkdown(content)}</small>`),
     )

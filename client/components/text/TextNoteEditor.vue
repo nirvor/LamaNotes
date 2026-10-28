@@ -6,6 +6,7 @@
     prose
     :session-state="sessionState"
     :structured-paste="true"
+    :hide-share-anchors="true"
     :aria-label="`Edit ${noteTitle || 'note'}`"
     :add-image-blob-hook="addImageBlobHook"
     @change="$emit('change')"

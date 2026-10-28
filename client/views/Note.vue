@@ -141,6 +141,7 @@
             : note.content
         "
         :enhance-note-lead="!isTextNote"
+        @rendered="focusSharedEntry"
         :class="{
           'lamanotes-share-quicknotes':
             isTextNote && hasSharedQuicknotes(note.content),
@@ -260,6 +261,7 @@ import {
   mdilPencil,
 } from "@mdi/light-js";
 import { useToast } from "../toastStore.js";
+import { sharedEntryPosition, sharedEntryRequest } from "../sharedEntry.js";
 import {
   computed,
   defineAsyncComponent,
@@ -533,7 +535,63 @@ const {
   getViewRoot: () => noteContent.value,
 });
 
+let handledSharedEntry = "";
+let pendingSharedEditorEntry = null;
+let sharedEntryScroll = null;
+
+function sharedEntryUnavailable() {
+  toast.add({
+    severity: "warn",
+    summary: "Shared entry",
+    detail: "This entry was changed or is no longer available.",
+    life: 5000,
+  });
+}
+
+function focusSharedEntry() {
+  const request = sharedEntryRequest(router.currentRoute.value.query);
+  if (!request || !isTextNote.value) return;
+  const key = `${note.value.title}:${request.id}:${request.edit}`;
+  if (key === handledSharedEntry) return;
+  const position = sharedEntryPosition(
+    note.value.content,
+    extractTextMarkdown(note.value.content, note.value.title),
+    request.id,
+  );
+  handledSharedEntry = key;
+  if (!position) return sharedEntryUnavailable();
+  if (request.edit && canModify.value) {
+    pendingSharedEditorEntry = request.id;
+    editHandler();
+    return;
+  }
+  const anchor = noteContent.value?.querySelector(`#${position.anchorId}`);
+  const target =
+    anchor?.parentElement?.matches("p") &&
+    anchor.parentElement.childNodes.length === 1
+      ? anchor.parentElement.nextElementSibling
+      : anchor;
+  sharedEntryScroll?.abort();
+  sharedEntryScroll = new AbortController();
+  const signal = sharedEntryScroll.signal;
+  const align = () => {
+    if (!signal.aborted && target?.isConnected)
+      target.scrollIntoView({ block: "center" });
+  };
+  const stop = () => sharedEntryScroll?.abort();
+  window.addEventListener("pointerdown", stop, { once: true, signal });
+  window.addEventListener("keydown", stop, { once: true, signal });
+  noteContent.value?.querySelectorAll("img").forEach((image) => {
+    if (!image.complete)
+      image.addEventListener("load", align, { once: true, signal });
+  });
+  requestAnimationFrame(align);
+  document.fonts.ready.then(align);
+}
+
 function init() {
+  handledSharedEntry = "";
+  pendingSharedEditorEntry = null;
   // Return if we already have the note e.g. When we rename a note, the route prop would change but we’d already have the note.
   if (props.title && props.title == note.value.title) {
     return;
@@ -544,7 +602,9 @@ function init() {
   noteLoadStartedAt = performance.now();
   loadingIndicator.value.setLoading();
   if (props.title) {
-    getNote(props.title)
+    getNote(props.title, {
+      force: Boolean(sharedEntryRequest(router.currentRoute.value.query)),
+    })
       .then((data) => {
         note.value = data;
         loadingIndicator.value.setLoaded();
@@ -1464,6 +1524,21 @@ function editorReadyHandler() {
   nextTick(() => {
     focusEditor();
     documentSession.restoreEditorPosition(contentEditor.value);
+    if (pendingSharedEditorEntry) {
+      const position = sharedEntryPosition(
+        note.value.content,
+        contentEditor.value?.getMarkdown?.() || "",
+        pendingSharedEditorEntry,
+      );
+      pendingSharedEditorEntry = null;
+      if (position)
+        contentEditor.value?.selectSearchRange?.(
+          position.caret,
+          position.caret,
+          { centerInPage: true },
+        );
+      else sharedEntryUnavailable();
+    }
   });
   if (!findVisible.value) {
     return;
@@ -2016,6 +2091,16 @@ watch(editMode, () => {
     nextTick(refreshDocumentFind);
   }
 });
+watch(
+  () => [
+    router.currentRoute.value.query.entry,
+    router.currentRoute.value.query.edit,
+  ],
+  () => {
+    handledSharedEntry = "";
+    if (note.value.title) nextTick(focusSharedEntry);
+  },
+);
 watch(contentEditor, () => {
   if (findVisible.value && contentEditor.value) {
     nextTick(refreshDocumentFind);
@@ -2042,6 +2127,7 @@ onMounted(() => {
   init();
 });
 onUnmounted(() => {
+  sharedEntryScroll?.abort();
   editorMemory.snapshot = null;
   clearContentChangedTimeout();
   publicationRequestSequence += 1;
