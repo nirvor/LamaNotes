@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import test_private_api as fixtures
 from notes.models import NoteUpdate
+from private_api.references import MAX_ASSET_BYTES
 
 
 class ReferenceContextTests(unittest.TestCase):
@@ -40,6 +41,31 @@ class ReferenceContextTests(unittest.TestCase):
     def parent(self, note=None):
         note = note or self.note
         return {key: note[key] for key in ("noteId", "version", "researchId")}
+
+    def test_scoped_original_export_accepts_100mb_and_rejects_one_byte_more(self):
+        self.assertEqual(MAX_ASSET_BYTES, 100_000_000)
+        data = b'\x00' * MAX_ASSET_BYTES
+        asset = self.service.create_asset(None, data, 'application/octet-stream', 'source', None, None,
+                                          'share-export-boundary', source_limit=MAX_ASSET_BYTES)
+        capture = self.post('/captures', {'kind': 'file', 'text': 'Selected original',
+            'assetIds': [asset['assetId']], 'provenance': {'channel': 'web'}}).json()
+        headers, _, _ = self.selected(capture_ids=[capture['captureId']])
+        source = {key: capture[key] for key in ('captureId', 'sha256')}
+        context = self.post('/references/context', {'sources': [source]}, headers)
+        self.assertEqual(context.status_code, 200, context.text)
+        self.assertEqual(context.json()['sources'][0]['assets'][0]['size'], MAX_ASSET_BYTES)
+        body = {'source': source, 'assetId': asset['assetId']}
+        download = self.post('/references/content', body, headers)
+        self.assertEqual(download.status_code, 200)
+        self.assertEqual(len(download.content), MAX_ASSET_BYTES)
+        self.assertEqual(hashlib.sha256(download.content).hexdigest(), asset['sha256'])
+        self.assertTrue(download.headers['content-disposition'].startswith('attachment;'))
+        self.assertEqual(download.headers['x-content-type-options'], 'nosniff')
+        with (self.service.store.assets / asset['assetId']).open('ab') as stream:
+            stream.write(b'\x00')
+        response = self.post('/references/content', body, headers)
+        self.assertEqual(response.status_code, 413)
+        self.assertIn('100 MB', response.text)
 
     def test_selected_note_and_capture_with_real_asset_bytes(self):
         data = b"%PDF-1.7\nSelected fixture PDF\n"

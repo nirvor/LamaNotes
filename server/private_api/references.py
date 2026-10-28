@@ -5,9 +5,10 @@ from fastapi import HTTPException
 from publications.metadata import PUBLICATION_FILE_LOCK
 
 from .store import missing
+from .media import SHARE_MAX_BYTES
 
 MAX_CONTEXT_BYTES = 2 * 1024 * 1024
-MAX_ASSET_BYTES = 20 * 1024 * 1024
+MAX_ASSET_BYTES = SHARE_MAX_BYTES
 ASSET_FIELDS = (
     "assetId",
     "sha256",
@@ -56,7 +57,7 @@ def asset_metadata(service, actor, asset_id):
     if not path.is_file() or path.is_symlink():
         missing()
     if path.stat().st_size > MAX_ASSET_BYTES:
-        raise HTTPException(413, "Selected asset exceeds 20 MB.")
+        raise HTTPException(413, "Selected original exceeds 100 MB (100,000,000 bytes).")
     asset = service.asset(actor, asset_id)
     if asset["size"] != path.stat().st_size:
         raise HTTPException(409, "Stored asset changed; review required.")

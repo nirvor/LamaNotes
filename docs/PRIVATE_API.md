@@ -211,7 +211,8 @@ credentials. The usual notes, captures, search and assets routes retain their
 existing scope requirements.
 
 Text context is limited to 2 MiB total UTF-8 note content and capture text.
-Each asset is limited to 20 MiB. Oversize selections return 413 without silent
+Each selected original is limited to 100,000,000 bytes (100 MB decimal).
+Oversize selections return 413 without silent
 truncation. Changed versions, capture hashes or stored asset bytes return 409.
 Empty/duplicate source selections and extra fields return 422. Private responses
 remain `no-store`. Byte responses also use `nosniff` and a sandbox CSP.

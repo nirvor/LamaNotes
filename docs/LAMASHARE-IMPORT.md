@@ -33,7 +33,7 @@ The target comes only from the existing `.private/focus-quicknotes.json` binding
 A durable receipt binds each pending operation to that stable note ID before
 downloading. A changed binding cannot redirect an unfinished action. Completed
 retries return their original receipt, including after later owner edits.
-Original files are bounded, MIME/signature/SHA checked and fsynced. Existing
+Original files are bounded, exact-size/SHA checked and fsynced. Existing
 Capture and Asset storage retains the raw item and media. Quicknotes media and
 capture associations are extended by union, without changing capabilities.
 
@@ -65,9 +65,11 @@ For an explicit Notes action, UTF-8 text/plain attachments are also included
 as editable fenced text, with an inert language hint inferred from the filename.
 The fence is longer than any original backtick run. Original bytes and the
 named attachment remain intact. Other media keep their existing presentation.
-MP4 and WebM use bounded, signature-checked private original attachments with
+MP4 and WebM use bounded private original attachments with
 their filename extensions. No video player is created. GIF keeps its existing
-image path. The ten-file and combined 20 MiB limits remain unchanged.
+image path. A send accepts up to ten files and exactly 100,000,000 bytes
+(100 MB decimal) combined. Unrecognized formats or failed previews remain
+private original attachments. Format recognition does not gate the transfer.
 
 `/share-import#ticket=lst_...` is an explicit Save to Notes handoff. The router
 removes the fragment before authentication and retains it in this tab's
@@ -86,8 +88,13 @@ Notes uses only the fixed `http://nirvstart:8080` origin, POST
 `/api/share/v1/notes-export` and the validated opaque file routes below it.
 It forwards no browser cookies or owner token, follows no redirects and does
 not fetch the item's source URL. Export metadata is bounded to 2 MiB. Files
-are limited to ten and 20 MiB combined, checked against their exact declared
-size, SHA-256, response MIME and the existing Notes media signature check.
+are limited to ten and 100,000,000 bytes combined, checked against their exact
+declared size and SHA-256. The internal source-asset save uses that same limit.
+Normal Notes uploads and derived/crop assets keep their existing 20 MiB limit.
+The existing job-scoped original export also permits files up to 100,000,000
+bytes, keeping its selected-note/capture/asset authority and integrity checks.
+The intake request carries only a scoped ticket, so its 1 KiB JSON limit and
+the 2 MiB export-metadata limit do not constrain original-file downloads.
 No new long-lived credential or environment variable is required.
 
 The existing private Capture, Asset and passive HTML note services perform

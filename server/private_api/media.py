@@ -1,5 +1,7 @@
 import re
 
+SHARE_MAX_BYTES = 100_000_000
+
 
 def normalized_mime(value):
     media = (value or "").split(";", 1)[0].strip().lower()

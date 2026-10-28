@@ -22,7 +22,7 @@ from private_api.media import editable_text, image_preview
 from private_api.store import canonical, fingerprint
 from publications.metadata import PUBLICATION_FILE_LOCK
 from quicknotes import MAX_NOTE_CHARS, Quicknotes, _Document, _sync_directory, append_fragments, literal_markdown, timestamp
-from share_import import NO_STORE, ShareCapture, ShareExport, bounded_response, fail
+from share_import import MAX_BYTES, NO_STORE, ShareCapture, ShareExport, bounded_response, fail, parse_export
 
 INTENT = "quicknotes.append"
 BINDING = "share-quicknotes-target"
@@ -132,7 +132,7 @@ class QuicknotesIntake:
                     limit=2 * 1024 * 1024, json={"ticket": ticket})
                 if media != 'application/json':
                     fail(502, "LamaShare returned an invalid Quicknotes export.")
-                export = QuicknotesExport.model_validate_json(raw)
+                export = parse_export(raw, QuicknotesExport)
                 saved = await run_in_threadpool(self.bind, export)
                 if saved:
                     return saved
@@ -160,7 +160,8 @@ class QuicknotesIntake:
             if saved:
                 return saved
             item, key = export.item, 'share-quicknotes-' + export.operation_id
-            assets = [self.service.create_asset(None, data, file.mime, 'source', None, None, key + '-' + file.id)
+            assets = [self.service.create_asset(None, data, file.mime, 'source', None, None, key + '-' + file.id,
+                                               source_limit=MAX_BYTES)
                       for file, data in zip(item.files, files, strict=True)]
             for asset in assets:
                 with (self.service.store.assets / asset['assetId']).open('rb') as stream:

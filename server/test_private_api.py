@@ -536,6 +536,14 @@ class PrivateApiTests(unittest.TestCase):
             data=fields,
         )
 
+    def test_share_source_limit_does_not_change_normal_upload_or_derived_limits(self):
+        data = b'\x00' * (20 * 1024 * 1024 + 1)
+        self.assertEqual(self.upload(self.owner, data=data).status_code, 413)
+        with self.assertRaises(HTTPException) as error:
+            self.service.create_asset(None, data, 'application/octet-stream', 'derived', None, None,
+                                      'derived-size-check', source_limit=100_000_000)
+        self.assertEqual(error.exception.status_code, 413)
+
     def test_pdf_download_filename_on_private_and_reader_routes(self):
         headers, _ = self.cap(
             ["assets:create", "assets:read", "notes:create", "notes:read"],

@@ -8,16 +8,18 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 from starlette.concurrency import run_in_threadpool
 
 from auth.scopes import NOTES_WRITE
 from private_api.models import CaptureCreate, PrivateNoteCreate, StrictModel, validate_source_url
-from private_api.media import image_preview
+from private_api.media import SHARE_MAX_BYTES, image_preview
 from publications.metadata import PUBLICATION_FILE_LOCK
 
 SHARE_ORIGIN = "http://nirvstart:8080"
-MAX_BYTES = 20 * 1024 * 1024
+MAX_BYTES = SHARE_MAX_BYTES
+SIZE_MESSAGE = "A send can contain up to 100 MB of original files (100,000,000 bytes)."
 OPAQUE = r"^[A-Za-z0-9_-]{32}$"
 NO_STORE = {"Cache-Control": "no-store", "Vary": "Authorization, Cookie"}
 
@@ -87,7 +89,9 @@ class ShareItem(StrictModel):
 
     @model_validator(mode="after")
     def bounded_item(self):
-        if (not self.ready or sum(file.size for file in self.files) > MAX_BYTES
+        if sum(file.size for file in self.files) > MAX_BYTES:
+            raise PydanticCustomError("share_size_limit", SIZE_MESSAGE)
+        if (not self.ready
             or len({file.id for file in self.files}) != len(self.files)
             or not self.files and not any(v.strip() for v in (self.title, self.text, self.url, self.annotation))):
             raise ValueError("Use a complete bounded Share item.")
@@ -112,6 +116,18 @@ class ShareCapture(CaptureCreate):
     share: ShareItem
 
 
+def parse_export(raw, model=ShareExport):
+    try:
+        return model.model_validate_json(raw)
+    except ValidationError as error:
+        if any(detail['type'] == 'share_size_limit' or
+               (detail['type'] == 'less_than_equal' and detail['loc'][-1:] == ('size',)
+                and detail.get('ctx', {}).get('le') == MAX_BYTES)
+               for detail in error.errors()):
+            fail(413, SIZE_MESSAGE)
+        raise
+
+
 async def bounded_response(client, method, path, *, limit, **kwargs):
     # Callers supply only fixed paths and validated opaque file IDs.
     async with client.stream(method, SHARE_ORIGIN + path, **kwargs) as response:
@@ -125,7 +141,7 @@ async def bounded_response(client, method, path, *, limit, **kwargs):
         async for chunk in response.aiter_raw():
             size += len(chunk)
             if size > limit:
-                fail(413, "The Share export exceeds its size limit.")
+                fail(413, "The Share export exceeds its declared size or transfer limit.")
             chunks.append(chunk)
         return b"".join(chunks), response.headers.get("content-type", "").split(";")[0].strip().lower()
 
@@ -156,7 +172,7 @@ class ShareImporter:
                     limit=2 * 1024 * 1024, json={"ticket": ticket})
                 if media != "application/json":
                     fail(502, "LamaShare returned an invalid export.")
-                export = ShareExport.model_validate_json(raw)
+                export = parse_export(raw)
                 replay = await run_in_threadpool(self.replay, export.item)
                 if replay:
                     return replay
@@ -195,7 +211,8 @@ class ShareImporter:
             if existing:
                 return existing
             key = "share-" + item.id
-            assets = [self.service.create_asset(None, data, file.mime, "source", None, None, key + "-" + file.id)
+            assets = [self.service.create_asset(None, data, file.mime, "source", None, None, key + "-" + file.id,
+                                               source_limit=MAX_BYTES)
                       for file, data in zip(item.files, files, strict=True)]
             kind = ("image" if item.files[0].mime.startswith("image/") else "audio" if item.files[0].mime.startswith("audio/") else "file") if item.files else "link" if item.url else "text"
             capture = self.service.create_capture(None, ShareCapture(kind=kind,

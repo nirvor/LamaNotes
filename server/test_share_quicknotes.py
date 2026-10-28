@@ -26,6 +26,7 @@ from private_api.models import CapabilityCreate, Enroll
 from private_api.service import PrivateService
 from quicknotes import Quicknotes, QuicknoteEntry
 from share_quicknotes import MARKER, RECEIPT, create_router
+from share_import import MAX_BYTES
 from test_quicknotes import IDENTITY, LEGACY, TEXT_MODE
 
 PNG = bytes.fromhex('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489'
@@ -396,6 +397,36 @@ class ShareQuicknotesTests(unittest.TestCase):
                 self.assertEqual((self.service.store.assets / asset['id']).read_bytes(), data)
         self.assertIn('print("hello")', self.source())
         self.assertNotIn('a' * 1000, self.source())
+
+    def test_exact_100mb_quicknotes_original_is_private_unchanged_and_retry_safe(self):
+        self.assertEqual(MAX_BYTES, 100_000_000)
+        self.data = b'\x00' * MAX_BYTES
+        self.item['files'][0].update(mime='application/octet-stream', size=MAX_BYTES,
+                                   sha256=hashlib.sha256(self.data).hexdigest())
+        response = self.post()
+        self.assertEqual(response.status_code, 200, response.text)
+        asset = self.service.store.objects('asset')[0]
+        path = self.service.store.assets / asset['id']
+        self.assertEqual(path.stat().st_size, MAX_BYTES)
+        with path.open('rb') as stream:
+            self.assertEqual(hashlib.file_digest(stream, 'sha256').hexdigest(), self.item['files'][0]['sha256'])
+        self.assertIn('/assets/' + asset['id'] + '/content', self.source())
+        self.assertTrue(self.post().json()['duplicate'])
+        self.assertEqual(len(self.service.store.objects('asset')), 1)
+
+    def test_100mb_plus_one_and_combined_overflow_never_fetch_or_append(self):
+        before = self.source()
+        first = self.item['files'][0]
+        first['size'] = MAX_BYTES + 1
+        self.assertEqual(self.post().status_code, 413)
+        first['size'] = MAX_BYTES // 2
+        self.item['files'].append({**first, 'id': 'g' * 32, 'size': MAX_BYTES // 2 + 1})
+        response = self.post()
+        self.assertEqual(response.status_code, 413)
+        self.assertIn('100 MB', response.text)
+        self.assertTrue(all(request.method == 'POST' for request in self.calls))
+        self.assertEqual(self.source(), before)
+        self.assertEqual(self.service.store.objects('asset'), [])
 
 
 if __name__ == '__main__':

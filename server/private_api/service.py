@@ -419,10 +419,13 @@ class PrivateService:
         )
 
     def create_asset(
-        self, actor, data, supplied, role, source_id, receipt, key
+        self, actor, data, supplied, role, source_id, receipt, key, *, source_limit=None
     ):
-        if len(data) > 20 * 1024 * 1024 or (role == "derived" and not data):
-            raise HTTPException(413, "Select a file up to 20 MB.")
+        limit = source_limit if role == "source" and source_limit is not None else 20 * 1024 * 1024
+        if len(data) > limit or (role == "derived" and not data):
+            message = ("Select original files totalling up to 100 MB (100,000,000 bytes)."
+                       if source_limit is not None and role == "source" else "Select a file up to 20 MB.")
+            raise HTTPException(413, message)
         media = normalized_mime(supplied)
         try:
             media = self.media_type(data, media)

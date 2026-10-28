@@ -16,7 +16,7 @@ from auth.scopes import NOTES_WRITE
 from notes.file_system.file_system import FileSystemNotes
 from private_api.middleware import PrivateRequestLimit
 from private_api.service import PrivateService
-from share_import import create_router
+from share_import import MAX_BYTES, ShareExport, create_router
 
 
 class OwnerAuth:
@@ -116,8 +116,10 @@ class ShareImportTests(unittest.TestCase):
         self.item['files'][0]['id'] = '../outside'
         self.assertEqual(self.post().status_code, 422)
         self.item['files'][0]['id'] = 'f'*32
-        self.item['files'][0]['size'] = 21 * 1024 * 1024
-        self.assertEqual(self.post().status_code, 422)
+        self.item['files'][0]['size'] = MAX_BYTES + 1
+        response = self.post()
+        self.assertEqual(response.status_code, 413)
+        self.assertIn('100 MB', response.text)
         self.assertTrue(all(request.method == 'POST' for request in self.calls))
         self.assertEqual(self.service.store.objects(), [])
 
@@ -156,6 +158,34 @@ class ShareImportTests(unittest.TestCase):
                 content = self.service.read_note(None, result.json()['noteId'])['content']
                 self.assertNotIn('<img', content)
                 self.assertIn(' download>', content)
+
+    def test_exact_decimal_100mb_original_survives_the_entire_library_import(self):
+        self.assertEqual(MAX_BYTES, 100_000_000)
+        self.data = b'\x00' * MAX_BYTES
+        self.item['files'][0].update(mime='application/octet-stream', size=len(self.data),
+                                   sha256=hashlib.sha256(self.data).hexdigest())
+        response = self.post()
+        self.assertEqual(response.status_code, 200, response.text)
+        asset = self.service.store.objects('asset')[0]
+        path = self.service.store.assets / asset['id']
+        self.assertEqual(path.stat().st_size, MAX_BYTES)
+        with path.open('rb') as stream:
+            self.assertEqual(hashlib.file_digest(stream, 'sha256').hexdigest(), self.item['files'][0]['sha256'])
+        self.assertEqual(self.post().json()['noteId'], response.json()['noteId'])
+
+    def test_combined_decimal_boundary_and_stream_overflow(self):
+        first = self.item['files'][0]
+        first['size'] = MAX_BYTES // 2
+        self.item['files'].append({**first, 'id': 'g' * 32})
+        self.assertEqual(sum(file.size for file in ShareExport.model_validate(self.export).item.files), MAX_BYTES)
+        self.item['files'][1]['size'] += 1
+        response = self.post()
+        self.assertEqual(response.status_code, 413)
+        self.assertIn('100 MB', response.text)
+        self.assertTrue(all(request.method == 'POST' for request in self.calls))
+        self.item['files'] = [{**first, 'size': len(self.data) - 1}]
+        self.assertEqual(self.post().status_code, 413)
+        self.assertEqual(self.service.store.objects(), [])
 
 
 if __name__ == '__main__':
