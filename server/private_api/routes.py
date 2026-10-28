@@ -22,6 +22,7 @@ from fastapi import (
 from fastapi.responses import FileResponse, HTMLResponse
 
 from notes.errors import NoteConflictError
+from .media import image_preview
 
 from .models import (
     AttachAssets,
@@ -385,7 +386,7 @@ def create_router(service, auth):
         if not path.is_file() or path.is_symlink():
             missing()
         media = asset["mediaType"]
-        disposition = "inline" if media.startswith("image/") else "attachment"
+        disposition = "inline" if image_preview(asset) else "attachment"
         # Storage keys have no extension. The response filename takes priority
         # over an HTML download attribute, including for existing PDF assets.
         filename = asset_id + {"application/pdf": ".pdf", "video/mp4": ".mp4", "video/webm": ".webm"}.get(media, "")
@@ -397,6 +398,7 @@ def create_router(service, auth):
             headers={
                 "Cache-Control": "no-store",
                 "Content-Security-Policy": "default-src 'none'; sandbox",
+                "X-Content-Type-Options": "nosniff",
             },
         )
 

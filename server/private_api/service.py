@@ -16,6 +16,7 @@ from publications.metadata import (
 )
 
 from .store import PrivateStore, fingerprint, missing, opaque_id
+from .media import normalized_mime
 
 
 class PrivateService:
@@ -420,12 +421,22 @@ class PrivateService:
     def create_asset(
         self, actor, data, supplied, role, source_id, receipt, key
     ):
-        if (not data and supplied != "text/plain") or len(data) > 20 * 1024 * 1024:
+        if len(data) > 20 * 1024 * 1024 or (role == "derived" and not data):
             raise HTTPException(413, "Select a file up to 20 MB.")
-        media = self.media_type(data, supplied)
+        media = normalized_mime(supplied)
+        try:
+            media = self.media_type(data, media)
+        except (HTTPException, UnicodeError):
+            if role == "derived":
+                raise
         digest = hashlib.sha256(data).hexdigest()
-        width, height = FileSystemAttachments._image_dimensions(data)
-        if media.startswith("image/") and (
+        try:
+            width, height = FileSystemAttachments._image_dimensions(data)
+        except Exception:
+            if role == "derived":
+                raise
+            width, height = None, None
+        if role == "derived" and media.startswith("image/") and (
             not width or not height or width * height > 40_000_000
         ):
             raise HTTPException(415, "Use a valid image up to 40 megapixels.")

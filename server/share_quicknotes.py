@@ -18,9 +18,10 @@ from starlette.concurrency import run_in_threadpool
 from notes.errors import NoteConflictError
 from notes.models import NoteUpdate
 from private_api.models import StrictModel
+from private_api.media import editable_text, image_preview
 from private_api.store import canonical, fingerprint
 from publications.metadata import PUBLICATION_FILE_LOCK
-from quicknotes import Quicknotes, _Document, _sync_directory, append_fragments, literal_markdown, timestamp
+from quicknotes import MAX_NOTE_CHARS, Quicknotes, _Document, _sync_directory, append_fragments, literal_markdown, timestamp
 from share_import import NO_STORE, ShareCapture, ShareExport, bounded_response, fail
 
 INTENT = "quicknotes.append"
@@ -77,19 +78,21 @@ def entry_fragments(item, assets, entry_id=None, originals=None):
     for index, (file, asset) in enumerate(zip(item.files, assets, strict=True)):
         url = '/api/private/v1/assets/' + asset['assetId'] + '/content'
         name = escape(file.name, quote=True)
-        if file.mime.startswith('image/'):
+        if image_preview(asset):
             visible.append(f'<p><img src="{url}" alt="{name}" loading="lazy"></p>')
             markdown.append('![' + literal_markdown(file.name) + '](' + url + ')')
-        else:
-            visible.append(f'<p><a href="{url}" download>{name}</a></p>')
-            markdown.append('[' + literal_markdown(file.name) + '](' + url + ')')
-            if file.mime == 'text/plain' and originals is not None:
-                text = originals[index].decode('utf-8').replace('\r\n', '\n').replace('\r', '\n')
-                language = {'py':'python','js':'javascript','ts':'typescript','ps1':'powershell',
-                            'json':'json','md':'markdown','sh':'bash','yml':'yaml','yaml':'yaml'}.get(file.name.rsplit('.',1)[-1].lower(), 'text')
-                fence = '`' * max(3, max((len(value) + 1 for value in re.findall(r'`+', text)), default=3))
-                markdown.append(fence + language + '\n' + text + '\n' + fence)
-                visible.append(f'<pre><code class="language-{language}">' + escape(text, quote=False) + '</code></pre>')
+        visible.append(f'<p><a href="{url}" download>{name}</a></p>')
+        markdown.append('[' + literal_markdown(file.name) + '](' + url + ')')
+        media = asset['mediaType']
+        text = (editable_text(originals[index], MAX_NOTE_CHARS)
+                if originals is not None and media != 'application/pdf'
+                and not media.startswith(('image/', 'audio/', 'video/')) else None)
+        if text is not None:
+            language = {'py':'python','js':'javascript','ts':'typescript','ps1':'powershell',
+                        'json':'json','md':'markdown','sh':'bash','yml':'yaml','yaml':'yaml'}.get(file.name.rsplit('.',1)[-1].lower(), 'text')
+            fence = '`' * max(3, max((len(value) + 1 for value in re.findall(r'`+', text)), default=3))
+            markdown.append(fence + language + '\n' + text + '\n' + fence)
+            visible.append(f'<pre><code class="language-{language}">' + escape(text, quote=False) + '</code></pre>')
     return ''.join(visible), '\n\n'.join(markdown)
 
 
@@ -137,9 +140,8 @@ class QuicknotesIntake:
                 for file in export.item.files:
                     data, media = await bounded_response(client, 'GET', '/api/share/v1/notes-export/files/' + file.id,
                         limit=file.size, headers={"Authorization": "Bearer " + export.file_token})
-                    if (media != file.mime or len(data) != file.size
-                        or hashlib.sha256(data).hexdigest() != file.sha256
-                        or self.service.media_type(data, file.mime) != file.mime):
+                    if (len(data) != file.size
+                        or hashlib.sha256(data).hexdigest() != file.sha256):
                         fail(422, "A shared file could not be verified. The action remains queued.")
                     files.append(data)
         except httpx.HTTPError:
@@ -193,8 +195,15 @@ class QuicknotesIntake:
                 db.execute('UPDATE objects SET payload=? WHERE id=?', (canonical(metadata), note_id))
                 if not markers:
                     visible, markdown = entry_fragments(item, assets, export.operation_id, files)
-                    content = append_fragments(note.content, export.operation_id, digest, visible, markdown,
-                                               marker_name=MARKER, shared=True)
+                    try:
+                        content = append_fragments(note.content, export.operation_id, digest, visible, markdown,
+                                                   marker_name=MARKER, shared=True)
+                    except HTTPException as error:
+                        if error.status_code != 413:
+                            raise
+                        visible, markdown = entry_fragments(item, assets, export.operation_id)
+                        content = append_fragments(note.content, export.operation_id, digest, visible, markdown,
+                                                   marker_name=MARKER, shared=True)
                     try:
                         note = self.service.notes.update(note.title, NoteUpdate(new_content=content, expected_version=note.version))
                     except NoteConflictError:

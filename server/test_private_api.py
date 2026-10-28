@@ -622,15 +622,13 @@ class PrivateApiTests(unittest.TestCase):
             ).status_code,
             404,
         )
-        self.assertEqual(
-            self.upload(
-                headers,
-                b"<svg><script>alert(1)</script></svg>",
-                media="image/svg+xml",
-                key="bad-asset-0001",
-            ).status_code,
-            415,
-        )
+        original = b"<svg><script>alert(1)</script></svg>"
+        uploaded = self.upload(headers, original, media="image/svg+xml", key="svg-original-0001")
+        self.assertEqual(uploaded.status_code, 201)
+        response = self.get("/assets/" + uploaded.json()["assetId"] + "/content", headers)
+        self.assertEqual(response.content, original)
+        self.assertTrue(response.headers["content-disposition"].startswith("attachment;"))
+        self.assertEqual(response.headers["x-content-type-options"], "nosniff")
 
     def test_revoke_note_removes_linked_asset_access(self):
         asset = self.upload(self.owner).json()

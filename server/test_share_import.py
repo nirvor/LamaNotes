@@ -145,6 +145,18 @@ class ShareImportTests(unittest.TestCase):
         self.assertNotIn('lst_private-invalid-fixture', response.text)
         self.assertEqual(self.calls, [])
 
+    def test_arbitrary_original_and_invalid_image_are_downloads_despite_response_mime(self):
+        for mime in ('application/x-custom', 'image/png'):
+            with self.subTest(mime=mime):
+                self.item['id'] = ('b' if mime.startswith('image/') else 'a') * 32
+                self.data = b'\x00\xffuntouched original'
+                self.item['files'][0].update(mime=mime, size=len(self.data), sha256=hashlib.sha256(self.data).hexdigest())
+                result = self.post()
+                self.assertEqual(result.status_code, 200, result.text)
+                content = self.service.read_note(None, result.json()['noteId'])['content']
+                self.assertNotIn('<img', content)
+                self.assertIn(' download>', content)
+
 
 if __name__ == '__main__':
     unittest.main()

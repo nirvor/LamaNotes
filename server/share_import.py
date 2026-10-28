@@ -13,13 +13,11 @@ from starlette.concurrency import run_in_threadpool
 
 from auth.scopes import NOTES_WRITE
 from private_api.models import CaptureCreate, PrivateNoteCreate, StrictModel, validate_source_url
+from private_api.media import image_preview
 from publications.metadata import PUBLICATION_FILE_LOCK
 
 SHARE_ORIGIN = "http://nirvstart:8080"
 MAX_BYTES = 20 * 1024 * 1024
-MIMES = {"image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf",
-         "text/plain", "audio/wav", "audio/ogg", "audio/mpeg", "audio/flac", "audio/mp4",
-         "video/mp4", "video/webm"}
 OPAQUE = r"^[A-Za-z0-9_-]{32}$"
 NO_STORE = {"Cache-Control": "no-store", "Vary": "Authorization, Cookie"}
 
@@ -60,8 +58,8 @@ class ShareFile(StrictModel):
 
     @model_validator(mode="after")
     def valid_file(self):
-        if self.mime not in MIMES or not self.uploaded or not self.name.strip() or self.name in {".", ".."}:
-            raise ValueError("Use a complete supported file.")
+        if not self.uploaded or not self.name.strip() or self.name in {".", ".."}:
+            raise ValueError("Use a complete file.")
         return self
 
 
@@ -166,9 +164,8 @@ class ShareImporter:
                 for file in export.item.files:
                     data, media = await bounded_response(client, "GET", "/api/share/v1/notes-export/files/" + file.id,
                         limit=file.size, headers={"Authorization": "Bearer " + export.file_token})
-                    if (media != file.mime or len(data) != file.size
-                        or hashlib.sha256(data).hexdigest() != file.sha256
-                        or self.service.media_type(data, file.mime) != file.mime):
+                    if (len(data) != file.size
+                        or hashlib.sha256(data).hexdigest() != file.sha256):
                         fail(422, "A shared file could not be verified. The original remains in LamaShare.")
                     files.append(data)
         except httpx.HTTPError:
@@ -231,9 +228,9 @@ def note_html(item, assets):
     for file, asset in zip(item.files, assets, strict=True):
         url = '/api/private/v1/assets/' + asset['assetId'] + '/content'
         name = escape(file.name, quote=True)
-        if file.mime.startswith('image/'):
-            parts.append(f'<figure class="lamanote-media"><img src="{url}" alt="{name}"><figcaption>{name}</figcaption></figure>')
-        elif file.mime.startswith('audio/'):
+        if image_preview(asset):
+            parts.append(f'<figure class="lamanote-media"><img src="{url}" alt="{name}"><figcaption><a href="{url}" download>{name}</a></figcaption></figure>')
+        elif asset['mediaType'].startswith('audio/'):
             parts.append(f'<figure class="lamanote-media"><audio controls preload="metadata" src="{url}"></audio><figcaption>{name}</figcaption></figure>')
         else:
             parts.append(f'<p><a href="{url}" download>{name}</a></p>')

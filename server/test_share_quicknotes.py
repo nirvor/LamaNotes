@@ -326,6 +326,51 @@ class ShareQuicknotesTests(unittest.TestCase):
         self.assertEqual((self.service.store.assets / self.service.store.objects('asset')[0]['id']).read_bytes(), b'')
         self.assertEqual(self.post(content=b'x'*1025, headers={'Content-Type':'application/json'}).status_code, 413)
 
+    def test_arbitrary_originals_and_invalid_previews_are_saved_exactly_and_replayed(self):
+        fixtures = [('archive.bin', 'application/x-custom', b'\x00\xfforiginal'),
+                    ('unusual.png', 'image/png', b'\x00\xffunusual image header'),
+                    ('invalid.txt', 'text/plain', b'\xff\xfeinvalid utf8'),
+                    ('empty.dat', '', b'')]
+        for name, mime, data in fixtures:
+            with self.subTest(name=name):
+                self.export['operationId'] = str(uuid4())
+                self.data = data
+                self.item['files'][0].update(name=name, mime=mime, size=len(data), sha256=hashlib.sha256(data).hexdigest())
+                response = self.post()
+                self.assertEqual(response.status_code, 200, response.text)
+                asset = next(asset for asset in self.service.store.objects('asset')
+                             if asset['payload']['sha256'] == hashlib.sha256(data).hexdigest())
+                self.assertEqual((self.service.store.assets / asset['id']).read_bytes(), data)
+                doc = BeautifulSoup(self.source(), 'html.parser')
+                self.assertTrue(doc.select_one('a[href="/api/private/v1/assets/' + asset['id'] + '/content"]'))
+                self.assertFalse(doc.select('img,script'))
+                before = self.source()
+                self.assertTrue(self.post().json()['duplicate'])
+                self.assertEqual(self.source(), before)
+
+    def test_mime_metadata_or_preview_errors_do_not_block_originals(self):
+        self.item['files'][0]['mime'] = 'application/octet-stream'
+        with patch('private_api.service.FileSystemAttachments._image_dimensions', side_effect=ValueError('preview failed')):
+            response = self.post()
+        self.assertEqual(response.status_code, 200, response.text)
+        asset = self.service.store.objects('asset')[0]
+        self.assertEqual((self.service.store.assets / asset['id']).read_bytes(), PNG)
+        self.assertFalse(BeautifulSoup(self.source(), 'html.parser').select('img'))
+
+    def test_readable_code_with_generic_mime_is_editable_but_large_text_stays_attached(self):
+        for name, data in [('source.py', b'print("hello")\n'), ('large.txt', b'a' * 1_000_000)]:
+            with self.subTest(name=name):
+                self.export['operationId'] = str(uuid4())
+                self.data = data
+                self.item['files'][0].update(name=name, mime='application/octet-stream', size=len(data), sha256=hashlib.sha256(data).hexdigest())
+                response = self.post()
+                self.assertEqual(response.status_code, 200, response.text)
+                asset = next(asset for asset in self.service.store.objects('asset')
+                             if asset['payload']['sha256'] == hashlib.sha256(data).hexdigest())
+                self.assertEqual((self.service.store.assets / asset['id']).read_bytes(), data)
+        self.assertIn('print("hello")', self.source())
+        self.assertNotIn('a' * 1000, self.source())
+
 
 if __name__ == '__main__':
     unittest.main()
