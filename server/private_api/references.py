@@ -52,13 +52,14 @@ def selected_objects(service, actor, parent, sources):
     return note, captures
 
 
-def asset_metadata(service, actor, asset_id):
+def asset_metadata(service, actor, asset_id, *, verify_bytes=True):
     path = service.store.assets / asset_id
     if not path.is_file() or path.is_symlink():
         missing()
     if path.stat().st_size > MAX_ASSET_BYTES:
         raise HTTPException(413, "Selected original exceeds 100 MB (100,000,000 bytes).")
-    asset = service.asset(actor, asset_id)
+    asset = (service.asset(actor, asset_id) if verify_bytes else
+             {"assetId": asset_id, **service.store.get_allowed(actor, asset_id, "asset")["payload"]})
     if asset["size"] != path.stat().st_size:
         raise HTTPException(409, "Stored asset changed; review required.")
     return {key: asset[key] for key in ASSET_FIELDS}
@@ -128,7 +129,8 @@ def reference_content(service, actor, request):
             attached = captures[0]["assetIds"]
         if request.asset_id not in attached:
             missing()
-        asset = asset_metadata(service, actor, request.asset_id)
+        # Verify the returned buffer below, without reading the original twice.
+        asset = asset_metadata(service, actor, request.asset_id, verify_bytes=False)
         content = (service.store.assets / request.asset_id).read_bytes()
         if (
             len(content) != asset["size"]

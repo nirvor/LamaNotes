@@ -1,4 +1,5 @@
 import hashlib
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
@@ -66,6 +67,30 @@ class ReferenceContextTests(unittest.TestCase):
         response = self.post('/references/content', body, headers)
         self.assertEqual(response.status_code, 413)
         self.assertIn('100 MB', response.text)
+
+    def test_original_export_reads_once_and_still_rejects_same_size_corruption(self):
+        data = b'Private original fixture'
+        asset = self.upload(self.owner, data).json()
+        capture = self.post('/captures', {'kind': 'file', 'assetIds': [asset['assetId']],
+                                         'provenance': {'channel': 'web'}}).json()
+        headers, _, _ = self.selected(capture_ids=[capture['captureId']])
+        source = {key: capture[key] for key in ('captureId', 'sha256')}
+        body = {'source': source, 'assetId': asset['assetId']}
+        path = self.service.store.assets / asset['assetId']
+        original_read = Path.read_bytes
+        reads = []
+        def counted_read(target):
+            if target == path:
+                reads.append(target)
+            return original_read(target)
+        with patch.object(Path, 'read_bytes', counted_read):
+            response = self.post('/references/content', body, headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, data)
+        self.assertEqual(len(reads), 1)
+        path.write_bytes(b'X' + data[1:])
+        self.assertEqual(self.post('/references/content', body, headers).status_code, 409)
+        self.assertEqual(self.post('/references/context', {'sources': [source]}, headers).status_code, 409)
 
     def test_selected_note_and_capture_with_real_asset_bytes(self):
         data = b"%PDF-1.7\nSelected fixture PDF\n"
