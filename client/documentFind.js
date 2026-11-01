@@ -19,19 +19,22 @@ export function findTextMatches(text = "", query = "", caseSensitive = false) {
     return [];
   }
 
-  const source = caseSensitive ? sourceText : sourceText.toLocaleLowerCase();
-  const needle = caseSensitive ? queryText : queryText.toLocaleLowerCase();
-  const matches = [];
-  let offset = 0;
-  while (offset <= source.length - needle.length) {
-    const start = source.indexOf(needle, offset);
-    if (start < 0) {
-      break;
-    }
-    matches.push({ start, end: start + needle.length });
-    offset = start + Math.max(needle.length, 1);
-  }
-  return matches;
+  const escaped = queryText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return [
+    ...sourceText.matchAll(new RegExp(escaped, caseSensitive ? "gu" : "giu")),
+  ].map((match) => ({
+    start: match.index,
+    end: match.index + match[0].length,
+  }));
+}
+
+export function replacementEdits(matches, replacement, index = null) {
+  const selected = index == null ? matches : matches.slice(index, index + 1);
+  return selected.map(({ start, end }) => ({
+    from: start,
+    to: end,
+    insert: String(replacement ?? ""),
+  }));
 }
 
 export function nextDocumentMatchIndex(count, currentIndex, direction = 1) {
@@ -57,7 +60,7 @@ function acceptedTextNode(node, root) {
   );
 }
 
-export function createDocumentRanges(root, query) {
+export function createDocumentRanges(root, query, caseSensitive = false) {
   if (!root || !query) {
     return { matches: [], ranges: [] };
   }
@@ -83,7 +86,7 @@ export function createDocumentRanges(root, query) {
     node = walker.nextNode();
   }
 
-  const matches = findTextMatches(text, query);
+  const matches = findTextMatches(text, query, caseSensitive);
   let startSegmentIndex = 0;
   let endSegmentIndex = 0;
   const ranges = matches
@@ -145,12 +148,21 @@ function selectedFindText() {
 export function useDocumentFind({
   isEditing,
   getEditorText,
+  getEditorMatches,
+  replaceEditorRanges,
+  requestEdit,
+  canEdit = () => true,
+  focusEditor,
   selectEditorRange,
   setEditorMatches,
   getViewRoot,
 } = {}) {
   const visible = ref(false);
   const query = ref("");
+  const replacement = ref("");
+  const caseSensitive = ref(false);
+  const replaceVisible = ref(false);
+  const replacedCount = ref(0);
   const matches = ref([]);
   const currentIndex = ref(-1);
   const findBar = ref();
@@ -161,6 +173,19 @@ export function useDocumentFind({
   let viewRanges = [];
   let refreshFrame = null;
   let previousFocus = null;
+  const replaceAllowed = computed(() =>
+    Boolean(canEdit() && replaceEditorRanges),
+  );
+  const canReplace = computed(
+    () => replaceAllowed.value && Boolean(isEditing?.()),
+  );
+
+  function editorMatches() {
+    return (
+      getEditorMatches?.(query.value, caseSensitive.value) ??
+      findTextMatches(getEditorText?.() || "", query.value, caseSensitive.value)
+    );
+  }
 
   function presentCurrentMatch() {
     if (currentIndex.value < 0) {
@@ -193,9 +218,13 @@ export function useDocumentFind({
       }
 
       if (isEditing?.()) {
-        matches.value = findTextMatches(getEditorText?.() || "", query.value);
+        matches.value = editorMatches();
       } else {
-        const result = createDocumentRanges(getViewRoot?.(), query.value);
+        const result = createDocumentRanges(
+          getViewRoot?.(),
+          query.value,
+          caseSensitive.value,
+        );
         matches.value = result.matches;
         viewRanges = result.ranges;
       }
@@ -231,12 +260,15 @@ export function useDocumentFind({
 
   function close({ restoreFocus = true } = {}) {
     visible.value = false;
+    replaceVisible.value = false;
     matches.value = [];
     currentIndex.value = -1;
     viewRanges = [];
     clearHighlights();
     setEditorMatches?.([], -1);
-    if (restoreFocus && previousFocus instanceof HTMLElement) {
+    if (restoreFocus && isEditing?.() && focusEditor) {
+      nextTick(focusEditor);
+    } else if (restoreFocus && previousFocus instanceof HTMLElement) {
       nextTick(() => previousFocus?.focus?.({ preventScroll: true }));
     }
     previousFocus = null;
@@ -257,15 +289,68 @@ export function useDocumentFind({
     }
   }
 
+  async function toggleReplace(force = null) {
+    open();
+    if (force === false || (force == null && replaceVisible.value)) {
+      replaceVisible.value = false;
+      return;
+    }
+    if (!replaceAllowed.value) return;
+    if (!isEditing?.()) await requestEdit?.();
+    await nextTick();
+    if (isEditing?.()) {
+      replaceVisible.value = true;
+      nextTick(() => findBar.value?.focusReplacement?.());
+    }
+  }
+
+  function replace(all = false) {
+    if (!canReplace.value || !query.value) return;
+    const currentMatches = editorMatches();
+    if (!currentMatches.length) return;
+    const index = Math.max(
+      0,
+      Math.min(currentIndex.value, currentMatches.length - 1),
+    );
+    const edits = replacementEdits(
+      currentMatches,
+      replacement.value,
+      all ? null : index,
+    );
+    if (replaceEditorRanges(edits) === false) return;
+    replacedCount.value = edits.length;
+    const after = editorMatches();
+    const next = after.findIndex(
+      (match) =>
+        match.start >= currentMatches[index].start + replacement.value.length,
+    );
+    currentIndex.value = all ? 0 : Math.max(0, next);
+    refresh();
+    nextTick(() => findBar.value?.focusReplacement?.());
+  }
+
   function keydownHandler(event) {
     if (
       (event.ctrlKey || event.metaKey) &&
       !event.altKey &&
-      event.key.toLowerCase() === "f"
+      ["f", "h"].includes(event.key.toLowerCase())
     ) {
       event.preventDefault();
       event.stopPropagation();
-      open();
+      if (event.key.toLowerCase() === "h") void toggleReplace(true);
+      else open();
+      return;
+    }
+    if (
+      event.key === "F3" ||
+      ((event.ctrlKey || event.metaKey) &&
+        !event.altKey &&
+        event.key.toLowerCase() === "g")
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!visible.value) open();
+      else move(event.shiftKey ? -1 : 1);
       return;
     }
     if (visible.value && event.key === "Escape") {
@@ -275,7 +360,17 @@ export function useDocumentFind({
     }
   }
 
-  watch(query, () => refresh({ resetCurrent: true }));
+  watch([query, caseSensitive], () => {
+    replacedCount.value = 0;
+    refresh({ resetCurrent: true });
+  });
+  watch(
+    () => isEditing?.(),
+    () => {
+      if (!isEditing?.()) replaceVisible.value = false;
+      nextTick(refresh);
+    },
+  );
   onMounted(() => window.addEventListener("keydown", keydownHandler, true));
   onBeforeUnmount(() => {
     window.removeEventListener("keydown", keydownHandler, true);
@@ -294,6 +389,14 @@ export function useDocumentFind({
     move,
     open,
     query,
+    replacement,
+    caseSensitive,
+    replaceVisible,
+    replacedCount,
+    replaceAllowed,
+    canReplace,
+    replace,
+    toggleReplace,
     refresh,
     total,
     visible,

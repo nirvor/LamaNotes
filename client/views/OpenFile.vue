@@ -24,8 +24,17 @@
       v-if="findVisible"
       ref="findBar"
       v-model="findQuery"
+      v-model:replacement="findReplacement"
+      v-model:case-sensitive="findCaseSensitive"
       :current="findCurrent"
       :total="findTotal"
+      :replace-visible="findReplaceVisible"
+      :replace-allowed="findReplaceAllowed"
+      :can-replace="findCanReplace"
+      :replaced-count="findReplacedCount"
+      @toggle-replace="toggleFindReplace()"
+      @replace="replaceFindMatch()"
+      @replace-all="replaceFindMatch(true)"
       @previous="findMove(-1)"
       @next="findMove(1)"
       @close="closeFind"
@@ -40,6 +49,7 @@
     />
 
     <div
+      v-if="!desktopShell.enabled"
       class="lamanotes-open-file-heading"
       :class="{
         'lamanotes-open-file-heading-desktop': desktopShell.enabled,
@@ -247,6 +257,7 @@ import {
   mdiCloudUploadOutline,
   mdiContentSaveAlertOutline,
   mdiContentSaveOutline,
+  mdiContentSaveEditOutline,
   mdiContentCopy,
   mdiCogOutline,
   mdiFileAlertOutline,
@@ -256,6 +267,8 @@ import {
   mdiFolderOpenOutline,
   mdiHarddisk,
   mdiPencilOutline,
+  mdiEyeOutline,
+  mdiMagnify,
   mdiReload,
 } from "@mdi/js";
 import {
@@ -307,6 +320,7 @@ import {
 } from "../largeFileMode.js";
 import { buildLocalLibraryNote } from "../localNotePromotion.js";
 import { localFilePathContext } from "../localFilePath.js";
+import { saveLocalFileAs } from "../localFileSaveAs.js";
 import { reportNativeReady } from "../nativeTelemetry.js";
 import {
   createDebouncedWork,
@@ -382,11 +396,27 @@ const {
   findBar,
   move: findMove,
   query: findQuery,
+  open: openFind,
+  replacement: findReplacement,
+  caseSensitive: findCaseSensitive,
+  replaceVisible: findReplaceVisible,
+  replaceAllowed: findReplaceAllowed,
+  canReplace: findCanReplace,
+  replacedCount: findReplacedCount,
+  toggleReplace: toggleFindReplace,
+  replace: replaceFindMatch,
   refresh: refreshDocumentFind,
   total: findTotal,
   visible: findVisible,
 } = useDocumentFind({
   isEditing: () => editMode.value,
+  canEdit: () => Boolean(activeFile.value),
+  requestEdit: () => setEditMode(true),
+  focusEditor: () => editorTextarea.value?.focusEditor?.(),
+  getEditorMatches: (query, caseSensitive) =>
+    editorTextarea.value?.getSearchMatches?.(query, caseSensitive),
+  replaceEditorRanges: (changes) =>
+    editorTextarea.value?.applySearchEdits?.(changes) ?? false,
   getEditorText: () =>
     editorTextarea.value?.getSearchText?.() ||
     activeFile.value?.draftContent ||
@@ -442,19 +472,24 @@ const metadataItems = computed(() => {
   return items;
 });
 const toolbarPathContext = computed(() => {
-  const pathContext = localFilePathContext(activeFile.value?.path || "");
-  if (!pathContext) {
+  const file = activeFile.value;
+  if (!file) {
     return null;
   }
+  const pathContext = localFilePathContext(file.path || "");
 
   return {
-    label: pathContext.label,
-    title: pathContext.fullPath,
+    label: desktopShell.enabled ? file.name : pathContext?.label || file.name,
+    title: [
+      pathContext?.fullPath || file.name,
+      ...metadataItems.value.map((item) => `${item.label}: ${item.value}`),
+    ].join("\n"),
     actions: [
       {
         key: "copy-path",
         label: pathCopied.value ? "Full path copied" : "Copy full file path",
         iconPath: pathCopied.value ? mdiCheck : mdiClipboardFileOutline,
+        visible: Boolean(file.path),
         handler: copyActiveFilePath,
       },
       {
@@ -505,6 +540,7 @@ onBeforeRouteLeave(confirmFileNavigation);
 onBeforeRouteUpdate(confirmFileNavigation);
 
 onMounted(() => {
+  window.addEventListener("keydown", localFileShortcutHandler, true);
   if (!supportsFileHandlingLaunchQueue() && !supportsNativeFileBridge()) {
     showStatus(
       "This browser can preview files here, but Windows file opening needs the installed LamaNotes app.",
@@ -557,6 +593,7 @@ watchEffect(() => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener("keydown", localFileShortcutHandler, true);
   textDropPreviewActive = false;
   flushDraftPersistence();
   draftPersistence.cancel();
@@ -686,17 +723,17 @@ function updateOpenFileActions() {
     },
     {
       key: "external-edit",
-      label: editMode.value ? "Done" : "Edit",
-      iconPath: editMode.value ? mdiCheck : mdiPencilOutline,
+      label: editMode.value ? "Preview" : "Edit",
+      iconPath: editMode.value ? mdiEyeOutline : mdiPencilOutline,
       visible: Boolean(file),
       iconOnly: true,
-      handler: editMode.value ? finishEditing : () => setEditMode(true),
+      handler: () => setEditMode(!editMode.value),
     },
     {
       key: "external-save",
-      label: "Save",
+      label: file?.dirty || file?.isNewDraft ? "Save (Ctrl+S)" : "Saved",
       iconPath: mdiContentSaveOutline,
-      visible: Boolean(file?.isNewDraft || (file?.handle && file?.dirty)),
+      visible: Boolean(file),
       disabled: !canSaveActiveFile.value,
       unsaved: Boolean(file?.dirty),
       iconOnly: true,
@@ -705,6 +742,23 @@ function updateOpenFileActions() {
           saveActiveFile(false);
         }
       },
+    },
+    {
+      key: "external-save-as",
+      label: "Save as (Ctrl+Shift+S)",
+      iconPath: mdiContentSaveEditOutline,
+      visible: Boolean(file),
+      disabled: documentSession.saving.value,
+      iconOnly: true,
+      handler: () => saveActiveFile(false, { saveAs: true }),
+    },
+    {
+      key: "external-find",
+      label: "Find (Ctrl+F)",
+      iconPath: mdiMagnify,
+      visible: Boolean(file),
+      iconOnly: true,
+      handler: openFind,
     },
     {
       key: "external-copy",
@@ -887,9 +941,9 @@ async function loadFiles(selectedFiles, message) {
 
   files.value = [readableFile];
   activeKey.value = readableFile.key;
-  documentSession.leaveEdit();
   documentSession.setDirty(false);
   restoreActiveDraft();
+  setEditMode(true);
   showStatus(message);
   restoreActiveScroll();
   reportFileReady();
@@ -1329,11 +1383,29 @@ function saveActiveFile(close = false, options = {}) {
   return documentSession.save({ close, ...options });
 }
 
-async function persistActiveFile({ force = false } = {}) {
+async function persistActiveFile({ force = false, saveAs = false } = {}) {
   flushDraftPersistence();
   const file = activeFile.value;
   if (!file) {
     return false;
+  }
+
+  if (saveAs && !file.isNewDraft) {
+    const submittedContent = file.draftContent;
+    const selected = await saveLocalFileAs(file, submittedContent);
+    if (!selected) return false;
+    const savedFile = await fileToPreview(selected);
+    savedFile.draftContent = file.draftContent;
+    savedFile.editorMemory = file.editorMemory;
+    acceptFileSave(savedFile, submittedContent);
+    documentSession.clearDraft(file.draftStorageKey);
+    files.value = files.value.map((candidate) =>
+      candidate.key === file.key ? savedFile : candidate,
+    );
+    activeKey.value = savedFile.key;
+    compareOpen.value = false;
+    refreshPreview(savedFile);
+    return selected.file;
   }
 
   if (!file.handle && file.isNewDraft && supportsNativeFileBridge()) {
@@ -1747,6 +1819,19 @@ async function openActiveFileFolder() {
 
 function documentKeydownHandler(event) {
   documentSession.keydownHandler(event);
+}
+
+function localFileShortcutHandler(event) {
+  if (
+    !activeFile.value ||
+    event.altKey ||
+    !(event.ctrlKey || event.metaKey) ||
+    event.key.toLowerCase() !== "s"
+  )
+    return;
+  event.preventDefault();
+  event.stopPropagation();
+  void saveActiveFile(false, { saveAs: event.shiftKey });
 }
 
 function reportEditorReady() {

@@ -139,6 +139,30 @@ class LamaNotesApiTests(unittest.TestCase):
         finally:
             store.close()
 
+    def test_save_as_uses_original_folder_and_extension_and_can_be_cancelled(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            original = Path(directory) / "source.ini"
+            original.write_bytes(b"value=old\r\n")
+            target = Path(directory) / "copy"
+            store = NativeFileStore()
+            try:
+                payload = store.payloads_for_paths([str(original)])[0]
+                api = LamaNotesApi(store, [], "https://notes.example", "https://notes.example")
+                api._window = Mock()
+                api._window.create_file_dialog.return_value = None
+                self.assertTrue(api.save_native_file_as(payload["id"], "value=new\n", payload["version"])["cancelled"])
+                self.assertEqual(original.read_bytes(), b"value=old\r\n")
+                api._window.create_file_dialog.return_value = str(target)
+                saved = api.save_native_file_as(payload["id"], "value=new\n", payload["version"])
+                self.assertTrue(saved["ok"])
+                self.assertEqual(saved["path"], str(target.with_suffix('.ini').resolve()))
+                self.assertEqual(target.with_suffix('.ini').read_bytes(), b"value=new\r\n")
+                self.assertEqual(original.read_bytes(), b"value=old\r\n")
+                self.assertEqual(api._window.create_file_dialog.call_args.kwargs['directory'], str(original.parent))
+                self.assertEqual(api._window.create_file_dialog.call_args.kwargs['save_filename'], original.name)
+            finally:
+                store.close()
+
     def test_create_native_file_adds_the_suggested_extension(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "draft"
@@ -891,6 +915,31 @@ class NativeFileStoreTests(unittest.TestCase):
         self.assertEqual(created["content"], "# New note\n")
         self.assertEqual(path.read_bytes(), b"# New note\n")
         self.assertFalse(list(self.root.glob(f".{path.name}.*.tmp")))
+
+    def test_save_as_preserves_encoding_bom_and_crlf_without_changing_original(self) -> None:
+        for index, raw in enumerate((b'\xef\xbb\xbfGr\xc3\xbc\xc3\x9fe\r\n', b'Gr\xfc\xdfe\r\n')):
+            with self.subTest(index=index):
+                source = self.root / f'original-{index}.txt'
+                target = self.root / f'copy-{index}.cfg'
+                source.write_bytes(raw)
+                payload = self.store.payloads_for_paths([str(source)])[0]
+                saved = self.store.save_as(payload['id'], target, payload['content'] + 'next\n', payload['version'])
+                self.assertTrue(saved['ok'])
+                self.assertEqual(target.read_bytes(), raw + b'next\r\n')
+                self.assertEqual(source.read_bytes(), raw)
+                self.assertEqual(saved['encoding'], payload['encoding'])
+                self.assertEqual(saved['lineEnding'], 'CRLF')
+                self.assertEqual(self.store.registered_path(saved['id']), target.resolve())
+
+    def test_save_as_to_the_original_path_keeps_version_conflict_protection(self) -> None:
+        source = self.root / 'original.txt'
+        source.write_bytes(b'old\n')
+        payload = self.store.payloads_for_paths([str(source)])[0]
+        source.write_bytes(b'outside\n')
+        result = self.store.save_as(payload['id'], source, 'mine\n', payload['version'])
+        self.assertFalse(result['ok'])
+        self.assertTrue(result['conflict'])
+        self.assertEqual(source.read_bytes(), b'outside\n')
 
     def test_save_detects_external_version_conflict(self) -> None:
         path = self.root / "sample.ini"

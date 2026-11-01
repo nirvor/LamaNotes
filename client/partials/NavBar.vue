@@ -351,13 +351,12 @@ function showLogOutButton() {
 }
 
 .lamanotes-navbar-context {
-  position: absolute;
-  top: 50%;
-  left: 0;
+  position: relative;
   display: flex;
   min-width: 0;
-  max-width: calc(100% - 16.8rem);
-  transform: translateY(-50%);
+  max-width: 100%;
+  flex: 1 1 7rem;
+  margin-right: auto;
   align-items: center;
   justify-content: flex-start;
   gap: 0.12rem;
@@ -416,7 +415,7 @@ function showLogOutButton() {
 
 @media (max-width: 560px) {
   .lamanotes-navbar-context {
-    max-width: calc(100% - 15.8rem);
+    max-width: 100%;
     font-size: 0.6rem;
   }
 

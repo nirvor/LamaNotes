@@ -60,6 +60,11 @@ but does not fight Windows UserChoice protection.
 - Watches local files natively, reloads clean files automatically, and shows a
   compact compare/reload/overwrite choice when both versions changed.
 - Saves edited external files atomically back to their original path.
+- Opens local files directly in the editor. The eye icon previews the current
+  draft without saving it. File details stay in the filename tooltip.
+- Uses Ctrl+F for find and Ctrl+H for replacement in the same compact bar.
+  Replace all is one undo step. Ctrl+Shift+S saves a copy and continues there,
+  preserving the original encoding and line endings.
 - Does not import external files into the VPS note folder.
 - Supports multiple independent windows. A second app launch gets its own local
   proxy port, and `New Window` opens the current LamaNotes route natively.

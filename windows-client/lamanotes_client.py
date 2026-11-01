@@ -418,21 +418,7 @@ class NativeFileStore:
         if expected_version and expected_version != current_version and not force:
             return {"ok": False, "conflict": True, "external": current_payload}
 
-        encoding = str(metadata.get("encoding", current_payload["encodingKey"]))
-        line_ending = str(metadata.get("lineEnding", current_payload["lineEnding"]))
-        bom = bool(metadata.get("bom", current_payload["bom"]))
-        normalized_content = normalize_newlines(content)
-        disk_content = normalized_content.replace("\n", line_ending_value(line_ending))
-        try:
-            raw = disk_content.encode(encoding)
-        except UnicodeEncodeError:
-            encoding = "utf-8"
-            bom = False
-            raw = disk_content.encode(encoding)
-        if bom and encoding == "utf-8":
-            raw = b"\xef\xbb\xbf" + raw
-
-        atomic_write(path, raw)
+        atomic_write(path, encode_file_content(content, metadata or current_payload))
         saved_payload = self._payload_for_path(path)
         if not saved_payload:
             raise OSError("Saved file could not be read back.")
@@ -440,13 +426,25 @@ class NativeFileStore:
             self._pending_changes.discard(file_id)
         return {"ok": True, **saved_payload}
 
-    def create(self, raw_path: str | Path, content: str) -> dict[str, Any]:
+    def save_as(self, file_id: str, raw_path: str | Path, content: str,
+                expected_version: str = "") -> dict[str, Any]:
+        with self._lock:
+            source = self._paths.get(str(file_id))
+            metadata = dict(self._metadata.get(str(file_id), {}))
+        if not source:
+            raise ValueError("The original file is not open in LamaNotes.")
+        path = Path(raw_path).expanduser()
+        if path.resolve() == source.resolve():
+            return self.save(str(file_id), content, expected_version)
+        return self.create(path, content, metadata=metadata)
+
+    def create(self, raw_path: str | Path, content: str, *,
+               metadata: dict[str, Any] | None = None) -> dict[str, Any]:
         path = Path(raw_path).expanduser()
         if path.suffix.lower() not in ALLOWED_EXTENSIONS:
             raise ValueError("Choose a supported text-file extension.")
 
-        normalized_content = normalize_newlines(content)
-        atomic_write(path, normalized_content.encode("utf-8"))
+        atomic_write(path, encode_file_content(content, metadata or {}))
         payload = self._payload_for_path(path)
         if not payload:
             raise OSError("Created file could not be read back.")
@@ -858,6 +856,26 @@ class LamaNotesApi:
     ) -> dict[str, Any]:
         return self._file_store.save(file_id, content, expected_version, force)
 
+    def save_native_file_as(self, file_id: str, content: str,
+                            expected_version: str = "") -> dict[str, Any]:
+        if not self._window:
+            return {"ok": False, "error": "Window is unavailable."}
+        source = self._file_store.registered_path(str(file_id))
+        if not source:
+            return {"ok": False, "error": "The original file is not open in LamaNotes."}
+        selected = self._window.create_file_dialog(
+            load_webview().SAVE_DIALOG,
+            directory=str(source.parent),
+            save_filename=source.name,
+            file_types=("Text and config (*.md;*.txt;*.cfg;*.ini;*.json;*.yaml;*.yml;*.toml;*.xml;*.log;*.csv;*.tex)",),
+        )
+        if not selected:
+            return {"ok": False, "cancelled": True}
+        selected_path = Path(selected[0] if isinstance(selected, (list, tuple)) else selected)
+        if not selected_path.suffix:
+            selected_path = selected_path.with_suffix(source.suffix)
+        return self._file_store.save_as(str(file_id), selected_path, content, expected_version)
+
     def restore_native_files(self, paths: list[str]) -> list[dict[str, Any]]:
         return self._file_store.payloads_for_paths(paths)
 
@@ -1101,6 +1119,18 @@ def decode_text(raw: bytes) -> tuple[str, str, bool]:
         except UnicodeDecodeError:
             continue
     return raw.decode("utf-8", errors="replace"), "utf-8", False
+
+
+def encode_file_content(content: str, metadata: dict[str, Any]) -> bytes:
+    encoding = str(metadata.get("encodingKey", metadata.get("encoding", "utf-8")))
+    bom = bool(metadata.get("bom", False))
+    text = normalize_newlines(content).replace("\n", line_ending_value(str(metadata.get("lineEnding", "LF"))))
+    try:
+        raw = text.encode(encoding)
+    except UnicodeEncodeError:
+        raw = text.encode("utf-8")
+        bom = False
+    return b"\xef\xbb\xbf" + raw if bom and encoding == "utf-8" else raw
 
 
 def normalize_newlines(content: str) -> str:

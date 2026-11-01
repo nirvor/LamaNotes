@@ -87,8 +87,17 @@
       v-if="findVisible"
       ref="findBar"
       v-model="findQuery"
+      v-model:replacement="findReplacement"
+      v-model:case-sensitive="findCaseSensitive"
       :current="findCurrent"
       :total="findTotal"
+      :replace-visible="findReplaceVisible"
+      :replace-allowed="findReplaceAllowed"
+      :can-replace="findCanReplace"
+      :replaced-count="findReplacedCount"
+      @toggle-replace="toggleFindReplace()"
+      @replace="replaceFindMatch()"
+      @replace-all="replaceFindMatch(true)"
       @previous="findMove(-1)"
       @next="findMove(1)"
       @close="closeFind"
@@ -522,12 +531,27 @@ const {
   findBar,
   move: findMove,
   query: findQuery,
+  replacement: findReplacement,
+  caseSensitive: findCaseSensitive,
+  replaceVisible: findReplaceVisible,
+  replaceAllowed: findReplaceAllowed,
+  canReplace: findCanReplace,
+  replacedCount: findReplacedCount,
+  toggleReplace: toggleFindReplace,
+  replace: replaceFindMatch,
   refresh: refreshDocumentFind,
   total: findTotal,
   visible: findVisible,
 } = useDocumentFind({
   isEditing: () => editMode.value,
+  canEdit: () => canModify.value,
+  requestEdit: editHandler,
+  focusEditor,
   getEditorText: () => contentEditor.value?.getSearchText?.() || "",
+  getEditorMatches: (query, caseSensitive) =>
+    contentEditor.value?.getSearchMatches?.(query, caseSensitive),
+  replaceEditorRanges: (changes) =>
+    contentEditor.value?.applySearchEdits?.(changes) ?? false,
   selectEditorRange: (from, to) =>
     contentEditor.value?.selectSearchRange?.(from, to),
   setEditorMatches: (matches, currentIndex) =>

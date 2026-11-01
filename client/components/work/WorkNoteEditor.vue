@@ -150,6 +150,8 @@ defineExpose({
   getContent: (title) =>
     buildWorkNoteHtml(title || props.noteTitle || "Untitled", getMarkdown()),
   getSearchText: () => markdown.value,
+  getSearchMatches: (...args) => sourceEditor.value?.getSearchMatches(...args),
+  applySearchEdits: (...args) => sourceEditor.value?.applySearchEdits(...args),
   selectSearchRange: (...args) =>
     sourceEditor.value?.selectSearchRange(...args),
   setSearchMatches: (...args) => sourceEditor.value?.setSearchMatches(...args),

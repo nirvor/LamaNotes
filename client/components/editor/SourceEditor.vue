@@ -102,6 +102,7 @@ import {
   historyField,
   historyKeymap,
   indentWithTab,
+  isolateHistory,
 } from "@codemirror/commands";
 import { markdownKeymap, markdownLanguage } from "@codemirror/lang-markdown";
 import {
@@ -118,6 +119,7 @@ import {
   EditorState,
   StateEffect,
   StateField,
+  Transaction,
 } from "@codemirror/state";
 import {
   Decoration,
@@ -131,6 +133,7 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
+import { findTextMatches } from "../../documentFind.js";
 import {
   mdiClose,
   mdiCheck,
@@ -188,6 +191,7 @@ const linkInput = ref();
 let linkSelection = null;
 const languageCompartment = new Compartment();
 const wrappingCompartment = new Compartment();
+const attributesCompartment = new Compartment();
 const externalUpdate = Annotation.define();
 let editorView = null;
 let languageLoadGeneration = 0;
@@ -532,6 +536,14 @@ function wrappingExtension(value = props.wrap) {
   return value ? EditorView.lineWrapping : [];
 }
 
+function contentAttributes() {
+  return EditorView.contentAttributes.of({
+    "aria-label": props.ariaLabel,
+    spellcheck: props.language === "markdown" || props.language === "text",
+    ...(props.prose ? { autocapitalize: "sentences", autocorrect: "on" } : {}),
+  });
+}
+
 function editorExtensions() {
   const anchors = (state) =>
     Decoration.set(
@@ -566,20 +578,16 @@ function editorExtensions() {
     keymap.of([
       indentWithTab,
       ...defaultKeymap,
-      ...searchKeymap,
+      ...searchKeymap.filter(
+        (binding) => !["Mod-f", "F3", "Mod-g", "Escape"].includes(binding.key),
+      ),
       ...historyKeymap,
     ]),
     languageCompartment.of(immediateLanguageExtension()),
     wrappingCompartment.of(wrappingExtension()),
     sourceTheme,
     syntaxHighlighting(sourceHighlightStyle),
-    EditorView.contentAttributes.of({
-      "aria-label": props.ariaLabel,
-      spellcheck: props.language === "markdown" || props.language === "text",
-      ...(props.prose
-        ? { autocapitalize: "sentences", autocorrect: "on" }
-        : {}),
-    }),
+    attributesCompartment.of(contentAttributes()),
     EditorView.updateListener.of((update) => {
       if (
         update.docChanged &&
@@ -812,6 +820,41 @@ function getSelectedText() {
   }
   const { start, end } = getSelectionRange();
   return editorView.state.doc.sliceString(start, end);
+}
+
+function getSearchMatches(query, caseSensitive = false) {
+  const protectedRanges = props.hideShareAnchors
+    ? sharedAnchorRanges(getValue())
+    : [];
+  return findTextMatches(getValue(), query, caseSensitive).filter(
+    (match) =>
+      !protectedRanges.some(
+        (range) => match.start < range.to && match.end > range.from,
+      ),
+  );
+}
+
+function applySearchEdits(changes) {
+  if (!editorView || !changes.length) return false;
+  const protectedRanges = props.hideShareAnchors
+    ? sharedAnchorRanges(getValue())
+    : [];
+  if (
+    changes.some((change) =>
+      protectedRanges.some(
+        (range) => change.from < range.to && change.to > range.from,
+      ),
+    )
+  )
+    return false;
+  editorView.dispatch({
+    changes,
+    annotations: [
+      Transaction.userEvent.of("input.replace"),
+      isolateHistory.of("full"),
+    ],
+  });
+  return true;
 }
 
 function replaceSelection(text, options = {}) {
@@ -1150,6 +1193,15 @@ watch(
 );
 
 watch(
+  () => [props.ariaLabel, props.language, props.prose],
+  () => {
+    editorView?.dispatch({
+      effects: attributesCompartment.reconfigure(contentAttributes()),
+    });
+  },
+);
+
+watch(
   () => props.wrap,
   (wrap) => {
     editorView?.dispatch({
@@ -1175,12 +1227,14 @@ onBeforeUnmount(() => {
 });
 
 defineExpose({
+  applySearchEdits,
   clearDroppedTextPosition,
   focusEditor,
   getMarkdown,
   getSelectedText,
   getSelectionRange,
   getSearchText,
+  getSearchMatches,
   getValue,
   isWysiwygMode,
   insertDroppedText,

@@ -38,6 +38,8 @@ watch(
 defineExpose({
   getMarkdown: () => normalizeTextMarkdown(markdown.value),
   getSearchText: () => markdown.value,
+  getSearchMatches: (...args) => sourceEditor.value?.getSearchMatches(...args),
+  applySearchEdits: (...args) => sourceEditor.value?.applySearchEdits(...args),
   focusEditor: (...args) => sourceEditor.value?.focusEditor(...args),
   selectSearchRange: (...args) =>
     sourceEditor.value?.selectSearchRange(...args),
