@@ -368,12 +368,13 @@ silently rewrite content.
   single-column pinned-note list as real navigation. A monochrome LamaNotes
   mark may sit behind this content as a low-contrast watermark; it must remain
   non-interactive and must not compete with note links.
-- Local and Library documents show one content surface at a time. Markdown and
-  text-like files open as a rendered reading view. Edit or double-click
+- Local and Library documents show one content surface at a time. Windows Workspace files
+  open with the source editor focused. Preview switches to the reading view. Edit or double-click
   replaces that view with the source editor; Done returns to the rendered
   view. An editor preview may replace the source temporarily, but source and
   preview are never stacked as a dual view.
-- Every route uses the same centered toolbar measure. Context actions grow to
+- Library routes share a centered toolbar measure. The Windows file toolbar
+  aligns with the left edge of the editor. Context actions grow to
   the left; Home and Menu stay in the same two positions at the right edge.
 - Creation, file opening, publishing/promotion, and view preferences belong in
   the Menu. The top row keeps only immediate document actions.

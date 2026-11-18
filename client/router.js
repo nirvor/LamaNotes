@@ -12,7 +12,10 @@ import { retainShareTicket } from "./shareImport.js";
 const loadHomeView = () => import("./views/Home.vue");
 const loadNoteView = () => import("./views/Note.vue");
 const loadLoginView = () => import("./views/LogIn.vue");
-const loadOpenFileView = () => import("./views/OpenFile.vue");
+const loadOpenFileView = () => {
+  if (desktopShell.enabled) void import("./components/editor/SourceEditor.vue").catch(() => {});
+  return import("./views/OpenFile.vue");
+};
 const loadSearchView = () => import("./views/SearchResults.vue");
 
 function parseSearchSort(sortBy) {

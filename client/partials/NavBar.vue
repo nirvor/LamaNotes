@@ -1,7 +1,10 @@
 <template>
   <nav
     class="lamanotes-navbar flex justify-end align-top"
-    :class="{ 'lamanotes-navbar-home': isHome }"
+    :class="{
+      'lamanotes-navbar-home': isHome,
+      'lamanotes-navbar-local': isLocalEditor,
+    }"
   >
     <RouterLink
       v-if="isHome"
@@ -35,6 +38,22 @@
           <SvgIcon type="mdi" :path="action.iconPath" size="0.88rem" />
         </button>
       </div>
+      <template v-if="isLocalEditor">
+        <button
+          v-if="compactFormatTools"
+          type="button"
+          class="local-format-trigger"
+          popovertarget="local-format-tools"
+          aria-label="Text formatting"
+          title="Text formatting"
+        >
+          <span aria-hidden="true">Aa</span>
+        </button>
+        <div
+          id="local-format-tools"
+          :popover="compactFormatTools ? 'auto' : null"
+        ></div>
+      </template>
       <template v-for="action in noteActions" :key="action.key">
         <CustomButton
           v-if="action.visible !== false"
@@ -106,6 +125,7 @@ import PopupMenu from "../components/PopupMenu.vue";
 import { authTypes, params, searchSortOptions } from "../constants.js";
 import { useGlobalStore } from "../globalStore.js";
 import { getToastOptions, toggleTheme } from "../helpers.js";
+import { isDesktopHost } from "../brand.js";
 import { openNewNote } from "../newNoteNavigation.js";
 import {
   checkNativeClientUpdate,
@@ -118,6 +138,19 @@ import notesMarkUrl from "../assets/brand/lamanotes-lamaui.webp";
 const globalStore = useGlobalStore();
 const menu = ref();
 const router = useRouter();
+const formatBreakpoint = window.matchMedia("(max-width: 45rem)");
+const compactFormatTools = ref(formatBreakpoint.matches);
+function resizeFormatTools(event) {
+  document.querySelector("#local-format-tools:popover-open")?.hidePopover();
+  compactFormatTools.value = event.matches;
+}
+onMounted(() => formatBreakpoint.addEventListener("change", resizeFormatTools));
+onBeforeUnmount(() =>
+  formatBreakpoint.removeEventListener("change", resizeFormatTools),
+);
+const isLocalEditor = computed(
+  () => isDesktopHost() && router.currentRoute.value.name === "openFile",
+);
 const isHome = computed(() => router.currentRoute.value.name === "home");
 const toast = useToast();
 let nativeUpdateCheckTimer = null;
@@ -132,7 +165,7 @@ const baseMenuItems = computed(() => {
   const items = [];
   if (showNewButton.value) {
     items.push({
-      label: "New Note",
+      label: isDesktopHost() ? "New local file" : "New Library note",
       icon: mdilPlusCircle,
       command: createNewNote,
     });
@@ -150,7 +183,7 @@ const baseMenuItems = computed(() => {
   items.push(
     { separator: true },
     {
-      label: "Search",
+      label: "Search Library",
       icon: mdilMagnify,
       command: () => emit("toggleSearchModal"),
       keyboardShortcut: "/",
@@ -309,6 +342,47 @@ function showLogOutButton() {
   isolation: isolate;
 }
 
+.lamanotes-navbar-local {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  transform: none;
+}
+
+#local-format-tools:empty,
+.local-format-trigger:has(+ #local-format-tools:empty) {
+  display: none;
+}
+.local-format-trigger {
+  anchor-name: --ln-format-trigger;
+  padding: 0.15rem 0.3rem;
+  font-weight: 600;
+  color: rgb(var(--theme-text-muted));
+}
+#local-format-tools:popover-open {
+  position: fixed;
+  inset: 3rem auto auto 0.5rem;
+  margin: 0;
+  padding: 0.25rem;
+  border: 1px solid rgb(var(--theme-border));
+  border-radius: 4px;
+  background: rgb(var(--theme-background-elevated));
+  color: rgb(var(--theme-text));
+}
+@supports (top: anchor(bottom)) {
+  #local-format-tools:popover-open {
+    position-anchor: --ln-format-trigger;
+    top: anchor(bottom);
+    left: clamp(0.45rem, anchor(left), calc(100vw - 15rem));
+  }
+}
+#local-format-tools :deep(.lamanotes-format-toolbar) {
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
 .lamanotes-navbar-action-link {
   display: inline-flex;
   align-items: center;

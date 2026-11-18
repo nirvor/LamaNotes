@@ -195,6 +195,11 @@
     box-sizing: border-box;
   }
 
+  body.lamanotes-native-host .lamanotes-open-file .lamanotes-source-editor-no-gutter .cm-line,
+  body.lamanotes-native-host .lamanotes-open-file .lamanotes-source-editor-no-gutter .cm-content {
+    padding-left: 0;
+  }
+
   body.lamanotes-native-host .lamanotes-navbar-actions {
     min-width: 0;
     max-width: 100%;

@@ -51,9 +51,6 @@
     <div
       v-if="!desktopShell.enabled"
       class="lamanotes-open-file-heading"
-      :class="{
-        'lamanotes-open-file-heading-desktop': desktopShell.enabled,
-      }"
     >
       <div class="min-w-0">
         <div class="lamanotes-open-file-kicker-line">
@@ -70,7 +67,7 @@
             <strong>{{ item.value }}</strong>
           </span>
         </div>
-        <h1 v-if="!desktopShell.enabled" class="lamanotes-open-file-title">
+        <h1 class="lamanotes-open-file-title">
           {{ activeFile ? activeFile.name : "Open a local file" }}
         </h1>
       </div>
@@ -146,6 +143,9 @@
         ref="editorTextarea"
         v-model="activeFile.draftContent"
         :language="editorLanguage"
+        :format-toolbar-target="desktopShell.enabled && editorLanguage === 'markdown' ? '#local-format-tools' : null"
+        :hide-format-toolbar="['text', 'txt'].includes(editorLanguage)"
+        :preview-formulas="editorLanguage === 'markdown' && !activeFile.largeFile"
         :wrap="editorWrap"
         :show-line-numbers="globalStore.showLineNumbers"
         :structured-paste="editorLanguage === 'markdown'"
@@ -174,6 +174,9 @@
         v-else-if="activeFile"
         :key="activeFile.key"
         :initialValue="activeFile.previewMarkdown"
+        :editable-table-cells="activeFile.previewMode === 'markdown' && Boolean(activeFile.handle || activeFile.isNewDraft)"
+        @cell-input="updatePreviewCell"
+        @cell-finish="finishPreviewCell"
         :enhance-note-lead="false"
         :note-title="noteTitleForFile(activeFile)"
         :task-checkboxes-disabled="
@@ -293,7 +296,7 @@ import { apiErrorHandler, createNote } from "../api.js";
 import { writePlainTextToClipboard } from "../clipboard.js";
 import ConfirmModal from "../components/ConfirmModal.vue";
 import DocumentFindBar from "../components/DocumentFindBar.vue";
-import CsvTablePreview from "../components/CsvTablePreview.vue";
+const CsvTablePreview = defineAsyncComponent(() => import("../components/CsvTablePreview.vue"));
 import IconLabel from "../components/IconLabel.vue";
 import { useDocumentFind } from "../documentFind.js";
 import { useDocumentSession } from "../documents/documentSession.js";
@@ -318,7 +321,6 @@ import {
   buildLargeFilePreview,
   shouldUseLargeFileMode,
 } from "../largeFileMode.js";
-import { buildLocalLibraryNote } from "../localNotePromotion.js";
 import { localFilePathContext } from "../localFilePath.js";
 import { saveLocalFileAs } from "../localFileSaveAs.js";
 import { reportNativeReady } from "../nativeTelemetry.js";
@@ -807,9 +809,11 @@ async function keepActiveFileAsNote() {
     return;
   }
 
-  const snapshot = buildLocalLibraryNote(file);
   keepingFile.value = true;
+  let snapshot;
   try {
+    const { buildLocalLibraryNote } = await import("../localNotePromotion.js");
+    snapshot = buildLocalLibraryNote(file);
     const created = await createNote(
       snapshot.title,
       snapshot.content,
@@ -830,7 +834,7 @@ async function keepActiveFileAsNote() {
       params: { title: created.title },
     });
   } catch (error) {
-    if (error.response?.status === 409) {
+    if (snapshot && error.response?.status === 409) {
       toast.add(
         getToastOptions(
           `A note named "${snapshot.title}" already exists. Nothing was overwritten.`,
@@ -1122,7 +1126,7 @@ function normalizeSelectedFile(selectedFile) {
 
 function contentToPreviewMarkdown(content, extension, type) {
   return isMarkdownFile(extension, type)
-    ? compactLeadingMarkdownMetadata(content)
+    ? content
     : fencedCode(content, codeLanguageForExtension(extension));
 }
 
@@ -1133,102 +1137,6 @@ function isMarkdownFile(extension, type) {
 function getExtension(filename = "") {
   const match = filename.toLowerCase().match(/\.([^.]+)$/);
   return match ? match[1] : "";
-}
-
-function escapeHtml(value = "") {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-function stripInlineMarkdown(value = "") {
-  return String(value)
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/\*([^*]+)\*/g, "$1")
-    .trim();
-}
-
-function normalizeMetadataKey(key = "") {
-  return stripInlineMarkdown(key)
-    .replace(/[*_`]+/g, "")
-    .replace(/^[-*\s]+/, "")
-    .replace(/\s*\/\s*/g, "/")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function compactMetadataValue(key, value) {
-  const normalizedKey = normalizeMetadataKey(key);
-  const cleaned = stripInlineMarkdown(value);
-  if (
-    !cleaned ||
-    normalizedKey === "original writer" ||
-    normalizedKey === "writer"
-  ) {
-    return "";
-  }
-
-  if (normalizedKey === "domain") {
-    return cleaned;
-  }
-
-  if (normalizedKey === "topic/subdomain") {
-    return cleaned;
-  }
-
-  if (normalizedKey === "difficulty level") {
-    return `difficulty ${cleaned}`;
-  }
-
-  if (normalizedKey === "tool use") {
-    return `tools ${cleaned}`;
-  }
-
-  return "";
-}
-
-function compactLeadingMarkdownMetadata(markdown = "") {
-  const normalized = String(markdown).replace(/\r\n?/g, "\n");
-  const lines = normalized.split("\n");
-  const firstHeadingIndex = lines.findIndex((line) => /^#{1,6}\s+/.test(line));
-  if (firstHeadingIndex <= 0) {
-    return markdown;
-  }
-
-  const leadingLines = lines.slice(0, firstHeadingIndex);
-  const fieldPattern = /^\s*(?:[-*]\s+)?([^:\n]{2,48}):\s*(.+?)\s*$/;
-  const fields = [];
-
-  for (const line of leadingLines) {
-    if (!line.trim()) {
-      continue;
-    }
-
-    const match = line.match(fieldPattern);
-    if (!match) {
-      return markdown;
-    }
-
-    fields.push({ key: match[1], value: match[2] });
-  }
-
-  if (!fields.length) {
-    return markdown;
-  }
-
-  const metaValues = fields
-    .map((field) => compactMetadataValue(field.key, field.value))
-    .filter(Boolean);
-  const rest = lines.slice(firstHeadingIndex).join("\n").trimStart();
-  if (!metaValues.length) {
-    return rest;
-  }
-
-  const metaLine = metaValues.map(escapeHtml).join(" | ");
-  return `<p class="lamanotes-external-meta-line"><strong>Meta</strong> ${metaLine}</p>\n\n${rest}`;
 }
 
 function fencedCode(content = "", language = "") {
@@ -1336,6 +1244,28 @@ function openFileEditorReadyHandler() {
     refreshDocumentFind();
     nextTick(() => findBar.value?.focusSelect?.());
   });
+}
+
+function updatePreviewCell({ before, after }) {
+  const file = activeFile.value;
+  if (file && file.draftContent === before && !editMode.value) {
+    file.draftContent = after;
+    activeFileChangedHandler();
+  }
+}
+
+function finishPreviewCell({ before, after, edit }) {
+  const file = activeFile.value;
+  if (!file || editMode.value || file.draftContent !== after) return;
+  if (before !== after) {
+    const memory = file.editorMemory || (file.editorMemory = {});
+    if (memory.previewResult !== before) memory.previewEdits = [];
+    if (memory.previewEdits.length || memory.snapshot?.state?.doc === before) {
+      memory.previewEdits.push(edit);
+      memory.previewResult = after;
+    }
+  }
+  refreshPreview(file);
 }
 
 function refreshPreview(file) {
@@ -1927,14 +1857,6 @@ function showStatus(message, tone = "info") {
   margin-bottom: 0.68rem;
 }
 
-.lamanotes-open-file-heading-desktop {
-  margin-bottom: 0.38rem;
-}
-
-.lamanotes-open-file-heading-desktop .lamanotes-open-file-kicker-line {
-  margin-bottom: 0;
-}
-
 .lamanotes-open-file-kicker-line {
   display: flex;
   min-width: 0;
@@ -2073,25 +1995,6 @@ function showStatus(message, tone = "info") {
     "Courier New", monospace;
   font-size: 0.86rem;
   line-height: 1.5;
-}
-
-:deep(.lamanotes-external-meta-line) {
-  max-width: 100%;
-  margin: 0 0 0.7rem 0 !important;
-  color: rgb(var(--theme-text-muted));
-  font-size: 0.8rem;
-  line-height: 1.25;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-:deep(.lamanotes-external-meta-line strong) {
-  color: rgb(var(--theme-text-very-muted));
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
 }
 
 .lamanotes-open-file

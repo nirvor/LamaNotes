@@ -2890,7 +2890,7 @@ def build_menu(window_ref: dict[str, webview.Window], base_url: str) -> list[Men
             APP_NAME,
             [
                 MenuAction(
-                    "New note",
+                    "New local file",
                     lambda: go(
                         "/open-file?new=1&draft=" + secrets.token_urlsafe(12)
                     ),
@@ -2907,7 +2907,7 @@ def build_menu(window_ref: dict[str, webview.Window], base_url: str) -> list[Men
             "Navigate",
             [
                 MenuAction("Home", lambda: go("/")),
-                MenuAction("Search", lambda: go("/search?term=*&sort=2")),
+                MenuAction("Search Library", lambda: go("/search?term=*&sort=2")),
                 MenuAction("Copy current link", copy_link),
             ],
         ),

@@ -1,7 +1,8 @@
 <template>
   <div class="lamanotes-source-editor-shell">
+    <Teleport :to="formatToolbarTarget || 'body'" :disabled="!formatToolbarTarget">
     <div
-      v-if="hasFormatting || $slots.tools"
+      v-if="!hideFormatToolbar && (hasFormatting || $slots.tools)"
       class="lamanotes-format-toolbar"
       role="toolbar"
       aria-label="Formatting"
@@ -9,6 +10,7 @@
       <FormattingTools v-if="hasFormatting" @format="formatSelection" />
       <slot name="tools" />
     </div>
+    </Teleport>
     <form
       v-if="linkVisible"
       class="lamanotes-editor-link"
@@ -150,6 +152,7 @@ import {
   ref,
   watch,
 } from "vue";
+import { formulaPreview } from "./formulaPreview.js";
 import FormattingTools from "./FormattingTools.vue";
 import { sharedAnchorRanges } from "../../sharedEntry.js";
 import { formattingEdit, safeEditorLink } from "./formatting.js";
@@ -174,6 +177,9 @@ const props = defineProps({
   structuredPaste: Boolean,
   sessionState: Object,
   formatting: { type: Boolean, default: true },
+  formatToolbarTarget: String,
+  hideFormatToolbar: Boolean,
+  previewFormulas: Boolean,
   prose: Boolean,
   hideShareAnchors: Boolean,
 });
@@ -585,6 +591,7 @@ function editorExtensions() {
     ]),
     languageCompartment.of(immediateLanguageExtension()),
     wrappingCompartment.of(wrappingExtension()),
+    ...(props.previewFormulas ? [formulaPreview] : []),
     sourceTheme,
     syntaxHighlighting(sourceHighlightStyle),
     attributesCompartment.of(contentAttributes()),
@@ -1142,10 +1149,20 @@ function isWysiwygMode() {
 onMounted(() => {
   const saved = props.sessionState?.snapshot;
   const config = { doc: initialContent(), extensions: editorExtensions() };
-  const state =
-    saved?.state?.doc === initialContent()
+  const restoreCellEdits = saved && props.sessionState?.previewResult === config.doc;
+  let state =
+    saved?.state?.doc === config.doc || restoreCellEdits
       ? EditorState.fromJSON(saved.state, config, { history: historyField })
       : EditorState.create(config);
+  if (restoreCellEdits) {
+    for (const changes of props.sessionState.previewEdits) {
+      state = state.update({ changes, annotations: isolateHistory.of("full") }).state;
+    }
+  }
+  if (props.sessionState) {
+    delete props.sessionState.previewEdits;
+    delete props.sessionState.previewResult;
+  }
   editorView = new EditorView({
     state,
     parent: editorHost.value,
@@ -1247,6 +1264,15 @@ defineExpose({
 });
 </script>
 
+<style>
+.cm-editor:not(.cm-focused) .cm-tooltip.lamanotes-formula-preview,
+.cm-tooltip.lamanotes-formula-preview[hidden] { display: none; }
+.cm-tooltip.lamanotes-formula-preview {
+  border: 1px solid rgb(var(--theme-border)); border-radius: 4px;
+  background-color: rgb(var(--theme-background-elevated)); color: rgb(var(--theme-text));
+  max-width: 95vw; overflow: auto; padding: 0.3rem 0.55rem; pointer-events: none;
+}
+</style>
 <style scoped>
 .lamanotes-source-editor-shell {
   position: relative;

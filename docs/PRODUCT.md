@@ -82,7 +82,12 @@ responsive rules and anti-patterns for every host and note type.
 Local text/Markdown, Work notes and HTML articles share the compact source
 editor and formatting actions. Bold, italic, smaller text, lists, checklists,
 links and code act on the current selection. Ctrl+B, Ctrl+I and Ctrl+K work in
-all three editors. Reading and editing remain separate views.
+all three editors. Reading and editing remain separate views. In a local Markdown file, the Windows
+document header contains the formatting controls. Plain text has no formatting
+row. An inline dollar-delimited formula at the caret is typeset below its line.
+Markdown preview preserves leading fields, including free-form project metadata.
+Click a table cell, or focus it and press Enter, to edit its source. Enter commits
+the cell to the local draft, Escape cancels it and Ctrl+S writes the file.
 
 Switching to reading and back retains selection, scroll and undo while the
 same document remains open. Double-clicking an unambiguous paragraph starts

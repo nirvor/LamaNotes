@@ -227,7 +227,7 @@ test("all routes share stable global toolbar anchors and a row-based menu", () =
   const menuIndex = navBarSource.indexOf("<!-- Menu -->");
   assert.ok(actionsIndex >= 0 && actionsIndex < homeIndex);
   assert.ok(homeIndex < menuIndex);
-  assert.match(navBarSource, /label: "New Note"[\s\S]*?command: createNewNote/);
+  assert.match(navBarSource, /label: isDesktopHost\(\) \? "New local file" : "New Library note"[\s\S]*?command: createNewNote/);
   assert.doesNotMatch(navBarSource, /New Window|openNewWindow|mdilPlusBox/);
   assert.doesNotMatch(navBarSource, /<!-- New Note -->/);
   assert.match(navBarSource, /label: "Toggle theme"/);

@@ -9,6 +9,7 @@ import {
 } from "../clipboard.js";
 
 const ignoredEditTriggerSelector = [
+  "[data-ln-cell]",
   "a",
   "button",
   "input",
